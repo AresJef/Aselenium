@@ -41,9 +41,12 @@ class Alert:
 
     # Properties --------------------------------------------------------------------------
     @property
-    async def text(self) -> str:
+    async def text(self) -> str | None:
         """Access the text of the alert `<str>`."""
-        res = await self._session.execute_command(Command.W3C_GET_ALERT_TEXT)
+        try:
+            res = await self._session.execute_command(Command.W3C_GET_ALERT_TEXT)
+        except errors.InvalidMethodError:
+            return None
         try:
             return res["value"]
         except KeyError as err:

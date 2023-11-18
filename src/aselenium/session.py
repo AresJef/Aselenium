@@ -3426,7 +3426,7 @@ class ChromiumBaseSession(Session):
         """Access the webdriver service `<ChromiumBaseService>`."""
         return self._service
 
-    # Network -----------------------------------------------------------------------------
+    # Chromium - Network ------------------------------------------------------------------
     @property
     async def network(self) -> Network:
         """Access the network conditions of the current session `<Network>`.
