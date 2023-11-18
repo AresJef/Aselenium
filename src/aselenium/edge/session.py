@@ -1,0 +1,54 @@
+# Licensed to the Software Freedom Conservancy (SFC) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The SFC licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+#   http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+# KIND, either express or implied.  See the License for the
+# specific language governing permissions and limitations
+# under the License.
+
+# -*- coding: UTF-8 -*-
+from aselenium.edge.options import EdgeOptions
+from aselenium.edge.service import EdgeService
+from aselenium.session import ChromiumBaseSession, ChromiumBaseSessionContext
+
+__all__ = ["EdgeSession", "EdgeSessionContext"]
+
+
+# Edge Session ------------------------------------------------------------------------------------
+class EdgeSession(ChromiumBaseSession):
+    """Represents a session of the Edge browser."""
+
+    # Basic -------------------------------------------------------------------------------
+    @property
+    def options(self) -> EdgeOptions:
+        """Access the Edge options `<EdgeOptions>`."""
+        return self._options
+
+    @property
+    def service(self) -> EdgeService:
+        """Access the Edge service `<EdgeService>`."""
+        return self._service
+
+
+class EdgeSessionContext(ChromiumBaseSessionContext):
+    """The context manager for an Edge session."""
+
+    def __init__(self, options: EdgeOptions, service: EdgeService) -> None:
+        """The context manager for an Edge session.
+
+        :param options: `<EdgeOptions>` The browser options.
+        :param service: `<EdgeService>` The browser service.
+        """
+        self._session = EdgeSession(options, service)
+
+    async def __aenter__(self) -> EdgeSession:
+        return await self.start()
