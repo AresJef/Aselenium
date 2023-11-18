@@ -18,6 +18,12 @@
 *.tar
 *.zip
 
+# Build #
+############
+*.egg-info
+/build
+/dist
+
 # Logs and databases #
 ######################
 *.log

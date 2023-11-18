@@ -4,45 +4,8 @@ on:
     types: [published]
 
 jobs:
-  build_wheels:
-    name: Build wheels on ${{matrix.arch}} for ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    env:
-      CIBW_SKIP: "cp27-* cp34-* cp35-* pp27-* cp36-musllinux_aarch64 pp37-manylinux_aarch64 cp36-manylinux_aarch64 *_i686 pp3*"
-    strategy:
-      matrix:
-        os: [ubuntu-22.04, windows-latest, macos-latest]
-        arch: [auto]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          submodules: true
-      - name: Install Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.12'
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v2
-        if: ${{ matrix.arch == 'aarch64' }}
-      - name: Install Build Tools
-        run: |
-          python -m pip install -U pip setuptools wheel
-      - name: Build wheels
-        env:
-          CIBW_ARCHS_MACOS: x86_64 universal2
-          CIBW_ARCHS_LINUX: ${{matrix.arch}}
-        run: |
-          pip wheel -w wheelhouse
-      - name: Upload wheels
-        uses: actions/upload-artifact@v3
-        with:
-          path: ./wheelhouse/*.whl
-          retention-days: 1
-    
-  build_sdist:
-    name: Build source distribution
+  build:
+    name: Build wheels and dists
     runs-on: ubuntu-latest
     env:
       CIBW_SKIP: "cp27-* cp34-* pp27-* cp35-*"
@@ -58,18 +21,18 @@ jobs:
       - name: Install Build Tools
         run: |
           python -m pip install -U pip setuptools build
-      - name: Build sdist
+      - name: Build wheel & sdist
         run: |
-          python -m build --sdist --outdir dist
+          python -m build --outdir dist
       - name: Upload sdist
         uses: actions/upload-artifact@v3
         with:
-          path: dist/*.tar.gz
+          path: dist/*
           retention-days: 1
   
   upload:
     name: Publish
-    needs: [build_wheels, build_sdist]
+    needs: [build]
     runs-on: ubuntu-latest
     steps:
       - name: Download Artifacts
