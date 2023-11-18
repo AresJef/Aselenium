@@ -17,55 +17,55 @@
 
 # -*- coding: UTF-8 -*-
 from typing import Any
-from aselenium.edge.options import EdgeOptions
-from aselenium.edge.service import EdgeService
-from aselenium.edge.session import EdgeSessionContext
-from aselenium.webdriver import ChromiumBaseWebDriver
+from aselenium.safari.options import SafariOptions
+from aselenium.safari.service import SafariService
+from aselenium.safari.session import SafariSessionContext
+from aselenium.webdriver import WebDriver
 
-__all__ = ["Edge"]
+__all__ = ["Safari"]
 
 
-# Edge Webdriver ----------------------------------------------------------------------------------
-class Edge(ChromiumBaseWebDriver):
-    """The webdriver for Edge."""
+# Safari Webdriver --------------------------------------------------------------------------------
+class Safari(WebDriver):
+    """The webdriver for Safari."""
 
     def __init__(
         self,
-        executable: str,
+        executable: str = "/usr/bin/safaridriver",
         service_timeout: int = 10,
         *service_args: Any,
         **service_kwargs: Any
     ) -> None:
-        """The webdriver for Edge.
+        """The webdriver for Safari.
 
-        :param executable: `<str>` The absolute path to the webdriver executable file.
+        :param executable: `<str>` The absolute path to the webdriver executable file. Defaults to `'/usr/bin/safaridriver'`.
         :param service_timeout: `<int/float>` Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
         :param service_args: `<Any>` Additional arguments for the webdriver service.
         :param service_kwargs: `<Any>` Additional keyword arguments for the webdriver service.
         """
         super().__init__(
             executable,
-            EdgeOptions,
-            EdgeService,
+            SafariOptions,
+            SafariService,
             service_timeout,
             *service_args,
             **service_kwargs,
         )
 
     @property
-    def options(self) -> EdgeOptions:
-        """Access the webdriver options for the browser `<EdgeOptions>`."""
+    def options(self) -> SafariOptions:
+        """Access the webdriver options for the browser `<SafariOptions>`."""
         return self._options
 
-    def acquire(self) -> EdgeSessionContext:
-        """Acquire a new browser session `<EdgeSession>`.
+    def acquire(self) -> SafariSessionContext:
+        """Acquire a new browser session `<SafariSession>`.
 
         ### Example:
         >>> async with driver.acquire() as session:
                 await session.load("https://www.google.com")
                 # . some automated tasks
         """
-        return EdgeSessionContext(
+        return SafariSessionContext(
             self._options,
             self._service_cls(
                 self._executable,

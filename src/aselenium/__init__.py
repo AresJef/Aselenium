@@ -37,6 +37,7 @@ from aselenium.webdriver import WebDriver, ChromiumBaseWebDriver
 from aselenium.edge import Edge, EdgeOptions, EdgeService, EdgeSession
 from aselenium.chrome import Chrome, ChromeOptions, ChromeService, ChromeSession
 from aselenium.chromium import Chromium, ChromiumOptions, ChromiumService, ChromiumSession
+from aselenium.safari import Safari, SafariOptions, SafariService, SafariSession
 
 # Errors
 from aselenium.errors import (
@@ -80,9 +81,10 @@ __all__ = [
     "ChromiumBaseSessionContext", "DefaultTimeouts", "DefaultNetworkConditions", 
     "Shadow", "KeyboardKeys", "MouseButtons", "WebDriver", "ChromiumBaseWebDriver",
     # Browser
-    "Edge", "EdgeOptions", "EdgeService", "EdgeSession", "Chrome", "ChromeOptions", 
-    "ChromeService", "ChromeSession", "Chromium", "ChromiumOptions", "ChromiumService", 
-    "ChromiumSession",
+    "Edge", "EdgeOptions", "EdgeService", "EdgeSession", 
+    "Chrome", "ChromeOptions", "ChromeService", "ChromeSession", 
+    "Chromium", "ChromiumOptions", "ChromiumService", "ChromiumSession",
+    "Safari", "SafariOptions", "SafariService", "SafariSession",
     # Errors
     "AseleniumError", "AseleniumTimeout", "WebDriverTimeoutError", "OptionsError", 
     "InvalidOptionsError", "InvalidCapabilitiesError", "InvalidOptionsProxyError", 
@@ -123,5 +125,6 @@ __all__ = [
     Edge, EdgeOptions, EdgeService, EdgeSession, 
     Chrome, ChromeOptions, ChromeService, ChromeSession, 
     Chromium, ChromiumOptions, ChromiumService, ChromiumSession,
+    Safari, SafariOptions, SafariService, SafariSession,
 )  # pyflakes
 # fmt: on

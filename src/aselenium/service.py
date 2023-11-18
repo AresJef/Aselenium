@@ -31,6 +31,7 @@ from aselenium.utils import is_file_exists
 
 __all__ = ["BaseService", "ChromiumBaseService"]
 
+
 # Base Service ------------------------------------------------------------------------------------
 class BaseService:
     """The base class for the webdriver service.
@@ -134,6 +135,20 @@ class BaseService:
         else:
             return self._ping_port(self._port)
 
+    @property
+    def port_args(self) -> list[str]:
+        """Access the part arguments for the service Process constructor.
+        This must be implemented in the subclass.
+
+        Returns:
+        - `["--port=" + str(self.port)]` for the Chromium based webdriver.
+        - `["-p", str(self.port)]` for Safari webdriver.
+        """
+        raise NotImplementedError(
+            "<{}>\nAttribute 'port_args' must be implemented in the "
+            "subclass.".format(self.__class__.__name__)
+        )
+
     def _free_port(self) -> int:
         """(Internal) Acquire a free socket port for the service."""
         sock = None
@@ -194,7 +209,8 @@ class BaseService:
             process = await wait_for(
                 create_subprocess_exec(
                     self._executable,
-                    "--port=%d" % self.port,
+                    *self.port_args,
+                    *self._args,
                     env=self._env,
                     close_fds=self._close_fds,
                     stdout=DEVNULL,
@@ -370,7 +386,9 @@ class BaseService:
     @property
     def started(self) -> bool:
         """Access whether the service is started `<bool>`."""
-        return self.process_running and self.port_connectable and self.session_connectable
+        return (
+            self.process_running and self.port_connectable and self.session_connectable
+        )
 
     async def start(self) -> None:
         """Start the Service."""
@@ -449,3 +467,12 @@ class BaseService:
 # Chromium Base Service ---------------------------------------------------------------------------
 class ChromiumBaseService(BaseService):
     """The base class for the chromium based webdriver service."""
+
+    # Socket ------------------------------------------------------------------------------
+    @property
+    def port_args(self) -> list[str]:
+        """Access the part arguments for the service Process constructor.
+
+        :return `<list[str]>`: `["--port=" + str(self.port)]`
+        """
+        return ["--port=" + str(self.port)]

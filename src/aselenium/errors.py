@@ -45,7 +45,7 @@ class InvalidOptionsError(OptionsError):
     """Exception raised for invalid options."""
 
 
-class InvalidCapabilitiesError(OptionsError):
+class InvalidCapabilitiesError(InvalidOptionsError):
     """Exception raised for invalid capabilities."""
 
 
@@ -57,8 +57,12 @@ class InvalidOptionsArgumentError(InvalidCapabilitiesError):
     """Exception raised for invalid arguments."""
 
 
-class InvalidOptionsExtensionError(OptionsError):
+class InvalidOptionsExtensionError(InvalidOptionsError):
     """Exception raised for invalid extensions."""
+
+
+class UnsupportedOptionsError(InvalidOptionsError):
+    """Exception raised for unsupported options."""
 
 
 # Services
@@ -662,7 +666,10 @@ def error_handler(res: dict[str, Any]) -> None:
             else:
                 message = value.get("message")
         except ValueError:
-            message = res.get("message", value.get("message"))
+            try:
+                message = res.get("message", value.get("message"))
+            except AttributeError:
+                message = str(value)
     else:
         message = res.get("message", value.get("message"))
 

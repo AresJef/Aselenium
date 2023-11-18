@@ -17,7 +17,7 @@
 
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
-from typing import Any, Type
+from typing import Any
 from aselenium.options import BaseOptions, ChromiumBaseOptions
 from aselenium.service import BaseService, ChromiumBaseService
 from aselenium.session import SessionContext, ChromiumBaseSessionContext
@@ -33,8 +33,8 @@ class WebDriver:
     def __init__(
         self,
         executable: str,
-        options_cls: Type[BaseOptions],
-        service_cls: Type[BaseService],
+        options_cls: type[BaseOptions],
+        service_cls: type[BaseService],
         service_timeout: int = 10,
         *service_args: Any,
         **service_kwargs: Any,
@@ -42,8 +42,8 @@ class WebDriver:
         """The webdriver for the browser.
 
         :param executable: `<str>` The absolute path to the webdriver executable file.
-        :param options_cls: `<Type[BaseOptions]>` The options class for the webdriver.
-        :param service_cls: `<Type[BaseService]>` The service class for the webdriver.
+        :param options_cls: `<type[BaseOptions]>` The options class for the webdriver.
+        :param service_cls: `<type[BaseService]>` The service class for the webdriver.
         :param service_timeout: `<int/float>` Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
         :param service_args: `<Any>` Additional arguments for the webdriver service.
         :param service_kwargs: `<Any>` Additional keyword arguments for the webdriver service.
@@ -52,7 +52,7 @@ class WebDriver:
         self._options: BaseOptions = options_cls()
         # Service
         self._executable: str = executable
-        self._service_cls: Type[BaseService] = service_cls
+        self._service_cls: type[BaseService] = service_cls
         self._service_timeout: int = service_timeout
         self._service_args: tuple[Any] = service_args
         self._service_kwargs: dict[str, Any] = service_kwargs
@@ -116,8 +116,8 @@ class ChromiumBaseWebDriver(WebDriver):
         """The webdriver for the Chromium based browser.
 
         :param executable: `<str>` The absolute path to the webdriver executable file.
-        :param options_cls: `<Type[ChromiumBaseOptions]>` The options class for the webdriver.
-        :param service_cls: `<Type[ChromiumBaseService]>` The service class for the webdriver.
+        :param options_cls: `<type[ChromiumBaseOptions]>` The options class for the webdriver.
+        :param service_cls: `<type[ChromiumBaseService]>` The service class for the webdriver.
         :param service_timeout: `<int/float>` Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
         :param service_args: `<Any>` Additional arguments for the webdriver service.
         :param service_kwargs: `<Any>` Additional keyword arguments for the webdriver service.

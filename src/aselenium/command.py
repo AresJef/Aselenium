@@ -121,6 +121,11 @@ class Command:
     # Chromium - DevTools Protocol
     EXECUTE_CDP_COMMAND: str = "executeCdpCommand"
 
+    ### Safari Specific ###
+    SAFARI_GET_PERMISSIONS: str = "safariGetPermissions"
+    SAFARI_SET_PERMISSIONS: str = "safariSetPermissions"
+    SAFARI_ATTACH_DEBUGGER: str = "safariAttachDebugger"
+
     ### Not Implemented ###
     # Session - Delete
     DELETE_SESSION: str = "deleteSession"
@@ -267,4 +272,10 @@ COMMANDS: dict[str, tuple[str, str]] = {
     # Chromium - Application | format: "/session/$sessionId{CMD}"
     Command.LAUNCH_APP: ("POST", "/chromium/launch_app"),
     # fmt : on
+    
+    ### Safari Specific ###
+    # Session | format: "/session/$sessionId{CMD}"
+    Command.SAFARI_GET_PERMISSIONS: ("GET", "/apple/permissions"),
+    Command.SAFARI_SET_PERMISSIONS: ("POST", "/apple/permissions"),
+    Command.SAFARI_ATTACH_DEBUGGER: ("POST", "/apple/attach_debugger"),
 }

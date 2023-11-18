@@ -16,7 +16,6 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any
 from aselenium.service import ChromiumBaseService
 
 __all__ = ["EdgeService"]

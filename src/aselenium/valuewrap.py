@@ -16,7 +16,7 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any, Type, Callable
+from typing import Any, Callable
 from aselenium.element import Element, ELEMENT_KEY
 from aselenium.shadow import Shadow, SHADOWROOT_KEY
 
@@ -66,7 +66,7 @@ def through(value: Any) -> Any:
     return value
 
 
-WARP_MAPPER: dict[Type, Callable] = {
+WARP_MAPPER: dict[type, Callable] = {
     list: warp_list,
     tuple: warp_tuple,
     dict: warp_dict,

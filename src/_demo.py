@@ -1,6 +1,7 @@
 import asyncio
+from aselenium import KeyboardKeys, Session, Proxy
+from aselenium import Chrome, Edge, Chromium, Safari
 from aselenium import ChromiumBaseWebDriver, ChromiumBaseSession
-from aselenium import Chrome, Edge, Chromium, KeyboardKeys, Session, Proxy
 
 
 async def test_proxy() -> None:
@@ -33,12 +34,10 @@ async def test_proxy() -> None:
 
 
 async def test_edge_options() -> None:
-    # Chrome options
+    # Edge options
     print()
-    print(" Chrome Options ".center(80, "-"))
-    driver = Edge(
-        "/Users/jef/Downloads/msedgedriver-mac-arm64/msedgedriver",
-    )
+    print(" Edge Options ".center(80, "-"))
+    driver = Edge("/Users/jef/Downloads/msedgedriver-mac-arm64/msedgedriver")
     # . browser version
     driver.options.browser_version = "119.0.2151.58"
     # . platform name
@@ -92,9 +91,7 @@ async def test_chrome_options() -> None:
     # Chrome options
     print()
     print(" Chrome Options ".center(80, "-"))
-    driver = Chrome(
-        "/Users/jef/Downloads/chromedriver-mac-arm64/chromedriver",
-    )
+    driver = Chrome("/Users/jef/Downloads/chromedriver-mac-arm64/chromedriver")
     # . browser version
     driver.options.browser_version = "119.0.6045.123"
     # . platform name
@@ -143,12 +140,10 @@ async def test_chrome_options() -> None:
 
 
 async def test_chromium_options() -> None:
-    # Chrome options
+    # Chromium options
     print()
-    print(" Chrome Options ".center(80, "-"))
-    driver = Chromium(
-        "/Users/jef/Downloads/chromiumdriver_mac64/chromedriver",
-    )
+    print(" Chromium Options ".center(80, "-"))
+    driver = Chromium("/Users/jef/Downloads/chromiumdriver_mac64/chromedriver")
     # . browser version
     driver.options.browser_version = "119.0.6045.123"
     # . platform name
@@ -196,6 +191,44 @@ async def test_chromium_options() -> None:
     print()
 
 
+async def test_safari_options() -> None:
+    # Safari options
+    print()
+    print(" Safari Options ".center(80, "-"))
+    driver = Safari("/usr/bin/safaridriver")
+    # . browser version
+    driver.options.browser_version = "17.1"
+    # . platform name
+    driver.options.platform_name = "mac"
+    # . accept Insecure Certs
+    driver.options.accept_insecure_certs = True
+    # . page Load Strategy
+    driver.options.page_load_strategy = "eager"
+    # . timeout
+    driver.options.set_timeouts(implicit=5, pageLoad=10)
+    # . strict file interactability
+    driver.options.strict_file_interactability = True
+    # . prompt behavior
+    driver.options.unhandled_prompt_behavior = "dismiss"
+    driver.options.unhandled_prompt_behavior = "dismiss and notify"
+    driver.options.unhandled_prompt_behavior = "accept"
+    driver.options.unhandled_prompt_behavior = "accept and notify"
+    driver.options.unhandled_prompt_behavior = "ignore"
+    # Final options
+    print(driver.options)
+
+    # Test driver
+    async with driver.acquire() as s:
+        print(s)
+        await s.load("https://www.baidu.com")
+        await s.load("https://whatismyipaddress.com/", retry=True)
+        await asyncio.sleep(5)
+
+    # Finished
+    print("-" * 80)
+    print()
+
+
 async def test_cancellation() -> None:
     print()
     print(" Edge Cancellation ".center(80, "-"))
@@ -226,6 +259,19 @@ async def test_cancellation() -> None:
     print()
     print(" Chromium Cancellation ".center(80, "-"))
     task = asyncio.create_task(test_chromium_options())
+    await asyncio.sleep(2)
+    task.cancel()
+    try:
+        await task
+    except asyncio.CancelledError:
+        print("-" * 80)
+        print("Cancelled Successfully")
+    print("-" * 80)
+    print()
+
+    print()
+    print(" Safari Cancellation ".center(80, "-"))
+    task = asyncio.create_task(test_safari_options())
     await asyncio.sleep(2)
     task.cancel()
     try:
@@ -321,17 +367,6 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
-    async def network(s: Session) -> None:
-        print(" Network Commands ".center(80, "-"))
-        # fmt: off
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
-        print("network:", await s.network)
-        print("set_network:", await s.set_network(latency=10, upload_throughput=1000))
-        print("reset_network:", await s.reset_network())
-        # fmt: on
-        print("-" * 80)
-        print()
-
     async def permission(s: Session) -> None:
         print(" Permission Commands ".center(80, "-"))
         # fmt: off
@@ -341,6 +376,10 @@ async def test_driver(browser: str = "chrome") -> None:
         print("set_permission:", await s.set_permission("camera", "denied"))
         print("set_permission:", await s.set_permission("camera", "granted"))
         print("set_permission:", await s.set_permission("camera", "prompt"))
+        try:
+            print("set_permission:", await s.set_permission("getUserMedia", False))
+        except Exception:
+            pass
         # fmt: on
         print("-" * 80)
         print()
@@ -408,14 +447,15 @@ async def test_driver(browser: str = "chrome") -> None:
         # fmt: off
         await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
         rect = await s.window_rect
-        await s.set_window_rect(800, 3000, 0, 0)
+        await s.set_window_rect(800, 900, 0, 0)
         print("scroll_to", await s.scroll_to(1000, 0))
         print("scroll_to_left", await s.scroll_to_left(60, by="pixels"))
         print("scroll_to_right", await s.scroll_to_right(6))
         el1 = await s.find_element("#kw", by="css")  # search input box
         await el1.send("Hello world!", pause=0.5)
-        await s.actions().key_down(KeyboardKeys.ENTER).key_up(KeyboardKeys.ENTER).perform()
-        await asyncio.sleep(1)
+        el2 = await s.find_element("#su", by="css")  # search button
+        await el2.click()
+        await asyncio.sleep(2)
         print("scroll_by", await s.scroll_by(0, 300, pause))
         print("scroll_to", await s.scroll_to(0, 3000, pause))
         print("scroll_to_top", await s.scroll_to_top(500, "pixels"))
@@ -428,6 +468,8 @@ async def test_driver(browser: str = "chrome") -> None:
         print()
 
     async def alert(s: Session) -> None:
+        if browser == "safari":
+            return None
         print(" Alert Commands ".center(80, "-"))
         # fmt: off
         await s.load("https://demo.guru99.com/test/delete_customer.php", timeout=FORCE_TIMEOUT, retry=True)
@@ -438,22 +480,24 @@ async def test_driver(browser: str = "chrome") -> None:
         await el2.click()
         print("alert:", (al := await s.alert))
         print("alert.text:", await al.text)
-        # await asyncio.sleep(1)
+        await asyncio.sleep(1)
         print("alert.dismiss:", await al.dismiss(pause=0.5))
         await el2.click()
         print("alert:", (al := await s.alert))
         print("alert.text:", await al.text)
-        # await asyncio.sleep(1)
+        await asyncio.sleep(1)
         print("alert.accept:", await al.accept(pause=0.5))
         print("alert:", (al := await s.alert))
         print("alert.text:", await al.text)
-        # await asyncio.sleep(1)
+        await asyncio.sleep(1)
         print("alert.accept:", await al.accept(pause=0.5))
         # fmt: on
         print("-" * 80)
         print()
 
     async def frame(s: Session) -> None:
+        if browser == "safari":
+            return None
         print(" Frame Commands ".center(80, "-"))
         # fmt: off
         await s.load("https://web.dev/shadowdom-v1/", timeout=FORCE_TIMEOUT, retry=True)
@@ -461,27 +505,30 @@ async def test_driver(browser: str = "chrome") -> None:
         css = "figure.demoarea > iframe"
         el = await s.find_element(css)
         if el is not None:
-            print("switch_frame (by element):", await s.switch_frame(el))
-            print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
-            print("default_frame:", await s.default_frame())
-            print("default_frame:", await s.default_frame())
-            print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
-            print()
+            print("switch_frame (by element):", switched := await s.switch_frame(el))
+            if switched:
+                print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
+                print("default_frame:", await s.default_frame())
+                print("default_frame:", await s.default_frame())
+                print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
+                print()
 
             # . switch by element locator
-            print("switch_frame (by locator):", await s.switch_frame(css))
-            print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
-            print("parent_frame:", await s.parent_frame())
-            print("parent_frame:", await s.parent_frame())
-            print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
-            print()
+            print("switch_frame (by locator):", switched := await s.switch_frame(css))
+            if switched:
+                print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
+                print("parent_frame:", await s.parent_frame())
+                print("parent_frame:", await s.parent_frame())
+                print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
+                print()
 
             # . switch by index
-            print("switch_frame (by index):", await s.switch_frame(0, by="index"))
-            print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
-            print("default_frame:", await s.default_frame())
-            print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
-            print()
+            print("switch_frame (by index):", switched := await s.switch_frame(0, by="index"))
+            if switched:
+                print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
+                print("default_frame:", await s.default_frame())
+                print("varify: ", (await (await s.find_element("body")).text).replace("\n", " ")[:30])
+                print()
         else:
             print("Test webpage not loaded properly")
         # fmt: on
@@ -574,31 +621,33 @@ async def test_driver(browser: str = "chrome") -> None:
         print("el.find_1st_el_css:", val := await el0.find_1st_element(css3, css1, by="css"), "<-:", el0)
         print("el.find_1st_el_xp:", val := await el0.find_1st_element(xpath3, xpath1, by="xpath"), "<-:", el0)
 
-        el1 = await s.find_element("a[href='http://image.baidu.com/']", by="css")
-        print("el.tag:", await el1.tag, "<-:", el1)
-        print("el.text:", await el1.text, "<-:", el1)
-        print("el.rect:", await el1.rect, "<-:", el1)
+        if browser != "safari":
+            el1 = await s.find_element("a[href='http://image.baidu.com/']", by="css")
+            print("el.tag:", await el1.tag, "<-:", el1)
+            print("el.text:", await el1.text, "<-:", el1)
+            print("el.rect:", await el1.rect, "<-:", el1)
 
-        el2 = await s.find_element("div.title-text.c-color-t", by="css")
-        print("el.aria_role:", await el2.aria_role, "<-:", el2)
-        print("el.aria_label:", await el2.aria_label, "<-:", el2)
-        print("el.properties:", await el2.properties, "<-:", el2)
-        print("el.get_property:", await el2.get_property("clientHeight"), "<-:", el2)
-        print("el.css_properties:", await el2.properties_css, "<-:", el2)
-        print("el.get_css_property:", await el2.get_property_css("cursor"), "<-:", el2)
-        print("el.attributes:", await el2.attributes, "<-:", el2)
-        print("el.get_attribute_dom:", await el2.get_attribute_dom("class"), "<-:", el2)
+            el2 = await s.find_element("div.title-text.c-color-t", by="css")
+            print("el.aria_role:", await el2.aria_role, "<-:", el2)
+            print("el.aria_label:", await el2.aria_label, "<-:", el2)
+            print("el.properties:", await el2.properties, "<-:", el2)
+            print("el.get_property:", await el2.get_property("clientHeight"), "<-:", el2)
+            print("el.css_properties:", await el2.properties_css, "<-:", el2)
+            print("el.get_css_property:", await el2.get_property_css("cursor"), "<-:", el2)
+            print("el.attributes:", await el2.attributes, "<-:", el2)
+            print("el.get_attribute:", await el2.get_attribute("class"), "<-:", el2)
+            print("el.get_attribute_dom:", await el2.get_attribute_dom("class"), "<-:", el2)
 
-        el3 = await s.find_element(css3, by="css")
-        print("el.take_screenshot", await el3.take_screenshot(), "<-:", el3)
-        # print("el.save_screenshot", await el3.save_screenshot(image), "<-:", el3)
+            el3 = await s.find_element(css3, by="css")
+            print("el.take_screenshot", await el3.take_screenshot(), "<-:", el3)
+            # print("el.save_screenshot", await el3.save_screenshot(image), "<-:", el3)
 
-        el4 = await s.find_element("#form", by="css")
-        xpath = xpath3
-        print("el.find_el_css:", await el4.find_element(css3, by="css"), "<-:", el4)
-        print("el.find_el_xp:", await el4.find_element(xpath, by="xpath"), "<-:", el4)
-        print("el.find_els_css:", await el4.find_elements(css3, by="css"), "<-:", el4)
-        print("el.find_els_xp:", await el4.find_elements(xpath, by="xpath"), "<-:", el4)
+            el4 = await s.find_element("#form", by="css")
+            xpath = xpath3
+            print("el.find_el_css:", await el4.find_element(css3, by="css"), "<-:", el4)
+            print("el.find_el_xp:", await el4.find_element(xpath, by="xpath"), "<-:", el4)
+            print("el.find_els_css:", await el4.find_elements(css3, by="css"), "<-:", el4)
+            print("el.find_els_xp:", await el4.find_elements(xpath, by="xpath"), "<-:", el4)
 
         # Control
         await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
@@ -644,6 +693,8 @@ async def test_driver(browser: str = "chrome") -> None:
         print()
 
     async def shadow(s: Session) -> None:
+        if browser == "safari":
+            return None
         print(" Shadow Commands ".center(80, "-"))
         # fmt: off
         await s.load("https://www.htmlelements.com/demos/menu/shadow-dom/index.htm", timeout=FORCE_TIMEOUT, retry=True)
@@ -711,9 +762,10 @@ async def test_driver(browser: str = "chrome") -> None:
         print()
 
     async def actions(s: Session) -> None:
+        if browser == "safari":
+            return None
         print(" Actions Commands ".center(80, "-"))
         # fmt: off
-
         await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
         print("image button:", el1 := await s.find_element("span.soutu-btn"))
         print("image button rect:", rect1 := await el1.rect)
@@ -805,6 +857,8 @@ async def test_driver(browser: str = "chrome") -> None:
         print()
 
     async def logs(s: Session) -> None:
+        if browser == "safari":
+            return None
         print(" Logs Commands ".center(80, "-"))
         await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
         print("logs:", await s.log_types)
@@ -814,7 +868,22 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
+    async def network(s: Session) -> None:
+        if browser not in ("chrome", "edge", "chromium"):
+            return None
+        print(" Network Commands ".center(80, "-"))
+        # fmt: off
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        print("network:", await s.network)
+        print("set_network:", await s.set_network(latency=10, upload_throughput=1000))
+        print("reset_network:", await s.reset_network())
+        # fmt: on
+        print("-" * 80)
+        print()
+
     async def chromium_casting(s: ChromiumBaseSession) -> None:
+        if browser not in ("chrome", "edge", "chromium"):
+            return None
         print(" Chromium Casting Commands ".center(80, "-"))
         # fmt: off
         await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
@@ -828,6 +897,8 @@ async def test_driver(browser: str = "chrome") -> None:
         print()
 
     async def chromium_cdp_cmds(s: ChromiumBaseSession) -> None:
+        if browser not in ("chrome", "edge", "chromium"):
+            return None
         print(" Chromium DevTools Protocol Commands ".center(80, "-"))
         # fmt: off
         await s.load("https://www.baidu.com/", timeout=FORCE_TIMEOUT, retry=True)
@@ -861,6 +932,8 @@ async def test_driver(browser: str = "chrome") -> None:
         driver = Chrome("/Users/jef/Downloads/chromedriver-mac-arm64/chromedriver")
     elif browser == "chromium":
         driver = Chromium("/Users/jef/Downloads/chromiumdriver_mac64/chromedriver")
+    elif browser == "safari":
+        driver = Safari("/usr/bin/safaridriver")
     else:
         raise ValueError(f"Browser not supported: '{browser}'")
     # fmt: on
@@ -883,8 +956,6 @@ async def test_driver(browser: str = "chrome") -> None:
         await timeouts(s)
         # Cookie commands
         await cookies(s)
-        # Network commands
-        await network(s)
         # Permission commands
         await permission(s)
         # Window commands
@@ -894,7 +965,7 @@ async def test_driver(browser: str = "chrome") -> None:
         # Alert commands
         await alert(s)
         # Frame commands
-        # await frame(s)
+        await frame(s)
         # Element commands
         await element(s)
         # Shadow commands
@@ -905,12 +976,12 @@ async def test_driver(browser: str = "chrome") -> None:
         await actions(s)
         # Logs commands
         await logs(s)
-        # Chromium special commands
-        if isinstance(driver, ChromiumBaseWebDriver):
-            # Casting commands
-            await chromium_casting(s)
-            # DevTools commands
-            await chromium_cdp_cmds(s)
+        # Network commands
+        await network(s)
+        # Casting commands
+        await chromium_casting(s)
+        # DevTools commands
+        await chromium_cdp_cmds(s)
 
         # Ended
         await asyncio.sleep(5)
@@ -921,7 +992,9 @@ if __name__ == "__main__":
     asyncio.run(test_edge_options())
     asyncio.run(test_chrome_options())
     asyncio.run(test_chromium_options())
+    asyncio.run(test_safari_options())
     asyncio.run(test_cancellation())
     asyncio.run(test_driver("edge"))
     asyncio.run(test_driver("chrome"))
     asyncio.run(test_driver("chromium"))
+    asyncio.run(test_driver("safari"))

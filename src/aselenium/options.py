@@ -620,9 +620,6 @@ class BaseOptions:
     - `DEFAULT_CAPABILITIES`: `dict[str, Any]` Class attribute that
        contains the default capabilities of the target browser.
 
-    - `VENDOR_PREFIX`: `str` Class attribute that corresponds to the
-       unique vendor prefix for the target browser. e.g. `moz`, `goog`.
-
     - `construct()`: class instance method, which complete the final
        capabilities for the browser.
     """
@@ -638,9 +635,6 @@ class BaseOptions:
         Each subclass of `Options` must implement the following:
         - `DEFAULT_CAPABILITIES`: `dict[str, Any]` Class attribute that
            contains the default capabilities of the target browser.
-
-        - `VENDOR_PREFIX`: `str` Class attribute that corresponds to the
-           unique vendor prefix for the target browser. e.g. `moz`, `goog`.
 
         - `construct()`: class instance method, which complete the final
            capabilities for the browser.
@@ -665,13 +659,6 @@ class BaseOptions:
         """
         self.__caps: dict[str, Any] = {}
         "The final browser capabilities."
-        # Vendor Prefix
-        if not isinstance(self.VENDOR_PREFIX, str) or not self.VENDOR_PREFIX:
-            raise errors.InvalidOptionsError(
-                f"<{self.__class__.__name__}>\nmust define its "
-                "own class attribute: `VENDOR_PREFIX`. For more "
-                "information, please refer to class docs."
-            )
         # Arguments
         self._arguments: list[str] = []
         # Proxy
@@ -1094,6 +1081,13 @@ class ChromiumBaseOptions(BaseOptions):
            capabilities for the browser.
         """
         super().__init__()
+        # Vendor Prefix
+        if not isinstance(self.VENDOR_PREFIX, str) or not self.VENDOR_PREFIX:
+            raise errors.InvalidOptionsError(
+                f"<{self.__class__.__name__}>\nmust define its "
+                "own class attribute: `VENDOR_PREFIX`. For more "
+                "information, please refer to class docs."
+            )
         # Brwoser Key
         if not isinstance(self.KEY, str) or not self.KEY:
             raise errors.InvalidOptionsError(

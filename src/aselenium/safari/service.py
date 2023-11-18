@@ -16,11 +16,20 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from aselenium.service import ChromiumBaseService
+from aselenium.service import BaseService
 
-__all__ = ["ChromiumService"]
+__all__ = ["SafariService"]
 
 
-# Chromium Service --------------------------------------------------------------------------------
-class ChromiumService(ChromiumBaseService):
-    "Chromium Service"
+# Safari Service ----------------------------------------------------------------------------------
+class SafariService(BaseService):
+    "Safari Service"
+
+    # Socket ------------------------------------------------------------------------------
+    @property
+    def port_args(self) -> list[str]:
+        """Access the part arguments for the service Process constructor.
+
+        :return `<list[str]>`: `["-p", str(self.port)]`
+        """
+        return ["-p", str(self.port)]

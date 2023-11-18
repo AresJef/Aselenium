@@ -145,6 +145,8 @@ class Element:
             )
         except errors.ElementNotFoundError:
             return False
+        except errors.InvalidMethodError:
+            return False
         except errors.InvalidScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to check element existance: {}".format(
@@ -164,6 +166,8 @@ class Element:
                 javascript.ELEMENT_IS_VISIBLE, self
             )
         except errors.ElementNotFoundError:
+            return False
+        except errors.InvalidMethodError:
             return False
         except errors.InvalidScriptError as err:
             raise errors.InvalidResponseError(
@@ -185,6 +189,8 @@ class Element:
             )
         except errors.ElementNotFoundError:
             return False
+        except errors.InvalidMethodError:
+            return False
         except errors.InvalidScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to check element viewability: {}".format(
@@ -198,6 +204,8 @@ class Element:
         try:
             res = await self.execute_command(Command.IS_ELEMENT_ENABLED)
         except errors.ElementNotFoundError:
+            return False
+        except errors.InvalidMethodError:
             return False
         try:
             return res["value"]
@@ -216,6 +224,8 @@ class Element:
         try:
             res = await self.execute_command(Command.IS_ELEMENT_SELECTED)
         except errors.ElementNotFoundError:
+            return False
+        except errors.InvalidMethodError:
             return False
         try:
             return res["value"]
@@ -342,6 +352,8 @@ class Element:
             return False
         except errors.ElementNotFoundError:
             return False
+        except errors.InvalidMethodError:
+            return False
 
     async def scroll_into_view(self, timeout: int | float = 5) -> bool:
         """Scroll the viewport to the element location.
@@ -405,9 +417,12 @@ class Element:
 
     # Information -------------------------------------------------------------------------
     @property
-    async def tag(self) -> str:
+    async def tag(self) -> str | None:
         """Access the tag name of the element `<str>`."""
-        res = await self.execute_command(Command.GET_ELEMENT_TAG_NAME)
+        try:
+            res = await self.execute_command(Command.GET_ELEMENT_TAG_NAME)
+        except errors.InvalidMethodError:
+            return None
         try:
             return res["value"]
         except KeyError as err:
@@ -417,9 +432,12 @@ class Element:
             ) from err
 
     @property
-    async def text(self) -> str:
+    async def text(self) -> str | None:
         """Access the text of the element `<str>`."""
-        res = await self.execute_command(Command.GET_ELEMENT_TEXT)
+        try:
+            res = await self.execute_command(Command.GET_ELEMENT_TEXT)
+        except errors.InvalidMethodError:
+            return None
         try:
             return res["value"]
         except KeyError as err:
@@ -429,14 +447,17 @@ class Element:
             ) from err
 
     @property
-    async def rect(self) -> ElementRect:
+    async def rect(self) -> ElementRect | None:
         """Access the size and relative position of the element `<ElementRect>`.
 
         ### Example:
         >>> rect = await element.rect
             # <ElementRect (width=100, height=100, x=22, y=60)>
         """
-        res = await self.execute_command(Command.GET_ELEMENT_RECT)
+        try:
+            res = await self.execute_command(Command.GET_ELEMENT_RECT)
+        except errors.InvalidMethodError:
+            return None
         try:
             return ElementRect(**res["value"])
         except KeyError as err:
@@ -452,9 +473,12 @@ class Element:
             ) from err
 
     @property
-    async def aria_role(self) -> str:
+    async def aria_role(self) -> str | None:
         """Acess the aria role of the element `<str>`."""
-        res = await self.execute_command(Command.GET_ELEMENT_ARIA_ROLE)
+        try:
+            res = await self.execute_command(Command.GET_ELEMENT_ARIA_ROLE)
+        except errors.InvalidMethodError:
+            return None
         try:
             return res["value"]
         except KeyError as err:
@@ -464,9 +488,12 @@ class Element:
             ) from err
 
     @property
-    async def aria_label(self) -> str:
+    async def aria_label(self) -> str | None:
         """Access the aria label of the element `<str>`."""
-        res = await self.execute_command(Command.GET_ELEMENT_ARIA_LABEL)
+        try:
+            res = await self.execute_command(Command.GET_ELEMENT_ARIA_LABEL)
+        except errors.InvalidMethodError:
+            return None
         try:
             return res["value"]
         except KeyError as err:
@@ -487,6 +514,8 @@ class Element:
             return await self._session._execute_script(
                 javascript.GET_ELEMENT_PROPERTIES, self
             )
+        except errors.InvalidMethodError:
+            return []
         except errors.InvalidScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to get element properties: {}".format(
@@ -497,16 +526,19 @@ class Element:
     async def get_property(
         self,
         name: str,
-    ) -> str | int | float | bool | list | dict | Element:
+    ) -> str | int | float | bool | list | dict | Element | None:
         """Get the property of the element by name.
 
         :param name: `<str>` Name of the property from the element.
         :return `<Any>`: The property value. If the property is an element, returns <class 'Element'>.
         """
         # Get property
-        res = await self.execute_command(
-            Command.GET_ELEMENT_PROPERTY, keys={"name": name}
-        )
+        try:
+            res = await self.execute_command(
+                Command.GET_ELEMENT_PROPERTY, keys={"name": name}
+            )
+        except errors.InvalidMethodError:
+            return None
         try:
             val = res["value"]
         except KeyError as err:
@@ -534,6 +566,8 @@ class Element:
             return await self._session._execute_script(
                 javascript.GET_ELEMENT_CSS_PROPERTIES, self
             )
+        except errors.InvalidMethodError:
+            return {}
         except errors.InvalidScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to get element css properties: {}".format(
@@ -541,7 +575,7 @@ class Element:
                 )
             ) from err
 
-    async def get_property_css(self, name: str) -> str:
+    async def get_property_css(self, name: str) -> str | None:
         """Get the css (style) property of the element by name.
 
         :param name: `<str>` Name of the css property from the element.
@@ -550,9 +584,12 @@ class Element:
         ### Example:
         >>> css_prop = await element.get_css_property("align-content")  # "normal"
         """
-        res = await self.execute_command(
-            Command.GET_ELEMENT_VALUE_OF_CSS_PROPERTY, keys={"propertyName": name}
-        )
+        try:
+            res = await self.execute_command(
+                Command.GET_ELEMENT_VALUE_OF_CSS_PROPERTY, keys={"propertyName": name}
+            )
+        except errors.InvalidMethodError:
+            return None
         try:
             return res["value"]
         except KeyError as err:
@@ -573,6 +610,8 @@ class Element:
             return await self._session._execute_script(
                 javascript.GET_ELEMENT_ATTRIBUTES, self
             )
+        except errors.InvalidMethodError:
+            return {}
         except errors.InvalidScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to get element attributes: {}".format(
@@ -580,7 +619,7 @@ class Element:
                 )
             ) from err
 
-    async def get_attribute(self, name: str) -> str:
+    async def get_attribute(self, name: str) -> str | None:
         """Get the latest attribute value.
 
         If the attribute's value has been changed after the page loaded,
@@ -597,6 +636,8 @@ class Element:
             return await self._session._execute_script(
                 javascript.GET_ELEMENT_ATTRIBUTES, self, name
             )
+        except errors.InvalidMethodError:
+            return None
         except errors.InvalidScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to get element attribute: {}".format(
@@ -604,7 +645,7 @@ class Element:
                 )
             ) from err
 
-    async def get_attribute_dom(self, name: str) -> str:
+    async def get_attribute_dom(self, name: str) -> str | None:
         """Get the attribute's initial value from the DOM tree.
 
         This method ignores any changes made after the page loaded.
@@ -618,9 +659,12 @@ class Element:
         >>> attr = await element.get_attribute_dom("#input")
             # "please enter password"
         """
-        res = await self.execute_command(
-            Command.GET_ELEMENT_ATTRIBUTE, keys={"name": name}
-        )
+        try:
+            res = await self.execute_command(
+                Command.GET_ELEMENT_ATTRIBUTE, keys={"name": name}
+            )
+        except errors.InvalidMethodError:
+            return None
         try:
             return res["value"]
         except KeyError as err:
@@ -629,9 +673,12 @@ class Element:
                 "response: {}".format(self.__class__.__name__, res)
             ) from err
 
-    async def take_screenshot(self) -> bytes:
+    async def take_screenshot(self) -> bytes | None:
         """Take a screenshot of the element `<bytes>`."""
-        res = await self.execute_command(Command.ELEMENT_SCREENSHOT)
+        try:
+            res = await self.execute_command(Command.ELEMENT_SCREENSHOT)
+        except errors.InvalidMethodError:
+            return None
         try:
             return self._session._decode_base64(res["value"])
         except KeyError as err:
@@ -853,6 +900,8 @@ class Element:
         try:
             res = await self.execute_command(Command.GET_SHADOW_ROOT)
         except errors.ShadowRootNotFoundError:
+            return None
+        except errors.InvalidMethodError:
             return None
         # Create shadow root
         try:

@@ -1547,108 +1547,6 @@ class Session:
                 "<{}>\nInvalid cookie: {}".format(self.__class__.__name__, cookie)
             ) from err
 
-    # Network -----------------------------------------------------------------------------
-    @property
-    async def network(self) -> Network:
-        """Access the network conditions of the current session `<Network>`.
-
-        ### Conditions explain:
-
-        - offline: Whether to simulate an offline network condition.
-        - latency: The minimum latency overhead.
-        - upload_throughput: The maximum upload throughput in bytes per second.
-        - download_throughput: The maximum download throughput in bytes per second.
-
-        ### Default conditions:
-        <Network (offline=False, latency=0, upload_throughput=-1, download_throughput=-1)>
-
-        ### Example:
-        >>> network = await session.network
-            # <Network (offline=False, latency=30, upload_throughput=-1, download_throughput=-1)>
-        """
-        # Request condition
-        try:
-            res = await self.execute_command(Command.GET_NETWORK_CONDITIONS)
-        except errors.UnknownError as err:
-            if ErrorCode.NETWORK_CONDITIONS_NOT_SET in str(err):
-                return Network()  # exit: default conditions
-            raise err
-        # Contruct condition
-        try:
-            return Network(**res["value"])
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse network conditions from "
-                "response: {}".format(self.__class__.__name__, res)
-            ) from err
-        except Exception as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nInvalid network conditions response: "
-                "{}".format(self.__class__.__name__, res["value"])
-            ) from err
-
-    async def set_network(
-        self,
-        offline: bool | None = None,
-        latency: int | None = None,
-        upload_throughput: int | None = None,
-        download_throughput: int | None = None,
-    ) -> Network:
-        """Set the network conditions of the current session.
-
-        :param offline: `<bool/None>` Whether to simulate an offline network
-        condition. If `None (default)`, keep the current offline condition.
-
-        :param latency: `<int/None>` The minimum latency overhead in milliseconds.
-        If `None (default)`, keep the current latency condition.
-
-        :param upload_throughput: `<int/None>` The maximum upload throughput
-        in bytes per second. If `None (default)`, keep the current condition.
-
-        :param download_throughput: `<int/None>` The maximum download throughput
-        in bytes per second. If `None (default)`, keep the current condition.
-
-        :return `<Network>`: The network conditions after update.
-
-        ### Example:
-        >>> network = await session.set_network(
-                offline=False, latency=10, download=10 * 1024, upload=10 * 1024,
-            )
-            # <Network (offline=False, latency=10, download=10240, upload=10240)>
-        """
-        # Update conditions
-        network = await self.network
-        if offline is not None:
-            network.offline = offline
-        if latency is not None:
-            network.latency = latency
-        if upload_throughput is not None:
-            network.upload_throughput = upload_throughput
-        if download_throughput is not None:
-            network.download_throughput = download_throughput
-        await self.execute_command(
-            Command.SET_NETWORK_CONDITIONS, body={"network_conditions": network.dict}
-        )
-        # Return conditions
-        return await self.network
-
-    async def reset_network(self) -> Network:
-        """Reset the network conditions of the current session to
-        the default configuration, and returns the reset `<Network>`.
-
-        ### Default conditions:
-        <Network (offline=False, latency=0, upload_throughput=-1, download_throughput=-1)>
-
-        ### Example:
-        >>> network = await session.reset_network()
-            # <Network (offline=False, latency=0, upload_throughput=-1, download_throughput=-1)>
-        """
-        await self.execute_command(
-            Command.SET_NETWORK_CONDITIONS,
-            body={"network_conditions": Network().dict},
-        )
-        return await self.network
-
     # Permission --------------------------------------------------------------------------
     @property
     async def permissions(self) -> list[Permission]:
@@ -3527,6 +3425,108 @@ class ChromiumBaseSession(Session):
     def service(self) -> ChromiumBaseService:
         """Access the webdriver service `<ChromiumBaseService>`."""
         return self._service
+
+    # Network -----------------------------------------------------------------------------
+    @property
+    async def network(self) -> Network:
+        """Access the network conditions of the current session `<Network>`.
+
+        ### Conditions explain:
+
+        - offline: Whether to simulate an offline network condition.
+        - latency: The minimum latency overhead.
+        - upload_throughput: The maximum upload throughput in bytes per second.
+        - download_throughput: The maximum download throughput in bytes per second.
+
+        ### Default conditions:
+        <Network (offline=False, latency=0, upload_throughput=-1, download_throughput=-1)>
+
+        ### Example:
+        >>> network = await session.network
+            # <Network (offline=False, latency=30, upload_throughput=-1, download_throughput=-1)>
+        """
+        # Request condition
+        try:
+            res = await self.execute_command(Command.GET_NETWORK_CONDITIONS)
+        except errors.UnknownError as err:
+            if ErrorCode.NETWORK_CONDITIONS_NOT_SET in str(err):
+                return Network()  # exit: default conditions
+            raise err
+        # Contruct condition
+        try:
+            return Network(**res["value"])
+        except KeyError as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nFailed to parse network conditions from "
+                "response: {}".format(self.__class__.__name__, res)
+            ) from err
+        except Exception as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nInvalid network conditions response: "
+                "{}".format(self.__class__.__name__, res["value"])
+            ) from err
+
+    async def set_network(
+        self,
+        offline: bool | None = None,
+        latency: int | None = None,
+        upload_throughput: int | None = None,
+        download_throughput: int | None = None,
+    ) -> Network:
+        """Set the network conditions of the current session.
+
+        :param offline: `<bool/None>` Whether to simulate an offline network
+        condition. If `None (default)`, keep the current offline condition.
+
+        :param latency: `<int/None>` The minimum latency overhead in milliseconds.
+        If `None (default)`, keep the current latency condition.
+
+        :param upload_throughput: `<int/None>` The maximum upload throughput
+        in bytes per second. If `None (default)`, keep the current condition.
+
+        :param download_throughput: `<int/None>` The maximum download throughput
+        in bytes per second. If `None (default)`, keep the current condition.
+
+        :return `<Network>`: The network conditions after update.
+
+        ### Example:
+        >>> network = await session.set_network(
+                offline=False, latency=10, download=10 * 1024, upload=10 * 1024,
+            )
+            # <Network (offline=False, latency=10, download=10240, upload=10240)>
+        """
+        # Update conditions
+        network = await self.network
+        if offline is not None:
+            network.offline = offline
+        if latency is not None:
+            network.latency = latency
+        if upload_throughput is not None:
+            network.upload_throughput = upload_throughput
+        if download_throughput is not None:
+            network.download_throughput = download_throughput
+        await self.execute_command(
+            Command.SET_NETWORK_CONDITIONS, body={"network_conditions": network.dict}
+        )
+        # Return conditions
+        return await self.network
+
+    async def reset_network(self) -> Network:
+        """Reset the network conditions of the current session to
+        the default configuration, and returns the reset `<Network>`.
+
+        ### Default conditions:
+        <Network (offline=False, latency=0, upload_throughput=-1, download_throughput=-1)>
+
+        ### Example:
+        >>> network = await session.reset_network()
+            # <Network (offline=False, latency=0, upload_throughput=-1, download_throughput=-1)>
+        """
+        await self.execute_command(
+            Command.SET_NETWORK_CONDITIONS,
+            body={"network_conditions": Network().dict},
+        )
+        return await self.network
 
     # Chromium - Casting ------------------------------------------------------------------
     @property

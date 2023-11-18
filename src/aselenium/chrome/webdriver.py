@@ -22,6 +22,8 @@ from aselenium.chrome.service import ChromeService
 from aselenium.chrome.session import ChromeSessionContext
 from aselenium.webdriver import ChromiumBaseWebDriver
 
+__all__ = ["Chrome"]
+
 
 # Chrome Webdriver --------------------------------------------------------------------------------
 class Chrome(ChromiumBaseWebDriver):
