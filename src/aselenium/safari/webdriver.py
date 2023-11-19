@@ -17,6 +17,7 @@
 
 # -*- coding: UTF-8 -*-
 from typing import Any
+from platform import system
 from aselenium.safari.options import SafariOptions
 from aselenium.safari.service import SafariService
 from aselenium.safari.session import SafariSessionContext
@@ -43,6 +44,11 @@ class Safari(WebDriver):
         :param service_args: `<Any>` Additional arguments for the webdriver service.
         :param service_kwargs: `<Any>` Additional keyword arguments for the webdriver service.
         """
+        if system() != "Darwin":
+            raise OSError(
+                "<{}> The webdriver for Safari is only supported on macOS, but "
+                "not the current system: '{}'".format(self.__class__.__name__, system())
+            )
         super().__init__(
             executable,
             SafariOptions,

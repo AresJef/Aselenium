@@ -32,4 +32,4 @@ class SafariService(BaseService):
 
         :return `<list[str]>`: `["-p", str(self.port)]`
         """
-        return ["-p", str(self.port)]
+        return ["-p", self.port_str]

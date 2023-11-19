@@ -69,6 +69,7 @@ class BaseService:
         self._creation_flags: int = self._kwargs.pop("creation_flags", 0)
         self._close_fds: bool = self._kwargs.pop("close_fds", system() != "Windows")
         self._port: int = -1
+        self._port_str: str = None
         self._env: Any = environ
         self._process: Process | None = None
         # Session
@@ -123,7 +124,15 @@ class BaseService:
                 port = self._free_port()
             self.__PORTS.add(port)
             self._port = port
+            self._port_str = str(port)
         return self._port
+
+    @property
+    def port_str(self) -> str:
+        """Access the socket port of the service in string format `<str>`."""
+        if self._port == -1:
+            self.port
+        return self._port_str
 
     @property
     def port_connectable(self) -> bool:
@@ -187,6 +196,7 @@ class BaseService:
         except KeyError:
             pass
         self._port = -1
+        self._port_str = None
         self._url = None
 
     # Process -----------------------------------------------------------------------------
@@ -380,7 +390,7 @@ class BaseService:
     def url(self) -> str:
         """Access the base url of the Service `<str>`."""
         if self._url is None:
-            self._url = "http://localhost:%d" % self.port
+            self._url = "http://localhost:" + self.port_str
         return self._url
 
     @property
@@ -473,6 +483,6 @@ class ChromiumBaseService(BaseService):
     def port_args(self) -> list[str]:
         """Access the part arguments for the service Process constructor.
 
-        :return `<list[str]>`: `["--port=" + str(self.port)]`
+        :return `<list[str]>`: `["--port=" + self.port_str]`
         """
-        return ["--port=" + str(self.port)]
+        return ["--port=" + self.port_str]
