@@ -18,7 +18,6 @@
 # -*- coding: UTF-8 -*-
 from typing import Any
 from copy import deepcopy
-from aselenium import errors
 from aselenium.logs import logger
 from aselenium.options import BaseOptions
 
@@ -33,6 +32,7 @@ class SafariOptions(BaseOptions):
         "browserName": "safari",
         "platformName": "mac",
     }
+    "the default capabilities of the safari browser `dict[str, Any]`"
 
     def __init__(self) -> None:
         super().__init__()

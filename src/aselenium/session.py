@@ -737,18 +737,21 @@ class Session:
         try:
             cancelled = False
             exceptions = []
+
             # . stop session
-            try:
-                while True:
-                    try:
-                        await self.execute_command(Command.QUIT)
+            while True:
+                try:
+                    await self.execute_command(Command.QUIT)
+                    break
+                except CancelledError:
+                    cancelled = True
+                except errors.SessionClientError:
+                    if not self._service.started:
                         break
-                    except CancelledError:
-                        cancelled = True
-            except errors.SessionClientError:
-                pass
-            except Exception as err:
-                exceptions.append(str(err))
+                except Exception as err:
+                    exceptions.append(str(err))
+                    break
+
             # . stop service
             try:
                 await self._service.stop()

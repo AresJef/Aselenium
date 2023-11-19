@@ -64,7 +64,7 @@ class BaseService:
         # Timeout
         self.timeout = timeout
         # Process
-        self._args: tuple[Any] = args
+        self._args: list[Any] = list(args)
         self._kwargs: dict[str, Any] = kwargs
         self._creation_flags: int = self._kwargs.pop("creation_flags", 0)
         self._close_fds: bool = self._kwargs.pop("close_fds", system() != "Windows")
@@ -119,12 +119,8 @@ class BaseService:
     def port(self) -> int:
         """Access the socket port of the service `<int>`."""
         if self._port == -1:
-            port = self._free_port()
-            while self._ping_port(port) or port in self.__PORTS:
-                port = self._free_port()
-            self.__PORTS.add(port)
-            self._port = port
-            self._port_str = str(port)
+            self._port = self.get_free_port()
+            self._port_str = str(self._port)
         return self._port
 
     @property
@@ -150,16 +146,28 @@ class BaseService:
         This must be implemented in the subclass.
 
         Returns:
-        - `["--port=" + str(self.port)]` for the Chromium based webdriver.
-        - `["-p", str(self.port)]` for Safari webdriver.
+        - `["--port=" + self.port_str]` for the Chromium & Gecko based webdriver.
+        - `["-p", self.port_str]` for Safari webdriver.
         """
         raise NotImplementedError(
             "<{}>\nAttribute 'port_args' must be implemented in the "
             "subclass.".format(self.__class__.__name__)
         )
 
+    def get_free_port(self) -> int:
+        """Acquire a free socket port for the service `<int>`.
+
+        This port is garanteed to be available and conflicts
+        free from other service instances.
+        """
+        port = self._free_port()
+        while self._ping_port(port) or port in self.__PORTS:
+            port = self._free_port()
+        self.__PORTS.add(port)
+        return port
+
     def _free_port(self) -> int:
-        """(Internal) Acquire a free socket port for the service."""
+        """(Internal) Acquire a free socket port `<int>`."""
         sock = None
         try:
             sock = socket(AF_INET, SOCK_STREAM)
@@ -177,7 +185,7 @@ class BaseService:
             del sock
 
     def _ping_port(self, port: int) -> bool:
-        """(Internal) Check if the socket port is in used `<bool>`."""
+        """(Internal) Check if the socket port is in use `<bool>`."""
         sock = None
         try:
             sock = create_connection(("localhost", port), 1)
@@ -189,12 +197,16 @@ class BaseService:
                 sock.close()
             del sock
 
-    def _reset_port(self) -> None:
-        """(Internal) Reset the socket port of the service."""
+    def _remove_port(self, port: int) -> None:
+        """(Internal) Remove the socket port from the service."""
         try:
-            self.__PORTS.remove(self._port)
+            self.__PORTS.remove(port)
         except KeyError:
             pass
+
+    def _reset_port(self) -> None:
+        """(Internal) Reset the socket port of the service."""
+        self._remove_port(self._port)
         self._port = -1
         self._port_str = None
         self._url = None
@@ -338,52 +350,41 @@ class BaseService:
 
     async def _stop_session(self) -> None:
         """(Internal) Stop the session of the service."""
-
-        async def shutdown_remote() -> None:
-            while True:
-                try:
-                    await self._session.post("/shutdown")
-                    break
-                except CancelledError:
-                    continue
-                except ClientConnectorError:
-                    return None
-
-            # Verify shutdown
-            if not self.port_connectable:
-                return None  # exit
-
-            # Wait for shutdown
-            start_time = unix_time()
-            while (unix_time() - start_time) < self._timeout:
-                if not self.port_connectable:
-                    return None  # exit
-                await sleep(0.2)
-
         # Already stopped
         if self._session is None:
             return None  # exit
 
         try:
             exceptions = []
-            # Shutdown remote
+            # . shutdown remote
             try:
-                await shutdown_remote()
+                await self._shutdown_remote()
             except Exception as err:
                 exceptions.append(str(err))
 
-            # Close session
+            # . close session
             try:
                 await self._session.close()
             except Exception as err:
                 exceptions.append(str(err))
 
-            # Raise errors
+            # . raise errors
             if exceptions:
                 raise errors.SessionShutdownError("\n".join(exceptions))
 
         finally:
             self._session = None
+
+    async def _shutdown_remote(self) -> None:
+        """(Internal) Shutdown the remote connection of the session."""
+        while True:
+            try:
+                await self._session.post("/shutdown")
+                break
+            except CancelledError:
+                continue  # retry
+            except ClientConnectorError:
+                return None  # exit
 
     # Service -----------------------------------------------------------------------------
     @property
@@ -486,3 +487,20 @@ class ChromiumBaseService(BaseService):
         :return `<list[str]>`: `["--port=" + self.port_str]`
         """
         return ["--port=" + self.port_str]
+
+    # Session -----------------------------------------------------------------------------
+    async def _shutdown_remote(self) -> None:
+        """(Internal) Shutdown the remote connection of the session."""
+        # Shutdown remote
+        await super()._shutdown_remote()
+
+        # Verify shutdown
+        if not self.port_connectable:
+            return None  # exit
+
+        # Wait for shutdown
+        start_time = unix_time()
+        while (unix_time() - start_time) < self._timeout:
+            if not self.port_connectable:
+                return None  # exit
+            await sleep(0.2)

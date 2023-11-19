@@ -191,11 +191,12 @@ class Proxy:
     @ftp_proxy.setter
     def ftp_proxy(self, value: str | None) -> None:
         if isinstance(value, str):
-            if not value.startswith("ftp"):
+            if not value.startswith("ftp://"):
                 raise errors.InvalidOptionsProxyError(
-                    "<{}>\n`ftp_proxy` must start with 'ftp', instead got: "
-                    "{}.".format(self.__class__.__name__, repr(value))
+                    "<{}>\n`ftp_proxy` must start with 'ftp://', "
+                    "instead got: {}.".format(self.__class__.__name__, repr(value))
                 )
+            value = value.split("://", 1)[1]
             self._proxy_type = "MANUAL"
         elif value is not None:
             raise errors.InvalidOptionsProxyError(
@@ -214,11 +215,12 @@ class Proxy:
     @http_proxy.setter
     def http_proxy(self, value: str | None) -> None:
         if isinstance(value, str):
-            if not value.startswith("http"):
+            if not value.startswith("http://") and not value.startswith("https://"):
                 raise errors.InvalidOptionsProxyError(
-                    "<{}>\n`http_proxy` must start with 'http', instead got: "
-                    "{}.".format(self.__class__.__name__, repr(value))
+                    "<{}>\n`http_proxy` must start with 'http://' or 'https://', "
+                    "instead got: {}.".format(self.__class__.__name__, repr(value))
                 )
+            value = value.split("://", 1)[1]
             self._proxy_type = "MANUAL"
         elif value is not None:
             raise errors.InvalidOptionsProxyError(
@@ -237,11 +239,12 @@ class Proxy:
     @https_proxy.setter
     def https_proxy(self, value: str | None) -> None:
         if isinstance(value, str):
-            if not value.startswith("http"):
+            if not value.startswith("https://") and not value.startswith("http://"):
                 raise errors.InvalidOptionsProxyError(
-                    "<{}>\n`https_proxy` must start with 'http', instead got: "
-                    "{}.".format(self.__class__.__name__, repr(value))
+                    "<{}>\n`https_proxy` must start with 'https://' or 'http://', "
+                    "instead got: {}.".format(self.__class__.__name__, repr(value))
                 )
+            value = value.split("://", 1)[1]
             self._proxy_type = "MANUAL"
         elif value is not None:
             raise errors.InvalidOptionsProxyError(
@@ -260,15 +263,16 @@ class Proxy:
     @socks_proxy.setter
     def socks_proxy(self, value: str | None) -> None:
         if isinstance(value, str):
-            if value.startswith("socks5"):
+            if value.startswith("socks5://"):
                 self._socks_version = 5
-            elif value.startswith("socks4"):
+            elif value.startswith("socks4://"):
                 self._socks_version = 4
             else:
                 raise errors.InvalidOptionsProxyError(
-                    "<{}>\n`socks_proxy` must start with 'socks5' or 'socks4', "
+                    "<{}>\n`socks_proxy` must start with 'socks5://' or 'socks4://', "
                     "instead got: {}.".format(self.__class__.__name__, repr(value))
                 )
+            value = value.split("://", 1)[1]
             self._proxy_type = "MANUAL"
         elif value is None:
             self._socks_version = None
@@ -1097,6 +1101,7 @@ class ChromiumBaseOptions(BaseOptions):
             )
         # Settings
         self._experimental_options: dict[str, Any] = {}
+        self._preferences: dict[str, Any] = {}
         self._extensions: list[str] = []
 
     # Caps: basic -------------------------------------------------------------------------
@@ -1107,6 +1112,8 @@ class ChromiumBaseOptions(BaseOptions):
 
         # Experimental Options
         options = self.experimental_options
+        if self._preferences:
+            options["prefs"] = self.preferences
         if self._arguments:
             options["args"] = self.arguments
         if self._extensions:
@@ -1115,47 +1122,6 @@ class ChromiumBaseOptions(BaseOptions):
 
         # Return caps
         return caps
-
-    # Caps: experimental options ----------------------------------------------------------
-    @property
-    def experimental_options(self) -> dict[str, Any]:
-        """Access the experimental options of the browser `<dict>`."""
-        return deepcopy(self._experimental_options)
-
-    def add_experimental_options(self, **options: Any) -> None:
-        """Add experimental options of the browser.
-
-        :param options: `<Any>` The experimental options to add.
-
-        ### Example:
-        >>> options.add_experimental_options(
-                prefs={"directory_upgrade": True},
-                excludeSwitches=["enable-automation"],
-                ...
-            )
-        """
-        # Add options
-        self._experimental_options |= options
-        self._caps_changed()
-
-    def rem_experimental_options(self, name: str) -> None:
-        """Remove an experimental option of the browser.
-
-        :param name: `<str>` The name of the experimental option.
-        """
-        try:
-            self._experimental_options.pop(name)
-            self._caps_changed()
-        except KeyError:
-            pass
-
-    def get_experimental_option(self, name: str) -> Any | None:
-        """Get an experimental option of the browser.
-
-        :param name: `<str>` The name of the experimental option.
-        :return `<Any/None>` The value of the experimental option, `None` if option not set.
-        """
-        return self._experimental_options.get(name)
 
     # Options: binary location ------------------------------------------------------------
     @property
@@ -1173,13 +1139,13 @@ class ChromiumBaseOptions(BaseOptions):
         # Set binary location
         if not isinstance(src, str):
             raise errors.InvalidOptionsError(
-                f"<{self.__class__.__name__}>\n'binary_location' must be type of `<str>`."
+                "<{}>\n'binary_location' must be type of "
+                "`<str>`.".format(self.__class__.__name__)
             )
         if not is_file_exists(src):
             raise errors.InvalidOptionsError(
-                "<{}>\nBrowser 'binary_location' not found at: {}".format(
-                    self.__class__.__name__, repr(src)
-                )
+                "<{}>\nBrowser 'binary_location' not found at: "
+                "{}".format(self.__class__.__name__, repr(src))
             )
         self.add_experimental_options(binary=src)
 
@@ -1206,6 +1172,89 @@ class ChromiumBaseOptions(BaseOptions):
                 f"<{self.__class__.__name__}>\n'debugger_address' must be type of `<str>`."
             )
         self.add_experimental_options(debuggerAddress=address)
+
+    # Caps: experimental options ----------------------------------------------------------
+    @property
+    def experimental_options(self) -> dict[str, Any]:
+        """Access the experimental options of the browser `<dict>`."""
+        return deepcopy(self._experimental_options)
+
+    def add_experimental_options(self, **options: Any) -> None:
+        """Add experimental options of the browser.
+
+        :param options: `<Any>` The experimental options to add.
+
+        ### Example:
+        >>> options.add_experimental_options(
+                excludeSwitches=["enable-automation"],
+                ...
+            )
+        """
+        # Add options
+        self._experimental_options |= options
+        self._caps_changed()
+
+    def rem_experimental_options(self, name: str) -> None:
+        """Remove an experimental option of the browser.
+
+        :param name: `<str>` The name of the experimental option.
+
+        ### Example:
+        >>> options.rem_experimental_options("excludeSwitches")
+        """
+        try:
+            self._experimental_options.pop(name)
+            self._caps_changed()
+        except KeyError:
+            pass
+
+    def get_experimental_option(self, name: str) -> Any | None:
+        """Get an experimental option of the browser.
+
+        :param name: `<str>` The name of the experimental option.
+        :return `<Any/None>` The value of the experimental option, `None` if option not set.
+        """
+        return self._experimental_options.get(name)
+
+    # Options: preferences ----------------------------------------------------------------
+    @property
+    def preferences(self) -> dict[str, Any]:
+        """Access the preferences of the browser `<dict[str, Any]>`."""
+        return deepcopy(self._preferences)
+
+    def set_preference(self, name: str, value: Any) -> None:
+        """Set a preference of the browser.
+
+        :param name: `<str>` The name of the preference.
+        :param value: `<Any>` The value of the preference.
+
+        ### Example:
+        >>> options.set_preference("directory_upgrade", True)
+        """
+        # Set preference
+        if not isinstance(name, str) or not name:
+            raise errors.InvalidOptionsError(
+                "<{}>\nInvalid 'preferences' name: {} {}.".format(
+                    self.__class__.__name__, repr(name), type(name)
+                )
+            )
+        self._preferences[name] = value
+        self._caps_changed()
+
+    def rem_preference(self, name: str) -> None:
+        """Remove a preference of the browser.
+
+        :param name: `<str>` The name of the preference.
+
+        ### Example:
+        >>> options.rem_preference("directory_upgrade")
+        """
+        # Remove preference
+        try:
+            self._preferences.pop(name)
+            self._caps_changed()
+        except KeyError:
+            pass
 
     # Options: extensions -----------------------------------------------------------------
     @property
