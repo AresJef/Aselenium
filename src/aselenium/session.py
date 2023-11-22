@@ -21,9 +21,9 @@ from math import ceil
 from uuid import uuid4
 from copy import deepcopy
 from base64 import b64decode
-from time import time as unit_time
-from typing import Any, Literal, Callable
+from time import time as unix_time
 from asyncio import sleep, CancelledError
+from typing import Any, Literal, Awaitable
 from aselenium.logs import logger
 from aselenium.alert import Alert
 from aselenium.shadow import Shadow
@@ -651,6 +651,8 @@ class Session:
         self._window_by_handle: dict[str, Window] = {}
         # Script
         self._script_by_name: dict[str, JavaScript] = {}
+        # Devtools cmd
+        self._cdp_cmd_by_name: dict[str, DevToolsCMD] = {}
         # Status
         self.__closed: bool = False
 
@@ -677,7 +679,7 @@ class Session:
 
     @property
     def base_url(self) -> str:
-        """Access the base URL of the session `<str>`."""
+        """Access the base service URL of the session `<str>`."""
         return self._base_url
 
     # Execute -----------------------------------------------------------------------------
@@ -725,7 +727,7 @@ class Session:
         self._conn = Connection(self._service.session)
 
         # Start the session
-        return await self._start_session()
+        return await self._start_session("default")
 
     async def quit(self) -> None:
         """Quit (close) the session."""
@@ -741,7 +743,9 @@ class Session:
             # . stop session
             while True:
                 try:
-                    await self.execute_command(Command.QUIT)
+                    await self.execute_command(
+                        Command.QUIT, timeout=self._service._timeout
+                    )
                     break
                 except CancelledError:
                     cancelled = True
@@ -774,10 +778,12 @@ class Session:
         finally:
             self._collect_garbage()
 
-    async def _start_session(self) -> Window:
-        """(Internal) Start the default window of session,
-        and returns it `<Window>`. This method should only
-        be called when session service is started.
+    async def _start_session(self, name: str = "default") -> Window:
+        """(Internal) Start the default window of session, and returns it `<Window>`.
+        This method should only be called when session service is started or all
+        the windows of the session are closed.
+
+        :param name: `<str>` The name of the first window for the session. Defaults to `'default'`.
         """
 
         def parse_session_id(res: dict) -> str:
@@ -834,7 +840,7 @@ class Session:
                     self.__class__.__name__, self._id
                 )
             )
-        return self._cache_window(handle, "default")
+        return self._cache_window(handle, name)
 
     # Navigate ----------------------------------------------------------------------------
     async def load(
@@ -963,6 +969,65 @@ class Session:
                 "response: {}".format(self.__class__.__name__, err)
             ) from err
 
+    async def wait_until_url(
+        self,
+        condition: Literal["equals", "contains", "startswith", "endswith"],
+        value: str,
+        timeout: int | float | None = 5,
+    ) -> bool:
+        """Wait until the URL of the active page window satisfies the given condition.
+
+        :param condition: `<str>` The condition the URL needs to satisfy.
+            Excepted values: `"equals"`, `"contains"`, `"startswith"`, `"endswith"`.
+        :param value: `<str>` The value of the condition.
+        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
+        :return: `<bool>` True if the URL satisfies the condition, False if timeout.
+
+        ### Example:
+        >>> await session.load("https://www.google.com/")
+            await session.wait_until_url("contains", "google", 5)  # True / False
+        """
+
+        async def equals() -> bool:
+            return await self.url == value
+
+        async def contains() -> bool:
+            return value in await self.url
+
+        async def startswith() -> bool:
+            return (await self.url).startswith(value)
+
+        async def endswith() -> bool:
+            return (await self.url).endswith(value)
+
+        # Validate value & condition
+        value = self._validate_wait_str_value(value)
+        if condition == "equals":
+            condition_checker = equals
+        elif condition == "contains":
+            condition_checker = contains
+        elif condition == "startswith":
+            condition_checker = startswith
+        elif condition == "endswith":
+            condition_checker = endswith
+        else:
+            self._raise_invalid_wait_condition(condition)
+
+        # Check condition
+        if await condition_checker():
+            return True
+        elif timeout is None:
+            return False
+
+        # Wait until satisfied
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            if await condition_checker():
+                return True
+            await sleep(0.2)
+        return False
+
     @property
     async def title(self) -> str:
         """Access the title of the active page window `<str>`.
@@ -978,6 +1043,64 @@ class Session:
                 "<{}>\nFailed to parse page title from "
                 "response: {}".format(self.__class__.__name__, err)
             ) from err
+
+    async def wait_until_title(
+        self,
+        condition: Literal["equals", "contains", "startswith", "endswith"],
+        value: str,
+        timeout: int | float | None = 5,
+    ) -> bool:
+        """Wait until the title of the active page window satisfies the given condition.
+
+        :param condition: `<str>` The condition the title needs to satisfy.
+            Excepted values: `"equals"`, `"contains"`, `"startswith"`, `"endswith"`.
+        :param value: `<str>` The value of the condition.
+        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
+        :return: `<bool>` True if the title satisfies the condition, False if timeout.
+
+        >>> await session.load("https://www.google.com/")
+            await session.wait_until_title("contains", "Google", 5)  # True / False
+        """
+
+        async def equals() -> bool:
+            return await self.title == value
+
+        async def contains() -> bool:
+            return value in await self.title
+
+        async def startswith() -> bool:
+            return (await self.title).startswith(value)
+
+        async def endswith() -> bool:
+            return (await self.title).endswith(value)
+
+        # Validate value & condition
+        value = self._validate_wait_str_value(value)
+        if condition == "equals":
+            condition_checker = equals
+        elif condition == "contains":
+            condition_checker = contains
+        elif condition == "startswith":
+            condition_checker = startswith
+        elif condition == "endswith":
+            condition_checker = endswith
+        else:
+            self._raise_invalid_wait_condition(condition)
+
+        # Check condition
+        if await condition_checker():
+            return True
+        elif timeout is None:
+            return False
+
+        # Wait until satisfied
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            if await condition_checker():
+                return True
+            await sleep(0.2)
+        return False
 
     @property
     async def viewport(self) -> Viewport:
@@ -1550,122 +1673,6 @@ class Session:
                 "<{}>\nInvalid cookie: {}".format(self.__class__.__name__, cookie)
             ) from err
 
-    # Permission --------------------------------------------------------------------------
-    @property
-    async def permissions(self) -> list[Permission]:
-        """Access all the permissions of the active page window `<list[Permission]>`.
-
-        ### Example:
-        >>> permissions = await session.permissions
-            # [
-            #    <Permission (name='geolocation', state='prompt')>,
-            #    <Permission (name='camera', state='denied')>,
-            #    ...
-            # ]
-        """
-        return [
-            permission
-            for name in sorted(Constraint.PERMISSION_NAMES)
-            if (permission := await self.get_permission(name))
-        ]
-
-    async def get_permission(self, name: str | Permission) -> Permission | None:
-        """Get a specific permission from the active page window.
-
-        :param name: `<str>` The name of the permission or a `<Permission>` instance.
-        :return `<Permission>`: The specified permission, or `None` if not found.
-
-        ### Example:
-        >>> permission = await session.get_permission("geolocation")
-            # <Permission (name='geolocation', state='prompt')>
-        """
-        # Validate permission name
-        if isinstance(name, str):
-            pass
-        elif isinstance(name, Permission):
-            name = name.name
-        else:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid permission name: {} {}.".format(
-                    self.__class__.__name__, repr(name), type(name)
-                )
-            )
-        # Request permission
-        try:
-            res = await self._execute_script(javascript.GET_PERMISSION, name)
-        except (errors.InvalidScriptError, errors.UnknownCommandError):
-            return None
-        try:
-            return Permission(name, res["state"])
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse permission from "
-                "response: {}".format(self.__class__.__name__, res)
-            ) from err
-        except Exception as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nInvalid permission response: "
-                "{}".format(self.__class__.__name__, res)
-            ) from err
-
-    async def set_permission(
-        self,
-        name: str,
-        state: Literal["granted", "denied", "prompt"],
-    ) -> Permission:
-        """Set a specific permission's state of the active page window.
-
-        :param name: `<str>` The name of the permission.
-        :param state: `<str>` The state of the permission, accepts: `'granted'`, `'denied'`, `'prompt'`.
-        :return `<Permission>`: The permission after update.
-
-        ### Example:
-        >>> perm = await session.set_permission("geolocation", "granted")
-            # <Permission (name='geolocation', state='granted')>
-        """
-        # Set permission
-        permission = Permission(name, state)
-        try:
-            await self.execute_command(
-                Command.SET_PERMISSION,
-                body={
-                    "descriptor": {"name": permission.name},
-                    "state": permission.state,
-                },
-            )
-        except errors.InvalidArgumentError as err:
-            msg = str(err)
-            if ErrorCode.INVALID_PERMISSION_STATE in msg:
-                raise errors.InvalidPermissionStateError(
-                    "<{}>\nInvalid permission state: {}.".format(
-                        self.__class__.__name__, repr(state)
-                    )
-                ) from err
-            if ErrorCode.INVALID_PERMISSION_NAME in msg:
-                raise errors.InvalidPermissionNameError(
-                    "<{}>\nInvalid permission name: {}.".format(
-                        self.__class__.__name__, repr(name)
-                    )
-                ) from err
-            raise err
-        # Return permission
-        return await self.get_permission(name)
-
-    def _validate_permission_name(self, name: Any) -> str:
-        """(Internal) Validate the name of a permission `<str>`"""
-        if isinstance(name, Permission):
-            return name.name
-        if name not in Constraint.PERMISSION_NAMES:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid permission name: {}. "
-                "Available options: {}".format(
-                    self.__class__.__name__,
-                    repr(name),
-                    sorted(Constraint.PERMISSION_NAMES),
-                )
-            )
-        return name
-
     # Window ------------------------------------------------------------------------------
     @property
     async def windows(self) -> list[Window]:
@@ -1797,7 +1804,9 @@ class Session:
             )
         except errors.InvalidSessionIdError as err:
             # . All windows are closed: start a new session
-            return await self._start_session()
+            self._window_by_name = {}
+            self._window_by_handle = {}
+            return await self._start_session(name)
         try:
             win = self._cache_window(res["value"]["handle"], name=name)
         except KeyError as err:
@@ -2181,15 +2190,10 @@ class Session:
         >>> await session.scroll_to_top(12, "count")
             # Try to scroll to the top of the page in 12 steps.
         """
-        # Validate value & strategy
+        # Validate arguments
         value = self._validate_scroll_value(value)
         by = self._validate_scroll_strategy(by)
-
-        # Validate pause
-        try:
-            pause = self._validate_pause(pause)
-        except errors.InvalidArgumentError as err:
-            raise errors.InvalidArgumentError(f"<{self.__class__.__name__}>{err}")
+        pause = self._validate_pause(pause)
 
         # Calculate scroll pixals
         if by == "steps":
@@ -2235,15 +2239,10 @@ class Session:
         >>> await session.scroll_to_bottom(100, "pixel")
             # Scroll to the bottom of the page by 100 pixels each time.
         """
-        # Validate value & strategy
+        # Validate arguments
         value = self._validate_scroll_value(value)
         by = self._validate_scroll_strategy(by)
-
-        # Validate pause
-        try:
-            pause = self._validate_pause(pause)
-        except errors.InvalidArgumentError as err:
-            raise errors.InvalidArgumentError(f"<{self.__class__.__name__}>{err}")
+        pause = self._validate_pause(pause)
 
         # Calculate scroll pixal
         if by == "steps":
@@ -2286,15 +2285,10 @@ class Session:
         >>> await session.scroll_to_left(12, "count")
             # Try to scroll to the left of the page in 12 steps.
         """
-        # Validate value & strategy
+        # Validate arguments
         value = self._validate_scroll_value(value)
         by = self._validate_scroll_strategy(by)
-
-        # Validate pause
-        try:
-            pause = self._validate_pause(pause)
-        except errors.InvalidArgumentError as err:
-            raise errors.InvalidArgumentError(f"<{self.__class__.__name__}>{err}")
+        pause = self._validate_pause(pause)
 
         # Calculate scroll pixals
         if by == "steps":
@@ -2340,15 +2334,10 @@ class Session:
         >>> await session.scroll_to_right(100, "pixel")
             # Scroll to the right of the page by 100 pixels each time.
         """
-        # Validate value & strategy
+        # Validate arguments
         value = self._validate_scroll_value(value)
         by = self._validate_scroll_strategy(by)
-
-        # Validate pause
-        try:
-            pause = self._validate_pause(pause)
-        except errors.InvalidArgumentError as err:
-            raise errors.InvalidArgumentError(f"<{self.__class__.__name__}>{err}")
+        pause = self._validate_pause(pause)
 
         # Calculate scroll pixal
         if by == "steps":
@@ -2373,26 +2362,43 @@ class Session:
         self,
         value: str | Element,
         by: Literal["css", "xpath"] = "css",
-        timeout: int | float = 5,
+        timeout: int | float | None = 5,
     ) -> bool:
-        """Scroll the viewport to the element by the given locator and strategy.
+        """Scroll the viewport to the element by the given selector and strategy.
 
-        :param value: `<str/Element>` The locator for the element, or an `<Element>` instance.
-        :param by: `<str>` The locator strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :param value: `<str/Element>` The selector for the element, or an `<Element>` instance.
+        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
             If the given 'value' is an `<Element>`, this argument will be ignored.
-        :param timeout: `<int/float>` The timeout in seconds to wait for the element to scroll into view. Defaults to `5`.
+        :param timeout: `<int/float/None>` Total seconds to wait for the element to scroll into view. Defaults to `5`.
         :return `<bool>`: True if the element is in the viewport, False if element not exists.
 
         ### Example:
         >>> viewable = await session.scroll_into_view("#element", by="css")
             # True / False
         """
-        if isinstance(value, Element):
+        # Element already specified
+        if self._is_element(value):
             return await value.scroll_into_view(timeout)
-        elif (element := await self.find_element(value, by=by)) is not None:
+
+        # Find element & scroll
+        strat = self._validate_selector_strategy(by)
+        element = await self._find_element_no_wait(value, strat)
+        if element is not None:
             return await element.scroll_into_view(timeout)
-        else:
+        elif timeout is None:
             return False
+
+        # Wait for element & scroll
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            element = await self._find_element_no_wait(value, strat)
+            if element is not None:
+                return await element.scroll_into_view(
+                    timeout - (unix_time() - start_time)
+                )
+            await sleep(0.2)
+        return False
 
     def _validate_scroll_strategy(self, by: Any) -> str:
         """(Internal) Validate the scroll 'by' strategy `<str>`"""
@@ -2423,41 +2429,60 @@ class Session:
         return value
 
     # Alert -------------------------------------------------------------------------------
-    @property
-    async def alert(self) -> Alert | None:
-        """Access the alert of the active page window `<Alert>`.
-        If alert is not present, returns `None`.
+    async def get_alert(self, timeout: int | float | None = 5) -> Alert | None:
+        """Get the alert of the active page window.
+
+        :param timeout: `<int/float/None>` Total seconds to wait for the alert to pop-up. Defaults to `5`.
+        :return `<Alert>`: The alert of the active page window, or `None` if alert not exists.
 
         ### Example:
-        >>> alert = await session.alert
+        >>> alert = await session.get_alert()
             # <Alert (session='5351...', service='http://...')>
         """
-        alert = Alert(self)
-        try:
-            await alert.text
+
+        async def find_alert() -> Alert | None:
+            try:
+                await self.execute_command(Command.W3C_GET_ALERT_TEXT)
+                return Alert(self)
+            except errors.AlertNotFoundError:
+                return None
+
+        # Get alert
+        if (alert := await find_alert()) is not None:
             return alert
-        except errors.AlertNotFoundError:
+        elif timeout is None:
             return None
+
+        # Wait for alert
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            if (alert := await find_alert()) is not None:
+                return alert
+            await sleep(0.2)
+        return None
 
     # Frame -------------------------------------------------------------------------------
     async def switch_frame(
         self,
         value: str | Element | int,
         by: Literal["css", "xpath", "index"] = "css",
+        timeout: int | float | None = 5,
     ) -> bool:
         """Switch focus to a specific frame in the active page window.
 
         :param value: `<str/Element/int>` Accepts three kinds of input:
-            - `<str>`: The locator for the element contains the frame.
+            - `<str>`: The selector for the element contains the frame.
             - `<Element>`: An element instance contains the frame.
             - `<int>`: The index (id) of the frame.
 
-        :param by: `<str>` The locator strategy, accepts `'css'`, `'xpath'` or `'index'`. Defaults to `'css'`.
+        :param by: `<str>` The selector strategy, accepts `'css'`, `'xpath'` or `'index'`. Defaults to `'css'`.
             If the given 'value' is an `<Element>`, this argument will be ignored.
-        :return `<bool>`: True if successfully switched focus, False if frame not exist.
+        :param timeout: `<int/float/None>` Total seconds to wait for frame switching. Defaults to `5`.
+        :return `<bool>`: True if successfully switched focus, False if frame not exists.
 
         ### Example:
-        >>> # . switch by element locator
+        >>> # . switch by element selector
             await session.switch_frame("figure.demoarea > iframe", by="css")  # True / False
 
         >>> # . switch by element instance
@@ -2467,10 +2492,20 @@ class Session:
         >>> # . switch by frame index
             await session.switch_frame(1, by="index")  # True / False
         """
+
+        async def switch(frame_id: Any) -> bool:
+            try:
+                await self.execute_command(
+                    Command.SWITCH_TO_FRAME, body={"id": frame_id}
+                )
+                return True
+            except (errors.FrameNotFoundError, errors.ElementNotFoundError):
+                return False
+
         # Switch by Element instance
-        if isinstance(value, Element):
+        if self._is_element(value):
             frame_id = {ELEMENT_KEY: value.id}
-        # Switch by Element locator
+        # Switch by Element selector
         elif by != "index":
             element = await self.find_element(value, by)
             if element is None:
@@ -2486,12 +2521,21 @@ class Session:
                     )
                 )
             frame_id = value
-        # Execute switch
-        try:
-            await self.execute_command(Command.SWITCH_TO_FRAME, body={"id": frame_id})
+
+        # Switch to frame
+        if await switch(frame_id):
             return True
-        except (errors.FrameNotFoundError, errors.ElementNotFoundError):
+        elif timeout is None:
             return False
+
+        # Switch with timeout
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            if await switch(frame_id):
+                return True
+            await sleep(0.2)
+        return False
 
     async def default_frame(self) -> bool:
         """Switch focus to the default frame (the `MAIN` document).
@@ -2532,231 +2576,104 @@ class Session:
             # <Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>
         """
         res = await self.execute_command(Command.W3C_GET_ACTIVE_ELEMENT)
-        return self._create_element(res.get("value", {}))
+        return self._create_element(res.get("value", None))
 
-    async def exists_element(
+    async def element_exists(
         self,
-        value: str,
+        value: str | Element,
         by: Literal["css", "xpath"] = "css",
     ) -> bool:
-        """Check if an element exists by the given locator and strategy.
-        This method ignores the implicit and explicit wait timeouts, and
-        returns element existence immediately.
+        """Check if an element exists. This method ignores the implicit wait
+        timeout, and returns element existence immediately.
 
-        :param value: `<str>` The locator for the element.
-        :param by: `<str>` The locator strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :param value: `<str/Element>` The selector for the element *OR* an `<Element>` instance.
+        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            If the given 'value' is an `<Element>`, this argument will be ignored.
         :return `<bool>`: True if the element exists, False otherwise.
 
         ### Example:
-        >>> await session.exists_element("#input_box")  # True / False
+        >>> await session.element_exists("#input_box")  # True / False
         """
-        return await self._exists_element(value, by, None)
+        if self._is_element(value):
+            return await value.exists
+        else:
+            strat = self._validate_selector_strategy(by)
+            return await self._element_exists_no_wait(value, strat)
 
-    async def exist_elements(
+    async def elements_exist(
         self,
-        *values: str,
+        *values: str | Element,
         by: Literal["css", "xpath"] = "css",
         all_: bool = True,
     ) -> bool:
-        """Check if multiple elements exist by the given locators and strategy.
-        This method ignores the implicit and explicit wait timeouts, and returns
-        elements existence immediately.
+        """Check if multiple elements exist. This method ignores the implicit
+        wait timeout, and returns elements existence immediately.
 
-        :param values: `<str>` The locators for multiple elements.
-        :param by: `<str>` The locator strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :param all_: `<bool>` How to determine elements existance. Defaults to `True (all elements)`.
+        :param values: `<str/Element>` The locators for multiple elements *OR* `<Element>` instances.
+        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            For values that are `<Element>` instances, this argument will be ignored.
+        :param all_: `<bool>` Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
             - `True`: All elements must exist to return True.
             - `False`: Any one of the elements exists returns True.
 
         :return `<bool>`: True if the elements exist, False otherwise.
 
         ### Example:
-        >>> await session.exist_elements(
+        >>> await session.elements_exist(
                 "#input_box", "#input_box2", by="css", all_=True
             )  # True / False
         """
-        return await self._exist_elements(values, by, all_, None)
+
+        async def check_existance(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.exists
+            else:
+                return await self._element_exists_no_wait(value, strat)
+
+        # Validate strategy
+        strat = self._validate_selector_strategy(by)
+        # Check existance
+        if all_:
+            for value in values:
+                if not await check_existance(value):
+                    return False
+            return True
+        else:
+            for value in values:
+                if await check_existance(value):
+                    return True
+            return False
 
     async def find_element(
         self,
         value: str,
         by: Literal["css", "xpath"] = "css",
     ) -> Element | None:
-        """Find the element by the given locator and strategy.
+        """Find the element by the given selector and strategy. The timeout for
+        finding an element is determined by the implicit wait of the session.
 
-        :param value: `<str>` The locator for the element.
-        :param by: `<str>` The locator strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :param value: `<str>` The selector for the element.
+        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
         :return `<Element/None>`: The located element, or `None` if not found.
 
         ### Example:
         >>> await session.find_element("#input_box", by="css")
             # <Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>
         """
-        return await self._find_element(self.execute_command, value, by)
-
-    async def find_elements(
-        self,
-        value: str,
-        by: Literal["css", "xpath"] = "css",
-    ) -> list[Element]:
-        """Find elements by the given locator and strategy.
-
-        :param value: `<str>` The locator for the elements.
-        :param by: `<str>` The locator strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :return `<list[Element]>`: A list of located elements (empty if not found).
-
-        ### Example:
-        >>> await session.find_elements("#input_box", by="css")
-            # [<Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>]
-        """
-        return await self._find_elements(self.execute_command, value, by)
-
-    async def find_1st_element(
-        self,
-        *values: str,
-        by: Literal["css", "xpath"] = "css",
-    ) -> Element | None:
-        """Find the first located element among multiple locators.
-
-        :param values: `<str>` The locators for multiple elements.
-        :param by: `<str>` The locator strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :return `<Element/None>`: The first located element among all locators, or `None` if not found.
-
-        ### Example:
-        >>> await session.find_1st_element("#input_box", "#input_box2", by="css")
-            # <Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>
-        """
-        return await self._find_1st_element(values, by, None)
-
-    async def wait_element_gone(
-        self,
-        value: str,
-        by: Literal["css", "xpath"] = "css",
-        timeout: int | float = 5,
-    ) -> bool:
-        """Wait for an element to disappear by the given locator and strategy.
-
-        :param value: `<str>` The locator for the element.
-        :param by: `<str>` The locator strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :param timeout: `<int/float>` Total seconds to wait for the element to disappear. Defaults to `5`.
-        :return `<bool>`: True if the element is gone, False if timeout.
-
-        ### Example:
-        >>> await session.wait_element_gone("#input_box", by="css", timeout=5)  # True / False
-        """
-        return await self._wait_element_gone(value, by, timeout, None)
-
-    async def wait_elements_gone(
-        self,
-        *values: str,
-        by: Literal["css", "xpath"] = "css",
-        timeout: int | float = 5,
-        all_: bool = True,
-    ) -> bool:
-        """Wait for multiple elements to disappear by the given locators and strategy.
-
-        :param values: `<str>` The locators for multiple elements.
-        :param by: `<str>` The locator strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :param timeout: `<int/float>` Total seconds to wait for the element(s) disappear. Defaults to `5`.
-        :param all_: How to determine element(s) are gone. Defaults to `True (all elements)`.
-            - `True`: All elements must be gone to return True.
-            - `False`: Any one of the elements is gone returns True.
-
-        :return `<bool>`: True if the elements are gone, False if timeout.
-
-        ### Example:
-        >>> await session.wait_elements_gone(
-                "#input_box", "#input_box2", by="css", timeout=5, all_=True
-            )  # True / False
-        """
-        return await self._wait_elements_gone(values, by, timeout, all_, None)
-
-    async def _exists_element(
-        self,
-        value: str,
-        by: str,
-        node: Element | Shadow | None,
-    ) -> bool:
-        """(Internal) Check if an element exists by the given
-        locator and strategy `<bool>`.
-        """
-        strat = self._validate_locator_strategy(by)
-        try:
-            if node is None:
-                return await self._execute_script(
-                    javascript.ELEMENT_EXISTS_IN_PAGE[strat], value
-                )
-            else:
-                return await self._execute_script(
-                    javascript.ELEMENT_EXISTS_IN_NODE[strat], value, node
-                )
-        except errors.ElementNotFoundError:
-            return False
-        except errors.InvalidScriptError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to check element existance: {}".format(
-                    self.__class__.__name__, err
-                )
-            ) from err
-
-    async def _exist_elements(
-        self,
-        values: tuple[str],
-        by: str,
-        all_: bool,
-        node: Element | Shadow | None,
-    ) -> bool:
-        """(Internal) Check if multiple elements exist by the
-        given locators and strategy `<bool>`.
-        """
-
-        async def exists_in_page(value: str) -> bool:
-            try:
-                return await self._execute_script(
-                    javascript.ELEMENT_EXISTS_IN_PAGE[strat], value
-                )
-            except errors.ElementNotFoundError:
-                return False
-
-        async def exists_in_node(value: str) -> bool:
-            try:
-                return await self._execute_script(
-                    javascript.ELEMENT_EXISTS_IN_NODE[strat], value, node
-                )
-            except errors.ElementNotFoundError:
-                return False
-
-        # Check existances
-        strat = self._validate_locator_strategy(by)
-        try:
-            if node is None:
-                exist = [await exists_in_page(value) for value in values]
-            else:
-                exist = [await exists_in_node(value) for value in values]
-        except errors.InvalidScriptError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to check element existance: {}".format(
-                    self.__class__.__name__, err
-                )
-            ) from err
-        return all(exist) if all_ else any(exist)
-
-    async def _find_element(self, exe: Callable, value: str, by: str) -> Element | None:
-        """(Internal) Find element by the given locator and
-        strategy `<Element>`. Returns `None` if not found."""
         # Locate element
-        strat = self._validate_locator_strategy(by)
+        strat = self._validate_selector_strategy(by)
         try:
-            res: dict[str, str] = await exe(
+            res = await self.execute_command(
                 Command.FIND_ELEMENT, body={"using": strat, "value": value}
             )
         except errors.ElementNotFoundError:
             return None
         except errors.InvalidArgumentError as err:
             raise errors.InvalidSelectorError(
-                "<{}>\nInvalid '{}' locator: {}.".format(by, repr(value))
+                "<{}>\nInvalid '{}' selector: {}".format(
+                    self.__class__.__name__, by, repr(value)
+                )
             ) from err
-
         # Create element
         try:
             return self._create_element(res["value"])
@@ -2767,23 +2684,36 @@ class Session:
                 )
             ) from err
 
-    async def _find_elements(self, exe: Callable, value: str, by: str) -> list[Element]:
-        """(Internal) Find elements by the given locator and strategy
-        `<list[Element]>`. Returns empty list if not found.
+    async def find_elements(
+        self,
+        value: str,
+        by: Literal["css", "xpath"] = "css",
+    ) -> list[Element]:
+        """Find elements by the given selector and strategy. The timeout for
+        finding the elements is determined by the implicit wait of the session
+
+        :param value: `<str>` The selector for the elements.
+        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :return `<list[Element]>`: A list of located elements (empty if not found).
+
+        ### Example:
+        >>> await session.find_elements("#input_box", by="css")
+            # [<Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>]
         """
         # Locate elements
-        strat = self._validate_locator_strategy(by)
+        strat = self._validate_selector_strategy(by)
         try:
-            res: dict[str, list[dict]] = await exe(
+            res = await self.execute_command(
                 Command.FIND_ELEMENTS, body={"using": strat, "value": value}
             )
         except errors.ElementNotFoundError:
             return []
         except errors.InvalidArgumentError as err:
             raise errors.InvalidSelectorError(
-                "<{}>\nInvalid '{}' locator: {}.".format(by, repr(value))
+                "<{}>\nInvalid '{}' selector: {}".format(
+                    self.__class__.__name__, by, repr(value)
+                )
             ) from err
-
         # Create elements
         try:
             return [self._create_element(value) for value in res["value"]]
@@ -2794,145 +2724,348 @@ class Session:
                 )
             ) from err
 
-    async def _find_1st_element(
+    async def find_1st_element(
         self,
-        values: tuple[str],
-        by: str,
-        node: Element | Shadow | None,
+        *values: str,
+        by: Literal["css", "xpath"] = "css",
     ) -> Element | None:
-        """(Internal) Find the first located element among multiple
-        locators `<Element>`. Returns `None` if not found.
+        """Find the first located element among multiple locators. The timeout for
+        finding the first element is determined by the implicit wait of the session.
+
+        :param values: `<str>` The locators for multiple elements.
+        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :return `<Element/None>`: The first located element among all locators, or `None` if not found.
+
+        ### Example:
+        >>> await session.find_1st_element("#input_box", "#input_box2", by="css")
+            # <Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>
+        """
+        # Validate strategy
+        strat = self._validate_selector_strategy(by)
+
+        # Locate 1st element
+        timeout = (await self.timeouts).implicit
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            for value in values:
+                element = await self._find_element_no_wait(value, strat)
+                if element is not None:
+                    return element
+                await sleep(0.2)
+        return None
+
+    async def wait_until_element(
+        self,
+        condition: Literal[
+            "gone",
+            "exist",
+            "visible",
+            "viewable",
+            "enabled",
+            "selected",
+        ],
+        value: str | Element,
+        by: Literal["css", "xpath"] = "css",
+        timeout: int | float | None = 5,
+    ) -> bool:
+        """Wait until an element satisfies the given condition.
+
+        :param condition: `<str>` The condition to satisfy. Available options:
+            - `'gone'`: Wait until an element disappears from the DOM tree.
+            - `'exist'`: Wait until an element appears in the DOM tree.
+            - `'visible'`: Wait until an element not only is displayed but also not
+                blocked by any other elements (e.g. an overlay or modal).
+            - `'viewable'`: Wait until an element is displayed regardless whether it
+                is blocked by other elements (e.g. an overlay or modal).
+            - `'enabled'`: Wait until an element is enabled.
+            - `'selected'`: Wait until an element is selected.
+
+        :param value: `<str/Element>` The selector for the element *OR* an `<Element>` instance.
+        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            If the given 'value' is an `<Element>`, this argument will be ignored.
+        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
+        :return `<bool>`: True if the element satisfies the condition, False otherwise.
+
+        ### Example:
+        >>> await session.wait_until_element(
+                "visible", "#input_box", by="css", timeout=5
+            )  # True / False
         """
 
-        async def find_in_page(value: str) -> Element | None:
-            try:
-                res = await self._execute_script(
-                    javascript.FIND_ELEMENT_IN_PAGE[strat], value
-                )
-            except errors.InvalidScriptError as err:
-                raise errors.InvalidResponseError(
-                    "<{}>\nFailed to locate element: {}".format(
-                        self.__class__.__name__, err
-                    )
-                ) from err
-            except errors.ElementNotFoundError:
-                return None
-            try:
-                return self._create_element(res)
-            except Exception:
-                return None
+        async def is_gone(value: str | Element) -> bool:
+            if self._is_element(value):
+                return not await value.exists
+            else:
+                return not await self._element_exists_no_wait(value, strat)
 
-        async def find_in_node(value: str) -> Element | None:
-            try:
-                res = await self._execute_script(
-                    javascript.FIND_ELEMENT_IN_NODE[strat], value, node
-                )
-            except errors.InvalidScriptError as err:
-                raise errors.InvalidResponseError(
-                    "<{}>\nFailed to locate element: {}".format(
-                        self.__class__.__name__, err
-                    )
-                ) from err
-            except errors.ElementNotFoundError:
-                return None
-            try:
-                return self._create_element(res)
-            except Exception:
-                return None
+        async def is_exist(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.exists
+            else:
+                return await self._element_exists_no_wait(value, strat)
 
-        # Strategy & timeout
-        strat = self._validate_locator_strategy(by)
-        timeout = (await self.timeouts).implicit
-        start_time = unit_time()
+        async def is_visible(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.visible
+            else:
+                element = await self._find_element_no_wait(value, strat)
+                return False if element is None else await element.visible
 
-        # Locate in page
-        if node is None:
-            while unit_time() - start_time < timeout:
-                for value in values:
-                    element = await find_in_page(value)
-                    if element is not None:
-                        return element
-                    await sleep(0.2)
-            return None
+        async def is_viewable(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.viewable
+            else:
+                element = await self._find_element_no_wait(value, strat)
+                return False if element is None else await element.viewable
 
-        # Locate in node
+        async def is_enabled(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.enabled
+            else:
+                element = await self._find_element_no_wait(value, strat)
+                return False if element is None else await element.enabled
+
+        async def is_selected(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.selected
+            else:
+                element = await self._find_element_no_wait(value, strat)
+                return False if element is None else await element.selected
+
+        # Validate strategy
+        strat = self._validate_selector_strategy(by)
+
+        # Determine condition
+        if condition == "gone":
+            condition_checker = is_gone
+        elif condition == "exist":
+            condition_checker = is_exist
+        elif condition == "visible":
+            condition_checker = is_visible
+        elif condition == "viewable":
+            condition_checker = is_viewable
+        elif condition == "enabled":
+            condition_checker = is_enabled
+        elif condition == "selected":
+            condition_checker = is_selected
         else:
-            while unit_time() - start_time < timeout:
+            self._raise_invalid_wait_condition(condition)
+
+        # Check condition
+        if await condition_checker(value):
+            return True
+        elif timeout is None:
+            return False
+
+        # Wait until satisfied
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            if await condition_checker(value):
+                return True
+            await sleep(0.2)
+        return False
+
+    async def wait_until_elements(
+        self,
+        condition: Literal[
+            "gone",
+            "exist",
+            "visible",
+            "viewable",
+            "enabled",
+            "selected",
+        ],
+        *values: str | Element,
+        by: Literal["css", "xpath"] = "css",
+        all_: bool = True,
+        timeout: int | float | None = 5,
+    ) -> bool:
+        """Wait until multiple elements satisfy the given condition.
+
+        :param condition: `<str>` The condition to satisfy. Available options:
+            - `'gone'`: Wait until the elements disappear from the DOM tree.
+            - `'exist'`: Wait until the elements appear in the DOM tree.
+            - `'visible'`: Wait until the elements not only are displayed but also not
+                blocked by any other elements (e.g. an overlay or modal).
+            - `'viewable'`: Wait until the elements are displayed regardless whether
+                blocked by other elements (e.g. an overlay or modal).
+            - `'enabled'`: Wait until the elements are enabled.
+            - `'selected'`: Wait until the elements are selected.
+
+        :param values: `<str/Element>` The locators for multiple elements *OR* `<Element>` instances.
+        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            For values that are `<Element>` instances, this argument will be ignored.
+        :param all_: `<bool>` Determine how to satisfy the condition. Defaults to `True (all elements)`.
+            - `True`: All elements must satisfy the condition to return True.
+            - `False`: Any one of the elements satisfies the condition returns True.
+
+        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
+        :return `<bool>`: True if the elements satisfy the condition, False otherwise.
+
+        ### Example:
+        >>> await session.wait_until_elements(
+                "visible", "#input_box1", "#search_button",
+                by="css", all_=True, timeout=5
+            )  # True / False
+        """
+
+        async def is_gone(value: str | Element) -> bool:
+            if self._is_element(value):
+                return not await value.exists
+            else:
+                return not await self._element_exists_no_wait(value, strat)
+
+        async def is_exist(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.exists
+            else:
+                return await self._element_exists_no_wait(value, strat)
+
+        async def is_visible(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.visible
+            else:
+                element = await self._find_element_no_wait(value, strat)
+                return False if element is None else await element.visible
+
+        async def is_viewable(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.viewable
+            else:
+                element = await self._find_element_no_wait(value, strat)
+                return False if element is None else await element.viewable
+
+        async def is_enabled(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.enabled
+            else:
+                element = await self._find_element_no_wait(value, strat)
+                return False if element is None else await element.enabled
+
+        async def is_selected(value: str | Element) -> bool:
+            if self._is_element(value):
+                return await value.selected
+            else:
+                element = await self._find_element_no_wait(value, strat)
+                return False if element is None else await element.selected
+
+        async def check_condition(values: tuple, condition_checker: Awaitable) -> bool:
+            if all_:
                 for value in values:
-                    element = await find_in_node(value)
-                    if element is not None:
-                        return element
-                    await sleep(0.2)
+                    if not await condition_checker(value):
+                        return False
+                return True
+            else:
+                for value in values:
+                    if await condition_checker(value):
+                        return True
+                return False
+
+        # Validate strategy
+        strat = self._validate_selector_strategy(by)
+
+        # Determine condition
+        if condition == "gone":
+            condition_checker = is_gone
+        elif condition == "exist":
+            condition_checker = is_exist
+        elif condition == "visible":
+            condition_checker = is_visible
+        elif condition == "viewable":
+            condition_checker = is_viewable
+        elif condition == "enabled":
+            condition_checker = is_enabled
+        elif condition == "selected":
+            condition_checker = is_selected
+        else:
+            self._raise_invalid_wait_condition(condition)
+
+        # Check condition
+        if await check_condition(values, condition_checker):
+            return True
+        elif timeout is None:
+            return False
+
+        # Wait until satisfied
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            if await check_condition(values, condition_checker):
+                return True
+            await sleep(0.2)
+        return False
+
+    async def _element_exists_no_wait(self, value: str, strat: str) -> bool:
+        """(Internal) Check if an element exists without implicit wait `<bool>`.
+        Returns `False` immediately if element not exists.
+        """
+        try:
+            return await self._execute_script(
+                javascript.ELEMENT_EXISTS_IN_PAGE[strat], value
+            )
+        except errors.ElementNotFoundError:
+            return False
+        except errors.InvalidElementStateError as err:
+            raise errors.InvalidSelectorError(
+                "<{}>\nInvalid 'css' selector: {}".format(
+                    self.__class__.__name__, repr(value)
+                )
+            ) from err
+        except errors.InvalidScriptError as err:
+            raise errors.InvalidXPathSelectorError(
+                "<{}>\nInvalid 'xpath' selector: {}".format(
+                    self.__class__.__name__, repr(value)
+                )
+            ) from err
+
+    async def _find_element_no_wait(self, value: str, strat: str) -> Element | None:
+        """(Internal) Find element without implicit wait `<Element>`.
+        Returns `None` immediately if element not exists.
+        """
+        try:
+            res = await self._execute_script(
+                javascript.FIND_ELEMENT_IN_PAGE[strat], value
+            )
+        except errors.ElementNotFoundError:
             return None
-
-    async def _wait_element_gone(
-        self,
-        value: str,
-        by: str,
-        timeout: int | float,
-        node: Element | Shadow | None,
-    ) -> bool:
-        """(Internal) Wait for an element to disappear `<bool>`."""
-        # Check existance
-        if not await self._exists_element(value, by, node):
-            return True
-
-        # Validate timeout
+        except errors.InvalidElementStateError as err:
+            raise errors.InvalidSelectorError(
+                "<{}>\nInvalid 'css' selector: {}".format(
+                    self.__class__.__name__, repr(value)
+                )
+            ) from err
+        except errors.InvalidScriptError as err:
+            raise errors.InvalidXPathSelectorError(
+                "<{}>\nInvalid 'xpath' selector: {}".format(
+                    self.__class__.__name__, repr(value)
+                )
+            ) from err
         try:
-            timeout = self._validate_timeout(timeout)
-        except errors.InvalidArgumentError as err:
-            raise errors.InvalidArgumentError(f"<{self.__class__.__name__}>{err}")
+            return self._create_element(res)
+        except Exception as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nFailed to parse element from response: {}".format(
+                    self.__class__.__name__, res
+                )
+            ) from err
 
-        # Wait for gone
-        start_time = unit_time()
-        while unit_time() - start_time < timeout:
-            if not await self._exists_element(value, by, node):
-                return True
-            await sleep(0.2)
-        return False
-
-    async def _wait_elements_gone(
-        self,
-        values: tuple[str],
-        by: str,
-        timeout: int | float,
-        all_: bool,
-        node: Element | Shadow | None,
-    ) -> bool:
-        """(Internal) Wait for multiple elements to disappear `<bool>`."""
-        # Check existance
-        all_ = not all_  # reverse logic
-        if not await self._exist_elements(values, by, all_, node):
-            return True
-
-        # Validate timeout
-        try:
-            timeout = self._validate_timeout(timeout)
-        except errors.InvalidArgumentError as err:
-            raise errors.InvalidArgumentError(f"<{self.__class__.__name__}>{err}")
-
-        # Wait for gone
-        start_time = unit_time()
-        while unit_time() - start_time < timeout:
-            if not await self._exist_elements(values, by, all_, node):
-                return True
-            await sleep(0.2)
-        return False
-
-    def _validate_locator_strategy(self, by: Any) -> str:
-        """(Internal) Validate locator strategy `<str>`."""
+    def _validate_selector_strategy(self, by: Any) -> str:
+        """(Internal) Validate selector strategy `<str>`."""
         if by == "css":
             return "css selector"
         elif by == "xpath" or by == "css selector":
             return by
         else:
             raise errors.InvalidSelectorError(
-                "<{}>\nInvalid locator strategy: {}. Available options: "
+                "<{}>\nInvalid selector strategy: {}. Available options: "
                 "['css', 'xpath'].".format(self.__class__.__name__, repr(by))
             )
 
-    def _create_element(self, element: dict[str, Any]) -> Element:
+    def _create_element(self, element: dict[str, Any]) -> Element | None:
         """(Internal) Create the element `<Element>`."""
+        if element is None:
+            return None
         try:
             return Element(element[ELEMENT_KEY], self)
         except KeyError as err:
@@ -2947,6 +3080,47 @@ class Session:
                     self.__class__.__name__, element[ELEMENT_KEY]
                 )
             ) from err
+
+    # Shadow ------------------------------------------------------------------------------
+    async def get_shadow(
+        self,
+        value: str,
+        by: Literal["css", "xpath"] = "css",
+        timeout: int | float | None = 5,
+    ) -> Shadow | None:
+        """Get the shadow root of an element by the given selector and strategy.
+
+        :param value: `<str>` The selector for the element contains the shadow root.
+        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :param timeout: `<int/float/None>` Total seconds to wait for the shadow root. Defaults to `5`.
+        :return `<Shadow>`: The shadow root of the element, or `None` if not exists.
+
+        ### Example:
+        >>> shadow = await session.get_shadow("#element", by="css")
+            # <Shadow (id='72216A833579C94EF54047C00F423735_element_4', element='7221...', session='f8c2...', service='http://...)>
+        """
+
+        async def find_shadow() -> Shadow | None:
+            element = await self._find_element_no_wait(value, strat)
+            return None if element is None else await element.shadow
+
+        # Validate strategy
+        strat = self._validate_selector_strategy(by)
+
+        # Get the shadow root
+        if (shadow := await find_shadow()) is not None:
+            return shadow
+        elif timeout is None:
+            return None
+
+        # Wait for shadow root
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            if (shadow := await find_shadow()) is not None:
+                return shadow
+            await sleep(0.2)
+        return None
 
     # Script ------------------------------------------------------------------------------
     @property
@@ -3228,53 +3402,6 @@ class Session:
         """
         return Actions(self, pointer, duration)
 
-    # Logs --------------------------------------------------------------------------------
-    @property
-    async def log_types(self) -> list[str]:
-        """Access the available log types of the session `<list[str]>`.
-
-        ### Example:
-        >>> log_types = await session.log_types
-            # ['browser', 'driver', 'client', 'server']
-        """
-        # Request available log types
-        res = await self.execute_command(Command.GET_AVAILABLE_LOG_TYPES)
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse log types from "
-                "response: {}".format(self.__class__.__name__, res)
-            ) from err
-
-    async def get_logs(self, log_type: str) -> list[dict[str, Any]]:
-        """Get a specific type of logs of the session.
-
-        ### Notice
-        Once the logs are retrieved, they will be cleared (removed) from the session.
-
-        :param log_type: `<str>` The log type. e.g. `'browser'`, `'driver'`, `'client'`, `'server'`, etc.
-        :return `<list[dict[str, Any]]>`: The logs for the specified log type.
-
-        ### Example:
-        >>> logs =  await session.get_logs("browser")
-            # [
-            #    {"level": "WARNING", "message": "...", "source": "..,", "timestamp": 1700...,}
-            #    {"level": "SEVERE", "message": "...", "source": "..,", "timestamp": 1700...,}
-            # ]
-        """
-        try:
-            res = await self.execute_command(Command.GET_LOG, body={"type": log_type})
-        except errors.InvalidArgumentError:
-            return []
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse logs from "
-                "response: {}".format(self.__class__.__name__, res)
-            ) from err
-
     # Utils -------------------------------------------------------------------------------
     async def pause(self, duration: int | float | None) -> None:
         """Pause the for a given duration.
@@ -3296,13 +3423,13 @@ class Session:
         """(Internal) Validate if pause value `> 0` `<int/float>`."""
         if not isinstance(value, (int, float)):
             raise errors.InvalidArgumentError(
-                "\nInvalid 'pause'. Must be an integer or float, "
-                "instead got: {}.".format(type(value))
+                "<{}>\nInvalid 'pause'. Must be an integer or float, "
+                "instead got: {}.".format(self.__class__.__name__, type(value))
             )
         if value <= 0:
             raise errors.InvalidArgumentError(
-                "\nInvalid 'pause'. Must be greater than 0, "
-                "instead got: {}.".format(value)
+                "<{}>\nInvalid 'pause'. Must be greater than 0, "
+                "instead got: {}.".format(self.__class__.__name__, value)
             )
         return value
 
@@ -3310,15 +3437,38 @@ class Session:
         """(Internal) Validate if timeout value `> 0` `<int/float>`."""
         if not isinstance(value, (int, float)):
             raise errors.InvalidArgumentError(
-                "\nInvalid 'timeout'. Must be an integer or float, "
-                "instead got: {}.".format(type(value))
+                "<{}>\nInvalid 'timeout'. Must be an integer or float, "
+                "instead got: {}.".format(self.__class__.__name__, type(value))
             )
         if value <= 0:
             raise errors.InvalidArgumentError(
-                "\nInvalid 'timeout'. Must be greater than 0, "
-                "instead got: {}.".format(value)
+                "<{}>\nInvalid 'timeout'. Must be greater than 0, "
+                "instead got: {}.".format(self.__class__.__name__, value)
             )
         return value
+
+    def _validate_wait_str_value(self, value: Any) -> str:
+        """(Internal) Validate if wait until 'value' is a non-empty string `<str>`."""
+        if not isinstance(value, str) or not value:
+            raise errors.InvalidArgumentError(
+                "<{}>\nInvalid wait until value: {} {}. "
+                "Must an non-empty string.".format(
+                    self.__class__.__name__, repr(value), type(value)
+                )
+            )
+        return value
+
+    def _raise_invalid_wait_condition(self, condition: Any) -> None:
+        """(Internal) Raise invalid wait until 'condition' error."""
+        raise errors.InvalidArgumentError(
+            "<{}>\nInvalid wait until condition: {} {}.".format(
+                self.__class__.__name__, repr(condition), type(condition)
+            )
+        )
+
+    def _is_element(self, element: Any) -> bool:
+        """(Internal) Check if the given object is an `<Element>` instance."""
+        return isinstance(element, Element)
 
     def _decode_base64(self, data: str, encoding: str = "ascii") -> bytes:
         """(Internal) Decode base64 string `<bytes>`."""
@@ -3364,6 +3514,8 @@ class Session:
         self._window_by_handle = None
         # Script
         self._script_by_name = None
+        # Devtools cmd
+        self._cdp_cmd_by_name = None
         # Status
         self.__closed = True
 
@@ -3415,8 +3567,6 @@ class ChromiumBaseSession(Session):
         service: ChromiumBaseService,
     ) -> None:
         super().__init__(options, service)
-        # Devtools cmd
-        self._cdp_cmd_by_name: dict[str, DevToolsCMD] = {}
 
     # Basic -------------------------------------------------------------------------------
     @property
@@ -3428,6 +3578,122 @@ class ChromiumBaseSession(Session):
     def service(self) -> ChromiumBaseService:
         """Access the webdriver service `<ChromiumBaseService>`."""
         return self._service
+
+    # Chromium - Permission ---------------------------------------------------------------
+    @property
+    async def permissions(self) -> list[Permission]:
+        """Access all the permissions of the active page window `<list[Permission]>`.
+
+        ### Example:
+        >>> permissions = await session.permissions
+            # [
+            #    <Permission (name='geolocation', state='prompt')>,
+            #    <Permission (name='camera', state='denied')>,
+            #    ...
+            # ]
+        """
+        return [
+            permission
+            for name in sorted(Constraint.PERMISSION_NAMES)
+            if (permission := await self.get_permission(name))
+        ]
+
+    async def get_permission(self, name: str | Permission) -> Permission | None:
+        """Get a specific permission from the active page window.
+
+        :param name: `<str>` The name of the permission or a `<Permission>` instance.
+        :return `<Permission>`: The specified permission, or `None` if not found.
+
+        ### Example:
+        >>> permission = await session.get_permission("geolocation")
+            # <Permission (name='geolocation', state='prompt')>
+        """
+        # Validate permission name
+        if isinstance(name, str):
+            pass
+        elif isinstance(name, Permission):
+            name = name.name
+        else:
+            raise errors.InvalidArgumentError(
+                "<{}>\nInvalid permission name: {} {}.".format(
+                    self.__class__.__name__, repr(name), type(name)
+                )
+            )
+        # Request permission
+        try:
+            res = await self._execute_script(javascript.GET_PERMISSION, name)
+        except (errors.InvalidScriptError, errors.UnknownCommandError):
+            return None
+        try:
+            return Permission(name, res["state"])
+        except KeyError as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nFailed to parse permission from "
+                "response: {}".format(self.__class__.__name__, res)
+            ) from err
+        except Exception as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nInvalid permission response: "
+                "{}".format(self.__class__.__name__, res)
+            ) from err
+
+    async def set_permission(
+        self,
+        name: str,
+        state: Literal["granted", "denied", "prompt"],
+    ) -> Permission:
+        """Set a specific permission's state of the active page window.
+
+        :param name: `<str>` The name of the permission.
+        :param state: `<str>` The state of the permission, accepts: `'granted'`, `'denied'`, `'prompt'`.
+        :return `<Permission>`: The permission after update.
+
+        ### Example:
+        >>> perm = await session.set_permission("geolocation", "granted")
+            # <Permission (name='geolocation', state='granted')>
+        """
+        # Set permission
+        permission = Permission(name, state)
+        try:
+            await self.execute_command(
+                Command.SET_PERMISSION,
+                body={
+                    "descriptor": {"name": permission.name},
+                    "state": permission.state,
+                },
+            )
+        except errors.InvalidArgumentError as err:
+            msg = str(err)
+            if ErrorCode.INVALID_PERMISSION_STATE in msg:
+                raise errors.InvalidPermissionStateError(
+                    "<{}>\nInvalid permission state: {}.".format(
+                        self.__class__.__name__, repr(state)
+                    )
+                ) from err
+            if ErrorCode.INVALID_PERMISSION_NAME in msg:
+                raise errors.InvalidPermissionNameError(
+                    "<{}>\nInvalid permission name: {}.".format(
+                        self.__class__.__name__, repr(name)
+                    )
+                ) from err
+            raise err
+        # Return permission
+        return await self.get_permission(name)
+
+    def _validate_permission_name(self, name: Any) -> str:
+        """(Internal) Validate the name of a permission `<str>`"""
+        if isinstance(name, Permission):
+            return name.name
+        if name not in Constraint.PERMISSION_NAMES:
+            raise errors.InvalidArgumentError(
+                "<{}>\nInvalid permission name: {}. "
+                "Available options: {}".format(
+                    self.__class__.__name__,
+                    repr(name),
+                    sorted(Constraint.PERMISSION_NAMES),
+                )
+            )
+        return name
 
     # Chromium - Network ------------------------------------------------------------------
     @property
@@ -3801,6 +4067,53 @@ class ChromiumBaseSession(Session):
                 )
             )
         return name
+
+    # Chromium - Logs ---------------------------------------------------------------------
+    @property
+    async def log_types(self) -> list[str]:
+        """Access the available log types of the session `<list[str]>`.
+
+        ### Example:
+        >>> log_types = await session.log_types
+            # ['browser', 'driver', 'client', 'server']
+        """
+        # Request available log types
+        res = await self.execute_command(Command.GET_AVAILABLE_LOG_TYPES)
+        try:
+            return res["value"]
+        except KeyError as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nFailed to parse log types from "
+                "response: {}".format(self.__class__.__name__, res)
+            ) from err
+
+    async def get_logs(self, log_type: str) -> list[dict[str, Any]]:
+        """Get a specific type of logs of the session.
+
+        ### Notice
+        Once the logs are retrieved, they will be cleared (removed) from the session.
+
+        :param log_type: `<str>` The log type. e.g. `'browser'`, `'driver'`, `'client'`, `'server'`, etc.
+        :return `<list[dict[str, Any]]>`: The logs for the specified log type.
+
+        ### Example:
+        >>> logs =  await session.get_logs("browser")
+            # [
+            #    {"level": "WARNING", "message": "...", "source": "..,", "timestamp": 1700...,}
+            #    {"level": "SEVERE", "message": "...", "source": "..,", "timestamp": 1700...,}
+            # ]
+        """
+        try:
+            res = await self.execute_command(Command.GET_LOG, body={"type": log_type})
+        except errors.InvalidArgumentError:
+            return []
+        try:
+            return res["value"]
+        except KeyError as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nFailed to parse logs from "
+                "response: {}".format(self.__class__.__name__, res)
+            ) from err
 
 
 class ChromiumBaseSessionContext(SessionContext):
