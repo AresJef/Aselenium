@@ -158,7 +158,7 @@ class Connection:
         except errors.TimeoutError as err:
             raise errors.SessionTimeoutError(
                 "<{}>\nSession timeout is reached for: {} {} {}\n"
-                "Error: A force timeout of the command has been set, "
+                "Error: A force timeout of the command has been reached, "
                 "and the browser failed to response in time: {}s.".format(
                     self.__class__.__name__, method, url, body, timeout
                 )
