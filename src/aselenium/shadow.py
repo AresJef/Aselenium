@@ -17,8 +17,11 @@
 
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
-from typing import Any, TYPE_CHECKING
-from aselenium import errors
+from asyncio import sleep
+from time import time as unix_time
+from typing import Any, Literal, Awaitable, TYPE_CHECKING
+from aselenium.command import Command
+from aselenium import errors, javascript
 from aselenium.service import BaseService
 from aselenium.connection import Connection
 
@@ -117,66 +120,129 @@ class Shadow:
         )
 
     # Element -----------------------------------------------------------------------------
-    async def exists_element(self, value: str) -> bool:
-        """Check if an element exists (inside the shadow) by the given
-        locator and strategy. This method ignores the implicit and
-        explicit wait timeouts, and returns element existence immediately.
+    async def element_exists(self, value: str | Element) -> bool:
+        """Check if an element exists (inside the shadow). This method ignores
+        the implicit wait timeout, and returns element existence immediately.
 
-        :param value: `<str>` The locator for the element `(css only)`.
+        :param value: `<str/Element>` The selector for the element (css only) *OR* an `<Element>` instance.
         :return `<bool>`: True if the element exists, False otherwise.
 
         ### Example:
-        >>> await shadow.exists_element("#input_box")  # True / False
+        >>> await shadow.element_exists("#input_box")  # True / False
         """
-        return await self._session._exists_element(value, "css", self)
+        if self._session._is_element(value):
+            return await value.exists
+        else:
+            return await self._element_exists_no_wait(value)
 
-    async def exist_elements(self, *values: str, all_: bool = True) -> bool:
-        """Check if multiple elements exist (inside the shadow) by the
-        given locators and strategy. This method ignores the implicit
-        and explicit wait timeouts, and returns elements existence
+    async def elements_exist(self, *values: str | Element, all_: bool = True) -> bool:
+        """Check if multiple elements exist (inside the shadow). This method
+        ignores the implicit wait timeout, and returns elements existence
         immediately.
 
-        :param values: `<str>` The locators for multiple elements `(css only)`.
-        :param by: `<str>` The locator strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :param all_: `<bool>` How to determine elements existance. Defaults to `True (all elements)`.
+        :param values: `<str/Element>` The locators for multiple elements (css only) *OR* `<Element>` instances.
+        :param all_: `<bool>` Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
             - `True`: All elements must exist to return True.
             - `False`: Any one of the elements exists returns True.
 
         :return `<bool>`: True if the elements exist, False otherwise.
 
         ### Example:
-        >>> await shadow.exist_elements(
+        >>> await shadow.elements_exist(
                 "#input_box", "#input_box2", all_=True
             )  # True / False
         """
-        return await self._session._exist_elements(values, "css", all_, self)
+
+        async def check_existance(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.exists
+            else:
+                return await self._element_exists_no_wait(value)
+
+        # Check existance
+        if all_:
+            for value in values:
+                if not await check_existance(value):
+                    return False
+            return True
+        else:
+            for value in values:
+                if await check_existance(value):
+                    return True
+            return False
 
     async def find_element(self, value: str) -> Element | None:
-        """Find the element (inside the shadow) by the given locator and strategy.
+        """Find the element (inside the shadow) by the given selector
+        and strategy. The timeout for finding an element is determined
+        by the implicit wait of the session.
 
-        :param value: `<str>` The locator for the element `(css only)`.
+        :param value: `<str>` The selector for the element `(css only)`.
         :return `<Element/None>`: The located element, or `None` if not found.
 
         ### Example:
         >>> await shadow.find_element("#input_box")
             # <Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_2', session='1e78...', service='http://...')>
         """
-        return await self._session._find_element(self.execute_command, value, "css")
+        try:
+            res = await self.execute_command(
+                Command.FIND_ELEMENT, body={"using": "css selector", "value": value}
+            )
+        except errors.ElementNotFoundError:
+            return None
+        except errors.InvalidArgumentError as err:
+            raise errors.InvalidSelectorError(
+                "<{}>\nInvalid 'css' selector: {}".format(
+                    self.__class__.__name__, repr(value)
+                )
+            ) from err
+        # Create element
+        try:
+            return self._session._create_element(res["value"])
+        except KeyError as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nFailed to parse element from response: {}".format(
+                    self.__class__.__name__, res
+                )
+            ) from err
 
     async def find_elements(self, value: str) -> list[Element]:
-        """Find elements (inside the shadow) by the given locator and strategy.
+        """Find elements (inside the shadow) by the given selector and
+        strategy. The timeout for finding the elements is determined by
+        the implicit wait of the session.
 
-        :param value: `<str>` The locator for the elements `(css only)`.
+        :param value: `<str>` The selector for the elements `(css only)`.
         :return `<list[Element]>`: A list of located elements (empty if not found).
 
         ### Example:
         >>> await shadow.find_elements("#input_box")
             # [<Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>]
         """
-        return await self._session._find_elements(self.execute_command, value, "css")
+        try:
+            res = await self.execute_command(
+                Command.FIND_ELEMENTS, body={"using": "css selector", "value": value}
+            )
+        except errors.ElementNotFoundError:
+            return []
+        except errors.InvalidArgumentError as err:
+            raise errors.InvalidSelectorError(
+                "<{}>\nInvalid 'css' selector: {}".format(
+                    self.__class__.__name__, repr(value)
+                )
+            ) from err
+        # Create elements
+        try:
+            return [self._session._create_element(value) for value in res["value"]]
+        except KeyError as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nFailed to parse elements from response: {}".format(
+                    self.__class__.__name__, res
+                )
+            ) from err
 
     async def find_1st_element(self, *values: str) -> Element | None:
-        """Find the first located element (inside the shadow) among multiple locators.
+        """Find the first located element (inside the shadow) among
+        multiple locators. The timeout for finding the first element
+        is determined by the implicit wait of the session.
 
         :param values: `<str>` The locators for multiple elements `(css only)`.
         :return `<Element/None>`: The first located element among all locators, or `None` if not found.
@@ -185,48 +251,311 @@ class Shadow:
         >>> await shadow.find_1st_element("#input_box", "#input_box2")
             # <Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>
         """
-        return await self._session._find_1st_element(values, "css", self)
+        # Locate 1st element
+        timeout = (await self._session.timeouts).implicit
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            for value in values:
+                element = await self._find_element_no_wait(value)
+                if element is not None:
+                    return element
+                await sleep(0.2)
+        return None
 
-    async def wait_element_gone(
+    async def wait_until_element(
         self,
-        value: str,
-        timeout: int | float = 5,
+        condition: Literal[
+            "gone",
+            "exist",
+            "visible",
+            "viewable",
+            "enabled",
+            "selected",
+        ],
+        value: str | Element,
+        timeout: int | float | None = 5,
     ) -> bool:
-        """Wait for an element (inside the shadow) to disappear by the
-        given locator and strategy.
+        """Wait until an element (inside the shadow) satisfies the given condition.
 
-        :param value: `<str>` The locator for the element `(css only)`.
-        :param timeout: `<int/float>` Total seconds to wait for the element to disappear. Defaults to `5`.
-        :return `<bool>`: True if the element is gone, False if timeout.
-        ### Example:
-        >>> await shadow.wait_element_gone("#input_box", timeout=5)  # True / False
-        """
-        return await self._session._wait_element_gone(value, "css", timeout, self)
+        :param condition: `<str>` The condition to satisfy. Available options:
+            - `'gone'`: Wait until an element disappears from the shadow.
+            - `'exist'`: Wait until an element appears in the shadow.
+            - `'visible'`: Wait until an element not only is displayed but also not
+                blocked by any other elements (e.g. an overlay or modal).
+            - `'viewable'`: Wait until an element is displayed regardless whether it
+                is blocked by other elements (e.g. an overlay or modal).
+            - `'enabled'`: Wait until an element is enabled.
+            - `'selected'`: Wait until an element is selected.
 
-    async def wait_elements_gone(
-        self,
-        *values: str,
-        timeout: int | float = 5,
-        all_: bool = True,
-    ) -> bool:
-        """Wait for multiple elements (inside the shadow) to disappear by
-        the given locators and strategy
-
-        :param values: `<str>` The locators for multiple elements `(css only)`.
-        :param timeout: `<int/float>` Total seconds to wait for the element(s) disappear. Defaults to `5`.
-        :param all_: How to determine element(s) are gone. Defaults to `True (all elements)`.
-            - `True`: All elements must be gone to return True.
-            - `False`: Any one of the elements is gone returns True.
-
-        :return `<bool>`: True if the elements are gone, False if timeout.
+        :param value: `<str/Element>` The selector for the element (css only) *OR* an `<Element>` instance.
+        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
+        :return `<bool>`: True if the element satisfies the condition, False otherwise.
 
         ### Example:
-        >>> await shadow.wait_elements_gone(
-                "#input_box", "#input_box2", timeout=5, all_=True
+        >>> await shadow.wait_until_element(
+                "visible", "#input_box", by="css", timeout=5
             )  # True / False
         """
-        return await self._session._wait_elements_gone(
-            values, "css", timeout, all_, self
+
+        async def is_gone(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return not await value.exists
+            else:
+                return not await self._element_exists_no_wait(value)
+
+        async def is_exist(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.exists
+            else:
+                return await self._element_exists_no_wait(value)
+
+        async def is_visible(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.visible
+            else:
+                element = await self._find_element_no_wait(value)
+                return False if element is None else await element.visible
+
+        async def is_viewable(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.viewable
+            else:
+                element = await self._find_element_no_wait(value)
+                return False if element is None else await element.viewable
+
+        async def is_enabled(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.enabled
+            else:
+                element = await self._find_element_no_wait(value)
+                return False if element is None else await element.enabled
+
+        async def is_selected(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.selected
+            else:
+                element = await self._find_element_no_wait(value)
+                return False if element is None else await element.selected
+
+        # Determine condition
+        if condition == "gone":
+            condition_checker = is_gone
+        elif condition == "exist":
+            condition_checker = is_exist
+        elif condition == "visible":
+            condition_checker = is_visible
+        elif condition == "viewable":
+            condition_checker = is_viewable
+        elif condition == "enabled":
+            condition_checker = is_enabled
+        elif condition == "selected":
+            condition_checker = is_selected
+        else:
+            self._raise_invalid_wait_condition(condition)
+
+        # Check condition
+        if await condition_checker(value):
+            return True
+        elif timeout is None:
+            return False
+
+        # Wait until satisfied
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            if await condition_checker(value):
+                return True
+            await sleep(0.2)
+        return False
+
+    async def wait_until_elements(
+        self,
+        condition: Literal[
+            "gone",
+            "exist",
+            "visible",
+            "viewable",
+            "enabled",
+            "selected",
+        ],
+        *values: str | Element,
+        all_: bool = True,
+        timeout: int | float | None = 5,
+    ) -> bool:
+        """Wait until multiple elements (inside the shadow) satisfy the given condition.
+
+        :param condition: `<str>` The condition to satisfy. Available options:
+            - `'gone'`: Wait until the elements disappear from the shadow.
+            - `'exist'`: Wait until the elements appear in the shadow.
+            - `'visible'`: Wait until the elements not only are displayed but also not
+                blocked by any other elements (e.g. an overlay or modal).
+            - `'viewable'`: Wait until the elements are displayed regardless whether
+                blocked by other elements (e.g. an overlay or modal).
+            - `'enabled'`: Wait until the elements are enabled.
+            - `'selected'`: Wait until the elements are selected.
+
+        :param values: `<str/Element>` The locators for multiple elements (css only) *OR* `<Element>` instances.
+        :param all_: `<bool>` Determine how to satisfy the condition. Defaults to `True (all elements)`.
+            - `True`: All elements must satisfy the condition to return True.
+            - `False`: Any one of the elements satisfies the condition returns True.
+
+        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
+        :return `<bool>`: True if the elements satisfy the condition, False otherwise.
+
+        ### Example:
+        >>> await shadow.wait_until_elements(
+                "visible", "#input_box1", "#search_button",
+                by="css", all_=True, timeout=5
+            )  # True / False
+        """
+
+        async def is_gone(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return not await value.exists
+            else:
+                return not await self._element_exists_no_wait(value)
+
+        async def is_exist(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.exists
+            else:
+                return await self._element_exists_no_wait(value)
+
+        async def is_visible(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.visible
+            else:
+                element = await self._find_element_no_wait(value)
+                return False if element is None else await element.visible
+
+        async def is_viewable(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.viewable
+            else:
+                element = await self._find_element_no_wait(value)
+                return False if element is None else await element.viewable
+
+        async def is_enabled(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.enabled
+            else:
+                element = await self._find_element_no_wait(value)
+                return False if element is None else await element.enabled
+
+        async def is_selected(value: str | Element) -> bool:
+            if self._session._is_element(value):
+                return await value.selected
+            else:
+                element = await self._find_element_no_wait(value)
+                return False if element is None else await element.selected
+
+        async def check_condition(values: tuple, condition_checker: Awaitable) -> bool:
+            if all_:
+                for value in values:
+                    if not await condition_checker(value):
+                        return False
+                return True
+            else:
+                for value in values:
+                    if await condition_checker(value):
+                        return True
+                return False
+
+        # Determine condition
+        if condition == "gone":
+            condition_checker = is_gone
+        elif condition == "exist":
+            condition_checker = is_exist
+        elif condition == "visible":
+            condition_checker = is_visible
+        elif condition == "viewable":
+            condition_checker = is_viewable
+        elif condition == "enabled":
+            condition_checker = is_enabled
+        elif condition == "selected":
+            condition_checker = is_selected
+        else:
+            self._raise_invalid_wait_condition(condition)
+
+        # Check condition
+        if await check_condition(values, condition_checker):
+            return True
+        elif timeout is None:
+            return False
+
+        # Wait until satisfied
+        timeout = self._validate_timeout(timeout)
+        start_time = unix_time()
+        while unix_time() - start_time < timeout:
+            if await check_condition(values, condition_checker):
+                return True
+            await sleep(0.2)
+        return False
+
+    async def _element_exists_no_wait(self, value: str) -> bool:
+        """(Internal) Check if an element exists (inside the element)
+        without implicit wait `<bool>`. Returns `False` immediately if
+        element not exists.
+        """
+        try:
+            return await self._session._execute_script(
+                javascript.ELEMENT_EXISTS_IN_NODE["css selector"], value, self
+            )
+        except errors.ElementNotFoundError:
+            return False
+        except errors.InvalidElementStateError as err:
+            raise errors.InvalidSelectorError(
+                "<{}>\nInvalid 'css' selector: {}".format(
+                    self.__class__.__name__, repr(value)
+                )
+            ) from err
+
+    async def _find_element_no_wait(self, value: str) -> Element | None:
+        """(Internal) Find element (inside the element) without implicit
+        wait `<Element>`. Returns `None` immediately if element not exists.
+        """
+        try:
+            res = await self._session._execute_script(
+                javascript.FIND_ELEMENT_IN_NODE["css selector"], value, self
+            )
+        except errors.ElementNotFoundError:
+            return None
+        except errors.InvalidElementStateError as err:
+            raise errors.InvalidSelectorError(
+                "<{}>\nInvalid 'css' selector: {}".format(
+                    self.__class__.__name__, repr(value)
+                )
+            ) from err
+        try:
+            return self._session._create_element(res)
+        except Exception as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nFailed to parse element from response: {}".format(
+                    self.__class__.__name__, res
+                )
+            ) from err
+
+    # Utils -------------------------------------------------------------------------------
+    def _validate_timeout(self, value: Any) -> int | float:
+        """(Internal) Validate if timeout value `> 0` `<int/float>`."""
+        if not isinstance(value, (int, float)):
+            raise errors.InvalidArgumentError(
+                "<{}>\nInvalid 'timeout'. Must be an integer or float, "
+                "instead got: {}.".format(self.__class__.__name__, type(value))
+            )
+        if value <= 0:
+            raise errors.InvalidArgumentError(
+                "<{}>\nInvalid 'timeout'. Must be greater than 0, "
+                "instead got: {}.".format(self.__class__.__name__, value)
+            )
+        return value
+
+    def _raise_invalid_wait_condition(self, condition: Any) -> None:
+        """(Internal) Raise invalid wait until 'condition' error."""
+        raise errors.InvalidArgumentError(
+            "<{}>\nInvalid wait until condition: {} {}.".format(
+                self.__class__.__name__, repr(condition), type(condition)
+            )
         )
 
     # Special methods ---------------------------------------------------------------------
