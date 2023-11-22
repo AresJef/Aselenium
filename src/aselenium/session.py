@@ -743,13 +743,15 @@ class Session:
             # . stop session
             while True:
                 try:
-                    await self.execute_command(Command.QUIT, timeout=5)
+                    await self.execute_command(Command.QUIT, timeout=3)
                     break
                 except CancelledError:
                     cancelled = True
                 except errors.SessionClientError:
                     if not self._service.started:
                         break
+                except errors.SessionTimeoutError:
+                    break
                 except Exception as err:
                     exceptions.append(str(err))
                     break

@@ -25,6 +25,7 @@ from asyncio.subprocess import Process, PIPE, DEVNULL
 from asyncio.subprocess import create_subprocess_exec
 from asyncio import wait_for, sleep, TimeoutError, CancelledError
 from socket import socket, AF_INET, SOCK_STREAM, create_connection
+from psutil import Process as psutil_Process
 from aiohttp import ClientSession, ClientConnectorError
 from aselenium import errors
 from aselenium.utils import is_file_exists
@@ -277,6 +278,18 @@ class BaseService:
     async def _stop_process(self) -> None:
         """(Internal) Stop the process of the service."""
 
+        # . Kill unclosed child processes
+        def kill_unclosed_child_processes() -> None:
+            try:
+                driver_process = psutil_Process(self._process.pid)
+            except Exception:
+                return None
+            for child in driver_process.children(recursive=False):
+                try:
+                    child.kill()
+                except Exception:
+                    pass
+
         # . Kill (SIGKILL) the process
         async def kill() -> None:
             # Force kill (SIGKILL)
@@ -301,6 +314,9 @@ class BaseService:
         # Already stopped
         if self._process is None:
             return None  # exit
+
+        # Kill unclosed child processes
+        kill_unclosed_child_processes()
 
         # Terminate (SIGTERM)
         try:
