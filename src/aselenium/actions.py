@@ -291,39 +291,49 @@ class Actions:
         self._pointer_up(button)
         return self.pause(pause)
 
-    def drop_and_drop(
+    def drag_and_drop(
         self,
-        src_element: Element,
-        dst_element: Element,
+        drag: Element | None = None,
+        drag_x: int = 0,
+        drag_y: int = 0,
+        drop: Element | None = None,
+        drop_x: int = 0,
+        drop_y: int = 0,
         pause: int | float | None = None,
     ) -> Actions:
-        """Drag and drop an element to another element.
+        """Drag and drop an element (coordinates) to another element (coordinates).
 
-        :param src_element: `<Element>` The source element to drag.
-        :param dst_element: `<Element>` The destination element to drop.
+        :param drag: `<Element/None>` The source element to drag. Defaults to `None`.
+        :param drag_x: `<int>` The x-coordinate of the viewport, `*OR*` the x-offset to the center of a 'drag' element. Defaults to `0`.
+        :param drag_y: `<int>` The y-coordinate of the viewport, `*OR*` the y-offset to the center of a 'drag' element. Defaults to `0`.
+        :param drop: `<Element/None>` The destination element to drop. Defaults to `None`.
+        :param drop_x: `<int>` The x-coordinate of the viewport, `*OR*` the x-offset to the center of an 'drop' element. Defaults to `0`.
+        :param drop_y: `<int>` The y-coordinate of the viewport, `*OR*` the y-offset to the center of an 'drop' element. Defaults to `0`.
         :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
         :return `<Actions>`: The actions chain.
 
         ### Notice:
-        The `drag_and_drop` method is a custom chain of the following actions:
-            - move_to(element=src_element)
-            - click(hold=True)
-            - move_to(element=dst_element)
-            - release()
+        The `drag_and_drop` method eqvivalent to the following actions:
+            - move_to(drag, drag_x, drag_y)
+            - click(MouseButtons.LEFT, hold=True)
+            - move_to(drop, drop_x, drop_y)
+            - release(MouseButtons.LEFT)
+
+        Based on testing, drag and drop only works properly for Chromium based browsers.
 
         ### Example:
         >>> left_element = await session.find_element("#left_element")
             right_element = await session.find_element("#right_element")
             (
                 await session.actions()
-                .drag_and_drop(left_element, right_element)
+                .drag_and_drop(drag=left_element, drop=right_element)
                 .perform())
             )
         """
-        self.move_to(element=src_element)
-        self.click(hold=True)
-        self.move_to(element=dst_element)
-        self.release()
+        self.move_to(element=drag, x=drag_x, y=drag_y)
+        self._pointer_down(MouseButtons.LEFT)
+        self.move_to(element=drop, x=drop_x, y=drop_y)
+        self._pointer_up(MouseButtons.LEFT)
         return self.pause(pause)
 
     def _pointer_move(
