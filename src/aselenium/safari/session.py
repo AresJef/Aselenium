@@ -74,7 +74,7 @@ class SafariSession(Session):
             timeout=timeout,
         )
 
-    # Information -------------------------------------------------------------------------
+    # Disable - Information ---------------------------------------------------------------
     async def print_pdf(
         self,
         orientation: Literal["portrait", "landscape"] | None = None,
@@ -96,7 +96,50 @@ class SafariSession(Session):
         )
         return None
 
-    # Permission --------------------------------------------------------------------------
+    # Disable - Frame ---------------------------------------------------------------------
+    async def switch_frame(
+        self,
+        value: str | Element | int,
+        by: Literal["css", "xpath", "index"] = "css",
+        timeout: int | float | None = None,
+    ) -> bool:
+        """Safari automation does not support frame commands `False`."""
+        logger.warning(
+            "<{}>\nSafari automation does not support frame "
+            "switching.".format(self.__class__.__name__)
+        )
+        return False
+
+    async def default_frame(self) -> bool:
+        """Safari automation does not support frame commands `True`."""
+        logger.warning(
+            "<{}>\nSafari automation does not support frame "
+            "switching.".format(self.__class__.__name__)
+        )
+        return True
+
+    async def parent_frame(self) -> bool:
+        """Safari automation does not support frame commands `True`."""
+        logger.warning(
+            "<{}>\nSafari automation does not support frame "
+            "switching.".format(self.__class__.__name__)
+        )
+        return True
+
+    # Disable - Actions -------------------------------------------------------------------
+    def actions(
+        self,
+        pointer: Literal["mouse", "pen", "touch"] = "mouse",
+        duration: int | float = 0.25,
+    ) -> None:
+        """Safari automation does not support actions commands `None`."""
+        logger.warning(
+            "<{}>\nSafari automation does not support actions "
+            "commands.".format(self.__class__.__name__)
+        )
+        return None
+
+    # Safari - Permission -----------------------------------------------------------------
     @property
     async def permissions(self) -> dict[str, bool]:
         """Access all the permissions of the active page window `<dict[str, bool]>`.
@@ -142,66 +185,6 @@ class SafariSession(Session):
             body={"permissions": permissions | {name: bool(value)}},
         )
         return await self.permissions
-
-    # Frame -------------------------------------------------------------------------------
-    async def switch_frame(
-        self,
-        value: str | Element | int,
-        by: Literal["css", "xpath", "index"] = "css",
-    ) -> bool:
-        """Safari automation does not support frame commands `False`."""
-        logger.warning(
-            "<{}>\nSafari automation does not support frame "
-            "switching.".format(self.__class__.__name__)
-        )
-        return False
-
-    async def default_frame(self) -> bool:
-        """Safari automation does not support frame commands `True`."""
-        logger.warning(
-            "<{}>\nSafari automation does not support frame "
-            "switching.".format(self.__class__.__name__)
-        )
-        return True
-
-    async def parent_frame(self) -> bool:
-        """Safari automation does not support frame commands `True`."""
-        logger.warning(
-            "<{}>\nSafari automation does not support frame "
-            "switching.".format(self.__class__.__name__)
-        )
-        return True
-
-    # Actions -----------------------------------------------------------------------------
-    def actions(
-        self,
-        pointer: Literal["mouse", "pen", "touch"] = "mouse",
-        duration: int | float = 0.25,
-    ) -> None:
-        """Safari automation does not support actions commands `None`."""
-        logger.warning(
-            "<{}>\nSafari automation does not support actions "
-            "commands.".format(self.__class__.__name__)
-        )
-        return None
-
-    # Logs --------------------------------------------------------------------------------
-    @property
-    async def log_types(self) -> None:
-        """Safari automation does not support log commands `None`."""
-        logger.warning(
-            "<{}>\nSafari automation does not support log "
-            "commands.".format(self.__class__.__name__)
-        )
-        return None
-
-    async def get_logs(self, log_type: str) -> None:
-        """Safari automation does not support log commands `None`."""
-        logger.warning(
-            "<{}>\nSafari automation does not support log "
-            "commands.".format(self.__class__.__name__)
-        )
-        return None
 
 
 class SafariSessionContext(SessionContext):
