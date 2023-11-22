@@ -1362,7 +1362,7 @@ class Element:
                 )
             ) from err
         try:
-            return None if res is None else self._session._create_element(res)
+            return self._session._create_element(res)
         except Exception as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to parse element from response: {}".format(
