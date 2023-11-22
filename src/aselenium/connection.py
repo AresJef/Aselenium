@@ -17,7 +17,6 @@
 
 # -*- coding: UTF-8 -*-
 from typing import Any
-from asyncio import Lock
 from string import Template
 from platform import system
 from orjson import dumps, loads
@@ -48,7 +47,6 @@ class Connection:
         :param session: `<ClientSession>` The async session of the connection.
         """
         self._session: ClientSession = session
-        self._lock: Lock = Lock()
 
     # Execution ---------------------------------------------------------------------------
     async def execute(
@@ -86,8 +84,7 @@ class Connection:
                 ) from err
 
         # Execute command
-        async with self._lock:
-            res = await self._request(method, base_url + cmd, body, timeout)
+        res = await self._request(method, base_url + cmd, body, timeout)
         error_handler(res)
 
         # Return response
@@ -205,4 +202,3 @@ class Connection:
 
     def __del__(self):
         self._session = None
-        self._lock = None
