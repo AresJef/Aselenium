@@ -170,6 +170,16 @@ class Rectangle:
         """
         return self._x + self._width
 
+    @property
+    def center_x(self) -> int:
+        """Access the x-coordinate of the center `<int>`."""
+        return self._x + self._width // 2
+
+    @property
+    def center_y(self) -> int:
+        """Access the y-coordinate of the center `<int>`."""
+        return self._y + self._height // 2
+
     # Special methods ----------------------------------------------------------
     def __repr__(self) -> str:
         return "<%s (width=%s, height=%s, x=%s, y=%s)>" % (
