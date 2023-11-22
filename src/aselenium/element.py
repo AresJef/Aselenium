@@ -912,7 +912,7 @@ class Element:
         if self._session._is_element(value):
             return await value.exists
         else:
-            strat = self._session._validate_locator_strategy(by)
+            strat = self._session._validate_selector_strategy(by)
             return await self._element_exists_no_wait(value, strat)
 
     async def elements_exist(
@@ -947,7 +947,7 @@ class Element:
                 return await self._element_exists_no_wait(value, strat)
 
         # Validate strategy
-        strat = self._session._validate_locator_strategy(by)
+        strat = self._session._validate_selector_strategy(by)
         # Check existance
         if all_:
             for value in values:
@@ -978,7 +978,7 @@ class Element:
             # <Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_2', session='1e78...', service='http://...')>
         """
         # Locate element
-        strat = self._session._validate_locator_strategy(by)
+        strat = self._session._validate_selector_strategy(by)
         try:
             res = await self.execute_command(
                 Command.FIND_ELEMENT, body={"using": strat, "value": value}
@@ -1019,7 +1019,7 @@ class Element:
             # [<Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>]
         """
         # Locate elements
-        strat = self._session._validate_locator_strategy(by)
+        strat = self._session._validate_selector_strategy(by)
         try:
             res = await self.execute_command(
                 Command.FIND_ELEMENTS, body={"using": strat, "value": value}
@@ -1060,7 +1060,7 @@ class Element:
             # <Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>
         """
         # Validate strategy
-        strat = self._session._validate_locator_strategy(by)
+        strat = self._session._validate_selector_strategy(by)
 
         # Locate 1st element
         timeout = (await self._session.timeouts).implicit
@@ -1152,7 +1152,7 @@ class Element:
                 return False if element is None else await element.selected
 
         # Validate strategy
-        strat = self._session._validate_locator_strategy(by)
+        strat = self._session._validate_selector_strategy(by)
 
         # Determine condition
         if condition == "gone":
@@ -1282,7 +1282,7 @@ class Element:
                 return False
 
         # Validate strategy
-        strat = self._session._validate_locator_strategy(by)
+        strat = self._session._validate_selector_strategy(by)
 
         # Determine condition
         if condition == "gone":
