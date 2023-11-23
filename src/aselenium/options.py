@@ -26,7 +26,7 @@ from aselenium import errors
 from aselenium.settings import Constraint, DefaultTimeouts
 from aselenium.utils import is_path_file, is_path_dir, prettify_dict
 
-__all__ = ["BaseOptions", "ChromiumBaseOptions", "Proxy", "Timeouts"]
+__all__ = ["BaseOptions", "ChromiumBaseOptions", "Proxy", "Timeouts", "ChromiumProfile"]
 
 # Constants ---------------------------------------------------------------------------------------
 PROXY_TYPES: set[str] = {"DEFAULT", "AUTODETECT", "MANUAL", "PAC"}
@@ -617,7 +617,7 @@ class Timeouts:
         return Timeouts(self._implicit, self._pageLoad, self._script, unit="ms")
 
 
-class Profile:
+class ChromiumProfile:
     """Represents the profile configuration for Chromium based browser.
     Such as: Edge, Chrome, Chromium, etc.
     """
@@ -700,9 +700,9 @@ class Profile:
     def __bool__(self) -> bool:
         return True
 
-    def copy(self) -> Profile:
-        """Copy the profile object."""
-        return Profile(self._directory, self._profile)
+    def copy(self) -> ChromiumProfile:
+        """Copy the profile object `<ChromiumProfile>`."""
+        return ChromiumProfile(self._directory, self._profile)
 
 
 # Base Options ------------------------------------------------------------------------------------
@@ -1189,7 +1189,7 @@ class ChromiumBaseOptions(BaseOptions):
                 "please refer to class docs."
             )
         # Settings
-        self._profile: Profile | None = None
+        self._profile: ChromiumProfile | None = None
         self._experimental_options: dict[str, Any] = {}
         self._preferences: dict[str, Any] = {}
         self._extensions: list[str] = []
@@ -1303,19 +1303,46 @@ class ChromiumBaseOptions(BaseOptions):
 
     # # Caps: profile -----------------------------------------------------------------------
     @property
-    def profile(self) -> Profile | None:
-        """Access the profile of the browser `<Profile>`.
+    def profile(self) -> ChromiumProfile | None:
+        """Access the profile of the browser `<ChromiumProfile>`.
         Returns `None` if profile is not configured.
         """
         return self._profile
 
-    def set_profile(self, directory: str, profile: str) -> Profile:
+    @profile.setter
+    def profile(self, value: ChromiumProfile | None) -> None:
+        # Remove profile
+        if value is None:
+            self._arguments = [
+                arg
+                for arg in self._arguments
+                if not arg.startswith("--user-data-dir=")
+                and not arg.startswith("--profile-directory=")
+            ]
+            self._profile = None
+            return None  # exit
+
+        # Set profile
+        if not isinstance(value, ChromiumProfile):
+            raise errors.InvalidProfileError(
+                "<{}>\nInvalid 'profile' ({} {}), must be an "
+                "instance of `<ChromiumProfile>'.".format(
+                    self.__class__.__name__, repr(value), type(value)
+                )
+            )
+        self.add_arguments(
+            "--user-data-dir=%s" % value.directory,
+            "--profile-directory=%s" % value.profile,
+        )
+        self._profile = value
+
+    def set_profile(self, directory: str, profile: str) -> ChromiumProfile:
         """Set the profile configuration for the Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
         :param directory: `<str>` The main directory contains the profile folder.
         :param profile: `<str>` The name of the profile folder.
-        :return `<Profile>`: The profile instance.
+        :return `<ChromiumProfile>`: The profile instance.
 
         ### Explain:
         >>> # . this method is equivalent to:
@@ -1337,11 +1364,7 @@ class ChromiumBaseOptions(BaseOptions):
             directory="/home/<username>/.config/google-chrome"
             profile="Default"
         """
-        self._profile = Profile(directory, profile)
-        self.add_arguments(
-            "--user-data-dir=%s" % self._profile.directory,
-            "--profile-directory=%s" % self._profile.profile,
-        )
+        self.profile = ChromiumProfile(directory, profile)
         return self._profile
 
     def rem_profile(self) -> None:
@@ -1354,19 +1377,7 @@ class ChromiumBaseOptions(BaseOptions):
         >>> # . remove the profile
             options.rem_profile()
         """
-        # Profile not set
-        if self._profile is None:
-            return None  # exit
-
-        # Remove profile
-        self._arguments = [
-            arg
-            for arg in self._arguments
-            if not arg.startswith("--user-data-dir=")
-            and not arg.startswith("--profile-directory=")
-        ]
-        self._profile = None
-        return None
+        self.profile = None
 
     # Options: preferences ----------------------------------------------------------------
     @property
