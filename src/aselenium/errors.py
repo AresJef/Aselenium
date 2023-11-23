@@ -49,12 +49,12 @@ class InvalidCapabilitiesError(InvalidOptionsError):
     """Exception raised for invalid capabilities."""
 
 
-class InvalidOptionsProxyError(InvalidCapabilitiesError):
+class InvalidProxyError(InvalidCapabilitiesError):
     """Exception raised for invalid proxy."""
 
 
-class InvalidOptionsArgumentError(InvalidCapabilitiesError):
-    """Exception raised for invalid arguments."""
+class InvalidProfileError(InvalidCapabilitiesError):
+    """Exception raised for invalid profile."""
 
 
 class UnsupportedOptionsError(InvalidOptionsError):
