@@ -75,7 +75,7 @@ class SafariSession(Session):
         )
 
     # Disable - Information ---------------------------------------------------------------
-    async def print_pdf(
+    async def print_page(
         self,
         orientation: Literal["portrait", "landscape"] | None = None,
         scale: int | float | None = None,
@@ -89,9 +89,9 @@ class SafariSession(Session):
         shrink_to_fit: bool | None = None,
         page_ranges: list[str] | None = None,
     ) -> None:
-        """Safari automation does not support print commands `None`."""
+        """Safari automation does not support print page commands `None`."""
         logger.warning(
-            "<{}>\nSafari automation does not support print "
+            "<{}>\nSafari automation does not support print page "
             "commands.".format(self.__class__.__name__)
         )
         return None
