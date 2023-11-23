@@ -68,6 +68,11 @@ async def test_edge_options() -> None:
     driver.options.binary_location = (
         "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
     )
+    # . profile
+    profile_dir = "/Users/jef/Library/Application Support/Microsoft Edge"
+    if os.path.isdir(profile_dir):
+        driver.options.set_profile(profile_dir, "Default")
+        # driver.options.rem_profile()
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
     # . experimental options
@@ -122,6 +127,11 @@ async def test_chrome_options() -> None:
     driver.options.binary_location = (
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
     )
+    # . profile
+    profile_dir = "/Users/jef/Library/Application Support/Google/Chrome"
+    if os.path.isdir(profile_dir):
+        driver.options.set_profile(profile_dir, "Default")
+        # driver.options.rem_profile()
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
     # . experimental options
@@ -174,6 +184,11 @@ async def test_chromium_options() -> None:
     driver.options.binary_location = (
         "/Applications/Chromium.app/Contents/MacOS/Chromium"
     )
+    # . profile
+    profile_dir = "/Users/jef/Library/Application Support/Chromium"
+    if os.path.isdir(profile_dir):
+        driver.options.set_profile(profile_dir, "Default")
+        # driver.options.rem_profile()
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
     # . experimental options
@@ -427,13 +442,13 @@ async def test_driver(browser: str = "chrome") -> None:
         print("page_source:", bool(page_source), page_source[:50] + "...", sep="\t")
         screenshot = await s.take_screenshot()
         print("screenshot:", bool(screenshot), screenshot[:30], sep="\t")
-        path = os.path.join(fld_path, "screenshot")
+        path = os.path.join(TEST_FOLDER, "screenshot")
         print("save_sshot:", await s.save_screenshot(path), sep="\t")
 
         pdf = await s.print_page()
         if pdf is not None:
             print("print_page:", bool(pdf), pdf[:30], sep="\t")
-            path = os.path.join(fld_path, "save_pdf")
+            path = os.path.join(TEST_FOLDER, "save_pdf")
             print("save_page:", await s.save_page(path), sep="\t")
 
         if isinstance(s, FirefoxSession):
@@ -445,7 +460,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
             full_st = await s.take_full_screenshot()
             print("take_full_screenshot:", bool(full_st), full_st[:30], sep="\t")
-            path = os.path.join(fld_path, "full_screenshot")
+            path = os.path.join(TEST_FOLDER, "full_screenshot")
             print("save_full_screenshot:", await s.save_full_screenshot(path), sep="\t")
 
         print("-" * 80)
@@ -1102,8 +1117,8 @@ async def test_driver(browser: str = "chrome") -> None:
             el = await s.find_element("span.soutu-btn", by="css")
             screenshot = await el.take_screenshot()
             print("[el] take_screenshot", bool(screenshot), screenshot[:30], sep="\t")
-            path = os.path.join(fld_path, "screenshot_button")
-            print("el.save_screenshot", await el.save_screenshot(path), sep="\t")
+            path = os.path.join(TEST_FOLDER, "screenshot_button")
+            print("[el] save_screenshot", await el.save_screenshot(path), sep="\t")
             print()
 
         # Control
@@ -1148,7 +1163,7 @@ async def test_driver(browser: str = "chrome") -> None:
         el = await s.find_element("span.soutu-btn")
         await el.click(pause=0.5)
         el = await s.find_element("input.upload-pic")
-        await el.upload(os.path.join(fld_path, "captcha-test.png"))
+        await el.upload(os.path.join(TEST_FOLDER, "captcha-test.png"))
         await s.wait_until_url("startswith", "https://graph.baidu.com/", timeout=20)
         print("[el] upload:\t", True, sep="\t")
         await asyncio.sleep(2)
@@ -1711,7 +1726,9 @@ async def test_driver(browser: str = "chrome") -> None:
         await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
 
         addons = [
-            os.path.join(fld_path, f) for f in os.listdir(fld_path) if f.endswith("xpi")
+            os.path.join(TEST_FOLDER, file)
+            for file in os.listdir(TEST_FOLDER)
+            if file.endswith("xpi")
         ]
         res = await s.install_addons(*addons)
         print("install_addons:\t", bool(res), await s.addons, sep="\t")
@@ -1744,8 +1761,6 @@ async def test_driver(browser: str = "chrome") -> None:
     FORCE_TIMEOUT = 30
 
     pause = 0.5
-    abs_path = os.path.abspath(os.path.dirname(__file__))
-    fld_path = os.path.join(abs_path, "test_files")
     async with driver.acquire() as s:
         # Base info
         await session_info(s)
@@ -1794,15 +1809,18 @@ async def test_driver(browser: str = "chrome") -> None:
 
 
 if __name__ == "__main__":
-    # asyncio.run(test_proxy())
-    # asyncio.run(test_edge_options())
-    # asyncio.run(test_chrome_options())
-    # asyncio.run(test_chromium_options())
-    # asyncio.run(test_firefox_options())
-    # asyncio.run(test_safari_options())
-    # asyncio.run(test_cancellation())
-    # asyncio.run(test_driver("edge"))
-    # asyncio.run(test_driver("chrome"))
-    # asyncio.run(test_driver("chromium"))
+    ABS_PATH = os.path.abspath(os.path.dirname(__file__))
+    TEST_FOLDER = os.path.join(ABS_PATH, "test_files")
+
+    asyncio.run(test_proxy())
+    asyncio.run(test_edge_options())
+    asyncio.run(test_chrome_options())
+    asyncio.run(test_chromium_options())
+    asyncio.run(test_firefox_options())
+    asyncio.run(test_safari_options())
+    asyncio.run(test_cancellation())
+    asyncio.run(test_driver("edge"))
+    asyncio.run(test_driver("chrome"))
+    asyncio.run(test_driver("chromium"))
     asyncio.run(test_driver("firefox"))
-    # asyncio.run(test_driver("safari"))
+    asyncio.run(test_driver("safari"))
