@@ -57,10 +57,6 @@ class InvalidOptionsArgumentError(InvalidCapabilitiesError):
     """Exception raised for invalid arguments."""
 
 
-class InvalidOptionsExtensionError(InvalidOptionsError):
-    """Exception raised for invalid extensions."""
-
-
 class UnsupportedOptionsError(InvalidOptionsError):
     """Exception raised for unsupported options."""
 
@@ -154,6 +150,10 @@ class InvalidRectValueError(InvalidValueError):
 
 class InvalidResponseError(InvalidValueError):
     """Exception raised when response is invalid."""
+
+
+class InvalidExtensionError(InvalidArgumentError, InvalidOptionsError):
+    """Exception raised for invalid extensions."""
 
 
 class UnknownMethodError(InvalidValueError):

@@ -18,7 +18,7 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 from math import ceil, floor
-from os.path import isfile, exists, dirname
+from os.path import isfile, isdir, exists, dirname
 from typing import Any, Iterator, KeysView, ValuesView, ItemsView
 from aselenium import errors
 
@@ -366,18 +366,18 @@ def process_keys(*keys: str | KeyboardKeys | Any) -> list[str]:
 
 
 # Utils: file -------------------------------------------------------------------------------------
-def is_file(path: str | Any) -> bool:
-    """Check if the path is a file `<bool>`."""
+def is_path_dir(path: str | Any) -> bool:
+    """Check if a path exists and is a directory `<bool>`."""
     try:
-        return isfile(path)
+        return exists(path) and isdir(path)
     except Exception:
         return False
 
 
-def is_file_exists(path: str | Any) -> bool:
-    """Check if the file/path exists `<bool>`."""
+def is_path_file(path: str | Any) -> bool:
+    """Check if a path exists and is a file `<bool>`."""
     try:
-        return exists(path)
+        return exists(path) and isfile(path)
     except Exception:
         return False
 
@@ -385,7 +385,7 @@ def is_file_exists(path: str | Any) -> bool:
 def is_file_dir_exists(file: str | Any) -> bool:
     """Check if the file's directory exists `<bool>`."""
     try:
-        return exists(dirname(file))
+        return is_path_dir(dirname(file))
     except Exception:
         return False
 

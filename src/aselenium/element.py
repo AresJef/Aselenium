@@ -26,7 +26,7 @@ from aselenium.service import BaseService
 from aselenium.connection import Connection
 from aselenium.shadow import Shadow, SHADOWROOT_KEY
 from aselenium.utils import Rectangle, KeyboardKeys
-from aselenium.utils import is_file, is_file_dir_exists, process_keys
+from aselenium.utils import is_path_file, is_file_dir_exists, process_keys
 
 if TYPE_CHECKING:
     from aselenium.session import Session
@@ -293,7 +293,7 @@ class Element:
         """
         # Validate
         for file in files:
-            if not is_file(file):
+            if not is_path_file(file):
                 raise errors.FileNotExistsError(
                     "<{}>\nInvalid file to upload: {}".format(
                         self.__class__.__name__, repr(file)
@@ -844,7 +844,7 @@ class Element:
         except errors.InvalidMethodError:
             return None
         try:
-            return self._session._decode_base64(res["value"])
+            return self._session._decode_base64(res["value"], "ascii")
         except KeyError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to get element screenshot from "
@@ -884,8 +884,8 @@ class Element:
                 return False
             # Save screenshot
             try:
-                with open(path, "wb") as f:
-                    f.write(data)
+                with open(path, "wb") as file:
+                    file.write(data)
                 return True
             except OSError:
                 return False

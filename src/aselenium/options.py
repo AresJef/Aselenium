@@ -22,7 +22,7 @@ from platform import system
 from base64 import b64encode
 from typing import Any, Literal
 from aselenium import errors
-from aselenium.utils import is_file_exists, prettify_dict
+from aselenium.utils import is_path_file, prettify_dict
 from aselenium.settings import Constraint, DefaultTimeouts
 
 __all__ = ["BaseOptions", "ChromiumBaseOptions", "Proxy", "Timeouts"]
@@ -1137,12 +1137,7 @@ class ChromiumBaseOptions(BaseOptions):
             return None  # exit
 
         # Set binary location
-        if not isinstance(src, str):
-            raise errors.InvalidOptionsError(
-                "<{}>\n'binary_location' must be type of "
-                "`<str>`.".format(self.__class__.__name__)
-            )
-        if not is_file_exists(src):
+        if not is_path_file(src):
             raise errors.InvalidOptionsError(
                 "<{}>\nBrowser 'binary_location' not found at: "
                 "{}".format(self.__class__.__name__, repr(src))
@@ -1269,7 +1264,7 @@ class ChromiumBaseOptions(BaseOptions):
     def add_extensions(self, *paths: str) -> None:
         """Add extensions to the browser (through local file).
 
-        :param paths: `<str>` The path to the extension file (\\*.crx).
+        :param paths: `<str>` The paths to the extension files (\\*.crx).
 
         ### Example:
         >>> options.add_extensions(
@@ -1282,13 +1277,8 @@ class ChromiumBaseOptions(BaseOptions):
         added = False
         for path in paths:
             # . validate ext path
-            if not isinstance(path, str):
-                raise errors.InvalidOptionsExtensionError(
-                    "<{}>\nExtension file path is not valid: "
-                    "{} {}".format(self.__class__.__name__, type(path), repr(path))
-                )
-            if not is_file_exists(path):
-                raise errors.InvalidOptionsExtensionError(
+            if not is_path_file(path):
+                raise errors.InvalidExtensionError(
                     "<{}>\nExtension file not found at: "
                     "{}".format(self.__class__.__name__, repr(path))
                 )
@@ -1297,9 +1287,9 @@ class ChromiumBaseOptions(BaseOptions):
                 with open(path, "rb") as f:
                     data = b64encode(f.read()).decode("utf-8")
             except Exception as err:
-                raise errors.InvalidOptionsExtensionError(
-                    "<{}>\nFailed to encode extension from: {}\n"
-                    "Error: {}".format(self.__class__.__name__, path, err)
+                raise errors.InvalidExtensionError(
+                    "<{}>\nFailed to encode extension at: {}\n"
+                    "Error: {}".format(self.__class__.__name__, repr(path), err)
                 ) from err
             # . add ext data
             if data not in self._extensions:
@@ -1323,7 +1313,7 @@ class ChromiumBaseOptions(BaseOptions):
             if isinstance(ext, bytes):
                 ext = ext.decode("utf-8")
             elif not isinstance(ext, str):
-                raise errors.InvalidOptionsExtensionError(
+                raise errors.InvalidExtensionError(
                     "<{}>\nExtension data is not valid: {} {}".format(
                         self.__class__.__name__, type(ext), repr(ext)
                     )

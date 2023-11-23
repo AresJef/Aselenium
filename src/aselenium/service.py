@@ -28,7 +28,7 @@ from socket import socket, AF_INET, SOCK_STREAM, create_connection
 from psutil import Process as psutil_Process
 from aiohttp import ClientSession, ClientConnectorError
 from aselenium import errors
-from aselenium.utils import is_file_exists
+from aselenium.utils import is_path_file
 
 __all__ = ["BaseService", "ChromiumBaseService"]
 
@@ -92,7 +92,7 @@ class BaseService:
             return None  # exit
 
         # Set executable
-        if not is_file_exists(executable):
+        if not is_path_file(executable):
             raise errors.ServiceExecutableNotFoundError(
                 "`<{}>`\nService (webdriver) executable not found at: {}".format(
                     self.__class__.__name__, repr(executable)

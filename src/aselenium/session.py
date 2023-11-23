@@ -20,8 +20,8 @@ from __future__ import annotations
 from math import ceil
 from uuid import uuid4
 from copy import deepcopy
-from base64 import b64decode
 from time import time as unix_time
+from base64 import b64decode, b64encode
 from asyncio import sleep, CancelledError
 from typing import Any, Literal, Awaitable
 from aselenium.logs import logger
@@ -651,8 +651,6 @@ class Session:
         self._window_by_handle: dict[str, Window] = {}
         # Script
         self._script_by_name: dict[str, JavaScript] = {}
-        # Devtools cmd
-        self._cdp_cmd_by_name: dict[str, DevToolsCMD] = {}
         # Status
         self.__closed: bool = False
 
@@ -1184,7 +1182,7 @@ class Session:
         """
         res = await self.execute_command(Command.SCREENSHOT)
         try:
-            return self._decode_base64(res["value"])
+            return self._decode_base64(res["value"], "ascii")
         except KeyError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to parse screenshot data from "
@@ -1227,20 +1225,19 @@ class Session:
                 return False
             # . save screenshot
             try:
-                with open(path, "wb") as f:
-                    f.write(data)
+                with open(path, "wb") as file:
+                    file.write(data)
                 return True
             except Exception as err:
                 logger.error(
-                    "<{}> Failed to save screenshot: {}".format(
-                        self.__class__.__name__, err
-                    )
+                    "<{}> Failed to save screenshot: "
+                    "{}".format(self.__class__.__name__, err)
                 )
                 return False
         finally:
             del data
 
-    async def print_pdf(
+    async def print_page(
         self,
         orientation: Literal["portrait", "landscape"] | None = None,
         scale: int | float | None = None,
@@ -1254,7 +1251,7 @@ class Session:
         shrink_to_fit: bool | None = None,
         page_ranges: list[str] | None = None,
     ) -> bytes:
-        """Print PDF of the active page window.
+        """Print the active page window into PDF.
 
         :param orientation: `<str>` The print orientation. Accepts: "portrait", "landscape".
         :param scale: `<int/float>` The scale of the page rendering. Must between 0.1 - 2.
@@ -1270,7 +1267,7 @@ class Session:
         :return `<bytes>`: The page PDF data.
 
         ### Example:
-        >>> await session.take_pdf()
+        >>> await session.print_page()
             # b'iVBORw0KGgoAAAANSUhEUgAA...'
         """
 
@@ -1363,7 +1360,7 @@ class Session:
         # Print request
         res = await self.execute_command(Command.PRINT_PAGE, body=options)
         try:
-            return self._decode_base64(res["value"])
+            return self._decode_base64(res["value"], "ascii")
         except KeyError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to parse print data from "
@@ -1376,7 +1373,7 @@ class Session:
                 )
             ) from err
 
-    async def save_pdf(
+    async def save_page(
         self,
         path: str,
         orientation: Literal["portrait", "landscape"] | None = None,
@@ -1408,7 +1405,7 @@ class Session:
         :return `<bool>`: True if the PDF has been saved, False if failed.
 
         ### Example:
-        >>> await session.save_pdf("~/path/to/screenshot.pdf")  # True / False
+        >>> await session.save_page("~/path/to/screenshot.pdf")  # True / False
         """
         # Validate pdf path
         if not is_file_dir_exists(path):
@@ -1425,7 +1422,7 @@ class Session:
         data = None
         try:
             # . print pdf
-            data = await self.print_pdf(
+            data = await self.print_page(
                 orientation=orientation,
                 scale=scale,
                 background=background,
@@ -1442,8 +1439,8 @@ class Session:
                 return False
             # . save pdf
             try:
-                with open(path, "wb") as f:
-                    f.write(data)
+                with open(path, "wb") as file:
+                    file.write(data)
                 return True
             except Exception as err:
                 logger.error(
@@ -3470,9 +3467,13 @@ class Session:
         """(Internal) Check if the given object is an `<Element>` instance."""
         return isinstance(element, Element)
 
-    def _decode_base64(self, data: str, encoding: str = "ascii") -> bytes:
-        """(Internal) Decode base64 string `<bytes>`."""
+    def _decode_base64(self, data: str, encoding: str) -> str:
+        """(Internal) Decode base64 string to `<bytes>`."""
         return b64decode(data.encode(encoding))
+
+    def _encode_base64(self, data: bytes, encoding: str) -> str:
+        """(Internal) Encode bytes to base64 `<str>`."""
+        return b64encode(data).decode(encoding)
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
@@ -3514,8 +3515,6 @@ class Session:
         self._window_by_handle = None
         # Script
         self._script_by_name = None
-        # Devtools cmd
-        self._cdp_cmd_by_name = None
         # Status
         self.__closed = True
 
@@ -3567,6 +3566,8 @@ class ChromiumBaseSession(Session):
         service: ChromiumBaseService,
     ) -> None:
         super().__init__(options, service)
+        # Devtools cmd
+        self._cdp_cmd_by_name: dict[str, DevToolsCMD] = {}
 
     # Basic -------------------------------------------------------------------------------
     @property
@@ -4114,6 +4115,13 @@ class ChromiumBaseSession(Session):
                 "<{}>\nFailed to parse logs from "
                 "response: {}".format(self.__class__.__name__, res)
             ) from err
+
+    # Special methods ---------------------------------------------------------------------
+    def _collect_garbage(self) -> None:
+        """(Internal) Collect garbage."""
+        super()._collect_garbage()
+        # Devtools cmd
+        self._cdp_cmd_by_name = None
 
 
 class ChromiumBaseSessionContext(SessionContext):
