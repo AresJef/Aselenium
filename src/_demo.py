@@ -1,8 +1,8 @@
 import asyncio, os
 from aselenium import KeyboardKeys, Session, Proxy
-from aselenium import Edge, Chrome, Chromium, FireFox, Safari
+from aselenium import Edge, Chrome, Chromium, Firefox, Safari
 from aselenium import ChromiumBaseWebDriver, ChromiumBaseSession
-from aselenium import ChromiumBaseSession, SafariSession, FireFoxSession
+from aselenium import ChromiumBaseSession, SafariSession, FirefoxSession
 
 
 async def test_proxy() -> None:
@@ -193,10 +193,10 @@ async def test_chromium_options() -> None:
 
 
 async def test_firefox_options() -> None:
-    # FireFox options
+    # Firefox options
     print()
-    print(" FireFox Options ".center(80, "-"))
-    driver = FireFox("/Users/jef/Downloads/geckodriver/geckodriver")
+    print(" Firefox Options ".center(80, "-"))
+    driver = Firefox("/Users/jef/Downloads/geckodriver/geckodriver")
     # . browser version
     driver.options.browser_version = "119.0.1"
     # . platform name
@@ -320,7 +320,7 @@ async def test_cancellation() -> None:
     print()
 
     print()
-    print(" FireFox Cancellation ".center(80, "-"))
+    print(" Firefox Cancellation ".center(80, "-"))
     task = asyncio.create_task(test_firefox_options())
     await asyncio.sleep(2)
     task.cancel()
@@ -436,7 +436,7 @@ async def test_driver(browser: str = "chrome") -> None:
             path = os.path.join(fld_path, "save_pdf")
             print("save_page:", await s.save_page(path), sep="\t")
 
-        if isinstance(s, FireFoxSession):
+        if isinstance(s, FirefoxSession):
             sch_bar = await s.find_element("#kw", by="css")
             await sch_bar.send("Hello world!", pause=0.5)
             sch_btn = await s.find_element("#su", by="css")
@@ -1482,7 +1482,7 @@ async def test_driver(browser: str = "chrome") -> None:
                 .send_keys(KeyboardKeys.ENTER, pause=1)
                 .perform()
             )
-            if isinstance(s, FireFoxSession):
+            if isinstance(s, FirefoxSession):
                 await asyncio.sleep(10)
             title = await s.title
             print("[AC] keyboards:\t\t", title.startswith("Hello World!"), sep="\t")
@@ -1501,7 +1501,7 @@ async def test_driver(browser: str = "chrome") -> None:
                 .send_keys(KeyboardKeys.ENTER, pause=1)
                 .perform()
             )
-            if isinstance(s, FireFoxSession):
+            if isinstance(s, FirefoxSession):
                 await asyncio.sleep(5)
 
             await s.actions().scroll_by(y=500, pause=1).perform()
@@ -1526,7 +1526,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def permission(s: ChromiumBaseSession) -> None:
         # Skip Firefox
-        if isinstance(s, FireFoxSession):
+        if isinstance(s, FirefoxSession):
             return None
 
         print(" Permission Commands ".center(80, "-"))
@@ -1682,9 +1682,9 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
-    async def firefox_context(s: FireFoxSession) -> None:
+    async def firefox_context(s: FirefoxSession) -> None:
         # Firefox only
-        if not isinstance(s, FireFoxSession):
+        if not isinstance(s, FirefoxSession):
             return None
 
         print(" Firefox Context Commands ".center(80, "-"))
@@ -1701,9 +1701,9 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
-    async def firefox_addon(s: FireFoxSession) -> None:
+    async def firefox_addon(s: FirefoxSession) -> None:
         # Firefox only
-        if not isinstance(s, FireFoxSession):
+        if not isinstance(s, FirefoxSession):
             return None
 
         print(" Firefox Addon Commands ".center(80, "-"))
@@ -1732,7 +1732,7 @@ async def test_driver(browser: str = "chrome") -> None:
     elif browser == "chromium":
         driver = Chromium("/Users/jef/Downloads/chromiumdriver_mac64/chromedriver")
     elif browser == "firefox":
-        driver = FireFox("/Users/jef/Downloads/geckodriver/geckodriver")
+        driver = Firefox("/Users/jef/Downloads/geckodriver/geckodriver")
     elif browser == "safari":
         driver = Safari("/usr/bin/safaridriver")
     else:
@@ -1794,15 +1794,15 @@ async def test_driver(browser: str = "chrome") -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(test_proxy())
-    asyncio.run(test_edge_options())
-    asyncio.run(test_chrome_options())
-    asyncio.run(test_chromium_options())
-    asyncio.run(test_firefox_options())
-    asyncio.run(test_safari_options())
-    asyncio.run(test_cancellation())
-    asyncio.run(test_driver("edge"))
-    asyncio.run(test_driver("chrome"))
-    asyncio.run(test_driver("chromium"))
+    # asyncio.run(test_proxy())
+    # asyncio.run(test_edge_options())
+    # asyncio.run(test_chrome_options())
+    # asyncio.run(test_chromium_options())
+    # asyncio.run(test_firefox_options())
+    # asyncio.run(test_safari_options())
+    # asyncio.run(test_cancellation())
+    # asyncio.run(test_driver("edge"))
+    # asyncio.run(test_driver("chrome"))
+    # asyncio.run(test_driver("chromium"))
     asyncio.run(test_driver("firefox"))
-    asyncio.run(test_driver("safari"))
+    # asyncio.run(test_driver("safari"))
