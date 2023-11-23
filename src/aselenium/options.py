@@ -21,9 +21,10 @@ from copy import deepcopy
 from platform import system
 from base64 import b64encode
 from typing import Any, Literal
+from os.path import join as join_path
 from aselenium import errors
-from aselenium.utils import is_path_file, prettify_dict
 from aselenium.settings import Constraint, DefaultTimeouts
+from aselenium.utils import is_path_file, is_path_dir, prettify_dict
 
 __all__ = ["BaseOptions", "ChromiumBaseOptions", "Proxy", "Timeouts"]
 
@@ -149,7 +150,7 @@ class Proxy:
     @auto_detect.setter
     def auto_detect(self, value: bool) -> None:
         if not isinstance(value, bool):
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 "<{}>\nInvalid `auto_detect`, must be type of "
                 "`<bool>`.".format(self.__class__.__name__)
             )
@@ -173,7 +174,7 @@ class Proxy:
         if isinstance(value, str):
             self._proxy_type = "PAC"
         elif value is not None:
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 "<{}>\nInvalid `pac_url`, must be type of "
                 "`<str>` or `None`.".format(self.__class__.__name__)
             )
@@ -192,14 +193,14 @@ class Proxy:
     def ftp_proxy(self, value: str | None) -> None:
         if isinstance(value, str):
             if not value.startswith("ftp://"):
-                raise errors.InvalidOptionsProxyError(
+                raise errors.InvalidProxyError(
                     "<{}>\n`ftp_proxy` must start with 'ftp://', "
                     "instead got: {}.".format(self.__class__.__name__, repr(value))
                 )
             value = value.split("://", 1)[1]
             self._proxy_type = "MANUAL"
         elif value is not None:
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 "<{}>\nInvalid `ftp_proxy`, must be type of "
                 "`<str>` or `None`.".format(self.__class__.__name__)
             )
@@ -216,14 +217,14 @@ class Proxy:
     def http_proxy(self, value: str | None) -> None:
         if isinstance(value, str):
             if not value.startswith("http://") and not value.startswith("https://"):
-                raise errors.InvalidOptionsProxyError(
+                raise errors.InvalidProxyError(
                     "<{}>\n`http_proxy` must start with 'http://' or 'https://', "
                     "instead got: {}.".format(self.__class__.__name__, repr(value))
                 )
             value = value.split("://", 1)[1]
             self._proxy_type = "MANUAL"
         elif value is not None:
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 "<{}>\nInvalid `http_proxy`, must be type of "
                 "`<str>` or `None`.".format(self.__class__.__name__)
             )
@@ -240,14 +241,14 @@ class Proxy:
     def https_proxy(self, value: str | None) -> None:
         if isinstance(value, str):
             if not value.startswith("https://") and not value.startswith("http://"):
-                raise errors.InvalidOptionsProxyError(
+                raise errors.InvalidProxyError(
                     "<{}>\n`https_proxy` must start with 'https://' or 'http://', "
                     "instead got: {}.".format(self.__class__.__name__, repr(value))
                 )
             value = value.split("://", 1)[1]
             self._proxy_type = "MANUAL"
         elif value is not None:
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 "<{}>\nInvalid `https_proxy`, must be type of "
                 "`<str>` or `None`.".format(self.__class__.__name__)
             )
@@ -268,7 +269,7 @@ class Proxy:
             elif value.startswith("socks4://"):
                 self._socks_version = 4
             else:
-                raise errors.InvalidOptionsProxyError(
+                raise errors.InvalidProxyError(
                     "<{}>\n`socks_proxy` must start with 'socks5://' or 'socks4://', "
                     "instead got: {}.".format(self.__class__.__name__, repr(value))
                 )
@@ -279,7 +280,7 @@ class Proxy:
             self._socks_username = None
             self._socks_password = None
         else:
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 "<{}>\nInvalid `socks_proxy`, must be type of "
                 "`<str>` or `None`.".format(self.__class__.__name__)
             )
@@ -296,7 +297,7 @@ class Proxy:
         if isinstance(value, str):
             self._proxy_type = "MANUAL"
         elif value is not None:
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 "<{}>\nInvalid `socks_username`, must be type of "
                 "`<str>` or `None`.".format(self.__class__.__name__)
             )
@@ -313,7 +314,7 @@ class Proxy:
         if isinstance(value, str):
             self._proxy_type = "MANUAL"
         elif value is not None:
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 "<{}>\nInvalid `socks_password`, must be type of "
                 "`<str>` or `None`.".format(self.__class__.__name__)
             )
@@ -336,13 +337,13 @@ class Proxy:
             try:
                 value = ",".join(value)
             except Exception as err:
-                raise errors.InvalidOptionsProxyError(
+                raise errors.InvalidProxyError(
                     "<{}>\nInvalid `no_proxy`, list of addresses items must "
                     "all be type of `<str>`.".format(self.__class__.__name__)
                 ) from err
             self._proxy_type = "MANUAL"
         elif value is not None:
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 "<{}>\nInvalid `no_proxy`, must be type of `<str>`, "
                 "`<list[str>]>` or `None`.".format(self.__class__.__name__)
             )
@@ -616,6 +617,94 @@ class Timeouts:
         return Timeouts(self._implicit, self._pageLoad, self._script, unit="ms")
 
 
+class Profile:
+    """Represents the profile configuration for Chromium based browser.
+    Such as: Edge, Chrome, Chromium, etc.
+    """
+
+    def __init__(self, directory: str, profile: str) -> None:
+        """The profile configuration for Chromium based browser.
+        Such as: Edge, Chrome, Chromium, etc.
+
+        :param directory: `<str>` The main directory contains the profile folder.
+        :param profile: `<str>` The name of the profile folder.
+
+        ### For Example
+        >>> # . the default profile directory for Chrome on MacOS:
+            directory="/Users/<username>/Library/Application Support/Google/Chrome"
+            profile="Default"
+
+        >>> # . the default profile directory for Chrome on Windows:
+            directory="C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data"
+            profile="Default"
+
+        >>> # . the default profile directory for Chrome on Linux:
+            directory="/home/<username>/.config/google-chrome"
+            profile="Default"
+        """
+        self.directory = directory
+        self.profile = profile
+
+    # Properties --------------------------------------------------------------------------
+    @property
+    def directory(self) -> str:
+        """Access the main directory contains the profile folder `<str>`."""
+        return self._directory
+
+    @directory.setter
+    def directory(self, value: str) -> None:
+        if not is_path_dir(value):
+            raise errors.InvalidProfileError(
+                "<{}>\nInvalid profile directory: {} {}".format(
+                    self.__class__.__name__, repr(value), type(value)
+                )
+            )
+        self._directory = value
+
+    @property
+    def profile(self) -> str:
+        """Access the name of the profile folder `<str>`."""
+        return self._profile
+
+    @profile.setter
+    def profile(self, value: str) -> None:
+        if not isinstance(value, str):
+            raise errors.InvalidProfileError(
+                "<{}>\nInvalid name for the profile folder: {} {}".format(
+                    self.__class__.__name__, repr(value), type(value)
+                )
+            )
+        full_path = join_path(self._directory, value)
+        if not is_path_dir(full_path):
+            raise errors.InvalidProfileError(
+                "<{}>\nProfile folder not found at: {}".format(
+                    self.__class__.__name__, repr(full_path)
+                )
+            )
+        self._profile = value
+
+    # Special methods ---------------------------------------------------------------------
+    def __repr__(self) -> str:
+        return "<%s (directory='%s', profile='%s')>" % (
+            self.__class__.__name__,
+            self._directory,
+            self._profile,
+        )
+
+    def __hash__(self) -> int:
+        return hash(self.__repr__())
+
+    def __eq__(self, __o: object) -> bool:
+        return hash(self) == hash(__o) if isinstance(__o, self.__class__) else False
+
+    def __bool__(self) -> bool:
+        return True
+
+    def copy(self) -> Profile:
+        """Copy the profile object."""
+        return Profile(self._directory, self._profile)
+
+
 # Base Options ------------------------------------------------------------------------------------
 class BaseOptions:
     """The base class for browser options.
@@ -842,7 +931,7 @@ class BaseOptions:
 
         # Set proxy
         if not isinstance(proxy, Proxy):
-            raise errors.InvalidOptionsProxyError(
+            raise errors.InvalidProxyError(
                 f"<{self.__class__.__name__}>\n`proxy` "
                 "must be an instance of `<class 'Proxy'>`."
             )
@@ -1005,7 +1094,7 @@ class BaseOptions:
         added = False
         for arg in args:
             if not isinstance(arg, str) or not arg:
-                raise errors.InvalidOptionsArgumentError(
+                raise errors.InvalidCapabilitiesError(
                     "<{}>\nSpecifed 'argument' is not valid: {} {}.".format(
                         self.__class__.__name__, type(arg), repr(arg)
                     )
@@ -1100,6 +1189,7 @@ class ChromiumBaseOptions(BaseOptions):
                 "please refer to class docs."
             )
         # Settings
+        self._profile: Profile | None = None
         self._experimental_options: dict[str, Any] = {}
         self._preferences: dict[str, Any] = {}
         self._extensions: list[str] = []
@@ -1210,6 +1300,73 @@ class ChromiumBaseOptions(BaseOptions):
         :return `<Any/None>` The value of the experimental option, `None` if option not set.
         """
         return self._experimental_options.get(name)
+
+    # # Caps: profile -----------------------------------------------------------------------
+    @property
+    def profile(self) -> Profile | None:
+        """Access the profile of the browser `<Profile>`.
+        Returns `None` if profile is not configured.
+        """
+        return self._profile
+
+    def set_profile(self, directory: str, profile: str) -> Profile:
+        """Set the profile configuration for the Chromium based browser.
+        Such as: Edge, Chrome, Chromium, etc.
+
+        :param directory: `<str>` The main directory contains the profile folder.
+        :param profile: `<str>` The name of the profile folder.
+        :return `<Profile>`: The profile instance.
+
+        ### Explain:
+        >>> # . this method is equivalent to:
+            driver.options.add_arguments(
+                "--user-data-dir=%s" % directory,
+                "--profile-directory=%s" % profile,
+            )
+
+        ### Example:
+        >>> # . the default profile directory for Chrome on MacOS:
+            directory="/Users/<username>/Library/Application Support/Google/Chrome"
+            profile="Default"
+
+        >>> # . the default profile directory for Chrome on Windows:
+            directory="C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data"
+            profile="Default"
+
+        >>> # . the default profile directory for Chrome on Linux:
+            directory="/home/<username>/.config/google-chrome"
+            profile="Default"
+        """
+        self._profile = Profile(directory, profile)
+        self.add_arguments(
+            "--user-data-dir=%s" % self._profile.directory,
+            "--profile-directory=%s" % self._profile.profile,
+        )
+        return self._profile
+
+    def rem_profile(self) -> None:
+        """Remove the previously configured profile for the browser.
+
+        ### Example:
+        >>> # . set profile
+            options.set_profile(directory, profile)
+
+        >>> # . remove the profile
+            options.rem_profile()
+        """
+        # Profile not set
+        if self._profile is None:
+            return None  # exit
+
+        # Remove profile
+        self._arguments = [
+            arg
+            for arg in self._arguments
+            if not arg.startswith("--user-data-dir=")
+            and not arg.startswith("--profile-directory=")
+        ]
+        self._profile = None
+        return None
 
     # Options: preferences ----------------------------------------------------------------
     @property
