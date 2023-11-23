@@ -1,4 +1,4 @@
-import asyncio
+import asyncio, os
 from aselenium import KeyboardKeys, Session, Proxy
 from aselenium import Edge, Chrome, Chromium, FireFox, Safari
 from aselenium import ChromiumBaseWebDriver, ChromiumBaseSession
@@ -427,12 +427,26 @@ async def test_driver(browser: str = "chrome") -> None:
         print("page_source:", bool(page_source), page_source[:50] + "...", sep="\t")
         screenshot = await s.take_screenshot()
         print("screenshot:", bool(screenshot), screenshot[:30], sep="\t")
-        print("save_sshot:", await s.save_screenshot(image), sep="\t")
+        path = os.path.join(fld_path, "screenshot")
+        print("save_sshot:", await s.save_screenshot(path), sep="\t")
 
-        pdf = await s.print_pdf()
+        pdf = await s.print_page()
         if pdf is not None:
-            print("print_pdf:", bool(pdf), pdf[:30], sep="\t")
-            print("save_pdf:", await s.save_pdf(image), sep="\t")
+            print("print_page:", bool(pdf), pdf[:30], sep="\t")
+            path = os.path.join(fld_path, "save_pdf")
+            print("save_page:", await s.save_page(path), sep="\t")
+
+        if isinstance(s, FireFoxSession):
+            sch_bar = await s.find_element("#kw", by="css")
+            await sch_bar.send("Hello world!", pause=0.5)
+            sch_btn = await s.find_element("#su", by="css")
+            await sch_btn.click()
+            await s.wait_until_title("startswith", "Hello", 10)
+
+            full_st = await s.take_full_screenshot()
+            print("take_full_screenshot:", bool(full_st), full_st[:30], sep="\t")
+            path = os.path.join(fld_path, "full_screenshot")
+            print("save_full_screenshot:", await s.save_full_screenshot(path), sep="\t")
 
         print("-" * 80)
         print()
@@ -441,8 +455,8 @@ async def test_driver(browser: str = "chrome") -> None:
         print(" Timeout Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
         await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
-        # fmt: off
 
+        # fmt: off
         init_timeouts = await s.timeouts
         print("timeouts:", init_timeouts, sep="\t")
 
@@ -463,8 +477,8 @@ async def test_driver(browser: str = "chrome") -> None:
               (init_timeouts.implicit, init_timeouts.pageLoad, init_timeouts.script) == 
               (rest_timeouts.implicit, rest_timeouts.pageLoad, rest_timeouts.script),
               rest_timeouts, sep="\t")
-
         # fmt: on
+
         print("-" * 80)
         print()
 
@@ -595,7 +609,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def alert(s: Session) -> None:
         # Skip Safari
-        if browser == "safari":
+        if isinstance(s, SafariSession):
             return None
 
         print(" Alert Commands ".center(80, "-"))
@@ -636,7 +650,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def frame(s: Session) -> None:
         # Skip Safari
-        if browser == "safari":
+        if isinstance(s, SafariSession):
             return None
 
         print(" Frame Commands ".center(80, "-"))
@@ -748,7 +762,7 @@ async def test_driver(browser: str = "chrome") -> None:
             print("wait_until_element [gone] (css):", res is True, res, sep="\t")
             res = await s.wait_until_element("gone", vil_css1, timeout=1)
             print("wait_until_element [gone] (css):", res is False, res, sep="\t")
-            if browser != "safari":
+            if not isinstance(s, SafariSession):
                 res = await s.wait_until_element("visible", vil_css1, timeout=1)
                 print("wait_until_element [visible] (css):", res is True, res, sep="\t")
                 res = await s.wait_until_element("selected", vil_css1, timeout=1)
@@ -771,7 +785,7 @@ async def test_driver(browser: str = "chrome") -> None:
             print("wait_until_elements [gone] (css):", res is True, res, sep="\t")
             res = await s.wait_until_elements("gone", *mix_csses, all_=True, timeout=1)
             print("wait_until_elements [gone] (css):", res is False, res, sep="\t")
-            if browser != "safari":
+            if not isinstance(s, SafariSession):
                 res = await s.wait_until_elements("visible", *vil_csses, timeout=1)
                 print("wait_until_elements [visible] (css):", res is True, res, sep="\t")
                 res = await s.wait_until_elements("visible", *mix_csses, all_=False, timeout=1)
@@ -827,7 +841,7 @@ async def test_driver(browser: str = "chrome") -> None:
             print("[el] wait_until_element [gone] (css):\t", res is True, res, sep="\t")
             res = await sb.wait_until_element("gone", vil_css1, timeout=1)
             print("[el] wait_until_element [gone] (css):\t", res is False, res, sep="\t")
-            if browser != "safari":
+            if not isinstance(s, SafariSession):
                 res = await sb.wait_until_element("visible", vil_css1, timeout=1)
                 print("[el] wait_until_element [visible] (css):", res is True, res, sep="\t")
                 res = await sb.wait_until_element("selected", vil_css1, timeout=1)
@@ -850,7 +864,7 @@ async def test_driver(browser: str = "chrome") -> None:
             print("[el] wait_until_elements [gone] (css):\t", res is True, res, sep="\t")
             res = await sb.wait_until_elements("gone", *mix_csses, all_=True, timeout=1)
             print("[el] wait_until_elements [gone] (css):\t", res is False, res, sep="\t")
-            if browser != "safari":
+            if not isinstance(s, SafariSession):
                 res = await sb.wait_until_elements("visible", *vil_csses, timeout=1)
                 print("[el] wait_until_elements [visible] (css):", res is True, res, sep="\t")
                 res = await sb.wait_until_elements("visible", *mix_csses, all_=False, timeout=1)
@@ -913,7 +927,7 @@ async def test_driver(browser: str = "chrome") -> None:
             print("wait_until_element [gone] (xpath):", res is True, res, sep="\t")
             res = await s.wait_until_element("gone", vil_xp1, by="xpath", timeout=1)
             print("wait_until_element [gone] (xpath):", res is False, res, sep="\t")
-            if browser != "safari":
+            if not isinstance(s, SafariSession):
                 res = await s.wait_until_element("visible", vil_xp1, by="xpath", timeout=1)
                 print("wait_until_element [visible] (xpath):", res is True, res, sep="\t")
                 res = await s.wait_until_element("selected", vil_xp1, by="xpath", timeout=1)
@@ -936,7 +950,7 @@ async def test_driver(browser: str = "chrome") -> None:
             print("wait_until_elements [gone] (xpath):", res is True, res, sep="\t")
             res = await s.wait_until_elements("gone", *mix_xps, by="xpath", all_=True, timeout=1)
             print("wait_until_elements [gone] (xpath):", res is False, res, sep="\t")
-            if browser != "safari":
+            if not isinstance(s, SafariSession):
                 res = await s.wait_until_elements("visible", *vil_xps, by="xpath", timeout=1)
                 print("wait_until_elements [visible] (xpath):", res is True, res, sep="\t")
                 res = await s.wait_until_elements("visible", *mix_xps, by="xpath", all_=False, timeout=1)
@@ -992,7 +1006,7 @@ async def test_driver(browser: str = "chrome") -> None:
             print("[el] wait_until_element [gone] (xpath):\t", res is True, res, sep="\t")
             res = await sb.wait_until_element("gone", vil_xp1, by="xpath", timeout=1)
             print("[el] wait_until_element [gone] (xpath):\t", res is False, res, sep="\t")
-            if browser != "safari":
+            if not isinstance(s, SafariSession):
                 res = await sb.wait_until_element("visible", vil_xp1, by="xpath", timeout=1)
                 print("[el] wait_until_element [visible] (xpath):", res is True, res, sep="\t")
                 res = await sb.wait_until_element("selected", vil_xp1, by="xpath", timeout=1)
@@ -1015,7 +1029,7 @@ async def test_driver(browser: str = "chrome") -> None:
             print("[el] wait_until_elements [gone] (xpath):", res is True, res, sep="\t")
             res = await sb.wait_until_elements("gone", *mix_xps, by="xpath", all_=True, timeout=1)
             print("[el] wait_until_elements [gone] (xpath):", res is False, res, sep="\t")
-            if browser != "safari":
+            if not isinstance(s, SafariSession):
                 res = await sb.wait_until_elements("visible", *vil_xps, by="xpath", timeout=1)
                 print("[el] wait_until_elements [visible] (xpath):", res is True, res, sep="\t")
                 res = await sb.wait_until_elements("visible", *mix_xps, by="xpath", all_=False, timeout=1)
@@ -1031,7 +1045,7 @@ async def test_driver(browser: str = "chrome") -> None:
             print()
 
         # Skip safari
-        if browser != "safari":
+        if not isinstance(s, SafariSession):
             print("Load 'image.baidu.com/'")
             await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
 
@@ -1088,7 +1102,8 @@ async def test_driver(browser: str = "chrome") -> None:
             el = await s.find_element("span.soutu-btn", by="css")
             screenshot = await el.take_screenshot()
             print("[el] take_screenshot", bool(screenshot), screenshot[:30], sep="\t")
-            print("el.save_screenshot", await el.save_screenshot(image + "_button"), sep="\t")
+            path = os.path.join(fld_path, "screenshot_button")
+            print("el.save_screenshot", await el.save_screenshot(path), sep="\t")
             print()
 
         # Control
@@ -1133,8 +1148,7 @@ async def test_driver(browser: str = "chrome") -> None:
         el = await s.find_element("span.soutu-btn")
         await el.click(pause=0.5)
         el = await s.find_element("input.upload-pic")
-        path = "/Users/jef/Pwork/Github_Repo/Simple_Toolbox/src/captcha-test.png"
-        await el.upload(path)
+        await el.upload(os.path.join(fld_path, "captcha-test.png"))
         await s.wait_until_url("startswith", "https://graph.baidu.com/", timeout=20)
         print("[el] upload:\t", True, sep="\t")
         await asyncio.sleep(2)
@@ -1145,7 +1159,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def shadow(s: Session) -> None:
         # Skip Safari
-        if browser == "safari":
+        if isinstance(s, SafariSession):
             return None
 
         print(" Shadow Commands ".center(80, "-"))
@@ -1153,8 +1167,7 @@ async def test_driver(browser: str = "chrome") -> None:
         url = "https://www.htmlelements.com/demos/menu/shadow-dom/index.htm"
         await s.load(url, timeout=FORCE_TIMEOUT, retry=True)
         shadow_css = "smart-ui-menu.smart-ui-component"
-        while not await s.element_exists(shadow_css):
-            await asyncio.sleep(0.2)
+        await s.wait_until_element("exist", shadow_css, timeout=100)
         sd = await s.get_shadow(shadow_css)
         print("shadow root:", sd is not None, sd, sep="\t")
         vil_css1 = "div[smart-id='container']"
@@ -1309,7 +1322,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def actions(s: Session) -> None:
         # Skip Safari
-        if browser == "safari":
+        if isinstance(s, SafariSession):
             return None
 
         print(" Actions Commands ".center(80, "-"))
@@ -1469,10 +1482,10 @@ async def test_driver(browser: str = "chrome") -> None:
                 .send_keys(KeyboardKeys.ENTER, pause=1)
                 .perform()
             )
-            if browser == "firefox":
+            if isinstance(s, FireFoxSession):
                 await asyncio.sleep(10)
             title = await s.title
-            print("[AC] keyboards:\t", title.startswith("Hello World!"), sep="\t")
+            print("[AC] keyboards:\t\t", title.startswith("Hello World!"), sep="\t")
             print()
 
         if 1:
@@ -1488,7 +1501,7 @@ async def test_driver(browser: str = "chrome") -> None:
                 .send_keys(KeyboardKeys.ENTER, pause=1)
                 .perform()
             )
-            if browser == "firefox":
+            if isinstance(s, FireFoxSession):
                 await asyncio.sleep(5)
 
             await s.actions().scroll_by(y=500, pause=1).perform()
@@ -1513,14 +1526,14 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def permission(s: ChromiumBaseSession) -> None:
         # Skip Firefox
-        if browser == "firefox":
+        if isinstance(s, FireFoxSession):
             return None
 
         print(" Permission Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
         await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
 
-        if browser == "safari":
+        if isinstance(s, SafariSession):
             permissions = await s.permissions
             print("permissions:", bool(permissions), permissions, sep="\t")
             p = await s.get_permission("getUserMedia")
@@ -1656,7 +1669,7 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
-    async def logs(s: Session) -> None:
+    async def logs(s: ChromiumBaseSession) -> None:
         # Chromium only
         if browser not in ("chrome", "edge", "chromium"):
             return None
@@ -1666,6 +1679,48 @@ async def test_driver(browser: str = "chrome") -> None:
         print("get_logs:", await s.get_logs("browser"))
         print("get_logs:", await s.get_logs("driver"))
         print("get_logs:", await s.get_logs("apple"))
+        print("-" * 80)
+        print()
+
+    async def firefox_context(s: FireFoxSession) -> None:
+        # Firefox only
+        if not isinstance(s, FireFoxSession):
+            return None
+
+        print(" Firefox Context Commands ".center(80, "-"))
+        print("Load 'www.baidu.com'")
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+
+        res = await s.context
+        print("context\t", res == "content", res, sep="\t")
+        res = await s.set_context("chrome")
+        print("set_context", res == "chrome", res, sep="\t")
+        res = await s.reset_context()
+        print("reset_context", res == "content", res, sep="\t")
+
+        print("-" * 80)
+        print()
+
+    async def firefox_addon(s: FireFoxSession) -> None:
+        # Firefox only
+        if not isinstance(s, FireFoxSession):
+            return None
+
+        print(" Firefox Addon Commands ".center(80, "-"))
+        print("Load 'www.baidu.com'")
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+
+        addons = [
+            os.path.join(fld_path, f) for f in os.listdir(fld_path) if f.endswith("xpi")
+        ]
+        res = await s.install_addons(*addons)
+        print("install_addons:\t", bool(res), await s.addons, sep="\t")
+        await asyncio.sleep(5)
+
+        await s.uninstall_addons(*await s.addons)
+        res = await s.addons
+        print("uninstall_addons:", not res, res, sep="\t")
+        await asyncio.sleep(5)
         print("-" * 80)
         print()
 
@@ -1689,7 +1744,8 @@ async def test_driver(browser: str = "chrome") -> None:
     FORCE_TIMEOUT = 30
 
     pause = 0.5
-    image = "/Users/jef/Desktop/image"
+    abs_path = os.path.abspath(os.path.dirname(__file__))
+    fld_path = os.path.join(abs_path, "test_files")
     async with driver.acquire() as s:
         # Base info
         await session_info(s)
@@ -1728,6 +1784,10 @@ async def test_driver(browser: str = "chrome") -> None:
         await chromium_cdp_cmds(s)
         # Logs commands
         await logs(s)
+        # Firefox context commands
+        await firefox_context(s)
+        # Firefox addon commands
+        await firefox_addon(s)
 
         # Ended
         await asyncio.sleep(5)
