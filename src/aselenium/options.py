@@ -18,10 +18,10 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 from copy import deepcopy
+import tempfile, os, shutil
 from platform import system
 from base64 import b64encode
 from typing import Any, Literal
-from os.path import join as join_path
 from aselenium import errors
 from aselenium.settings import Constraint, DefaultTimeouts
 from aselenium.utils import is_path_file, is_path_dir, prettify_dict
@@ -622,14 +622,25 @@ class ChromiumProfile:
     Such as: Edge, Chrome, Chromium, etc.
     """
 
-    def __init__(self, directory: str, profile: str) -> None:
+    def __init__(self, directory: str, profile: str, temporary: bool = False) -> None:
         """The profile configuration for Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
         :param directory: `<str>` The main directory contains the profile folder.
         :param profile: `<str>` The name of the profile folder.
+        :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `False`.
+            - If `True`, an identical temporary profile will be created based on the
+              given 'directory' and 'profile'. After all related sessions are closed,
+              the temporary profile will be deleted automatically, leaving the original
+              profile untouched.
+            - If `False`, the original profile will be used directly. Any changes made
+              during the session will be saved to the profile.
+            - *Notice*: In some rare cases (such as KeyboardInterrupt exception), the
+              temporary profile might not be deleted properly. In this case, a warning
+              message will be printed to the console, warning user to manually delete
+              the remaining temporary files if necessary.
 
-        ### For Example
+        ### Example:
         >>> # . the default profile directory for Chrome on MacOS:
             directory="/Users/<username>/Library/Application Support/Google/Chrome"
             profile="Default"
@@ -644,6 +655,12 @@ class ChromiumProfile:
         """
         self.directory = directory
         self.profile = profile
+        self._temp_directory: str = None
+        if temporary:
+            self._temp_profile: str = "TEMP_PROFILE"
+            self._create_temp_profile()
+        else:
+            self._temp_profile: str = None
 
     # Properties --------------------------------------------------------------------------
     @property
@@ -674,7 +691,7 @@ class ChromiumProfile:
                     self.__class__.__name__, repr(value), type(value)
                 )
             )
-        full_path = join_path(self._directory, value)
+        full_path = os.path.join(self._directory, value)
         if not is_path_dir(full_path):
             raise errors.InvalidProfileError(
                 "<{}>\nProfile folder not found at: {}".format(
@@ -682,6 +699,75 @@ class ChromiumProfile:
                 )
             )
         self._profile = value
+
+    @property
+    def directory_for_driver(self) -> str:
+        """Access the main directory to be used by the webdriver `<str>`.
+
+        - If temporary mode (`temporary=True`), returns the temporary
+          directory instead of the original profile directory.
+        - If the profile is in normal mode (`temporary=False`), returns
+          the original profile directory (equivalent to the 'directory'
+          attribute).
+        """
+        if self._temp_directory is None:
+            return self._directory
+        else:
+            return self._temp_directory
+
+    @property
+    def profile_for_driver(self) -> str:
+        """Access the name of the profile folder to be used by the webdriver `<str>`.
+
+        - If temporary mode (`temporary=True`), returns the temporary
+          profile folder name instead of the original profile folder.
+        - If the profile is in normal mode (`temporary=False`), returns
+          the original profile folder name (equivalent to the 'profile'
+          attribute).
+        """
+        if self._temp_profile is None:
+            return self._profile
+        else:
+            return self._temp_profile
+
+    # Temporary profile -------------------------------------------------------------------
+    def _create_temp_profile(self) -> None:
+        """(Internal) Create a temporary profile
+        based on the original profile.
+        """
+        # Temporary profile already created
+        if self._temp_directory is not None:
+            return None  # exit
+
+        # Create temporary profile
+        self._temp_directory = tempfile.mkdtemp()
+        temp_profile_dir = os.path.join(self._temp_directory, "TEMP_PROFILE")
+        shutil.copytree(os.path.join(self._directory, self._profile), temp_profile_dir)
+        os.chmod(temp_profile_dir, 0o755)
+
+    def _delete_temp_profile(self) -> None:
+        """(Internal) Delete the temporary profile
+        without affecting the original profile.
+        """
+        # Temporary profile not created
+        if self._temp_directory is None:
+            return None  # exit
+
+        # Delete temporary profile
+        warning = False
+        while is_path_dir(self._temp_directory):
+            try:
+                shutil.rmtree(self._temp_directory)
+            except OSError:
+                warning = True
+        if warning:
+            print(
+                "\n<{}> Encountered unexpected error when deleting temporary profile, "
+                "there might be some files left in the temporary directory: '{}'\n".format(
+                    self.__class__.__name__, self._temp_directory
+                )
+            )
+        self._temp_directory = None
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
@@ -700,9 +786,8 @@ class ChromiumProfile:
     def __bool__(self) -> bool:
         return True
 
-    def copy(self) -> ChromiumProfile:
-        """Copy the profile object `<ChromiumProfile>`."""
-        return ChromiumProfile(self._directory, self._profile)
+    def __del__(self):
+        self._delete_temp_profile()
 
 
 # Base Options ------------------------------------------------------------------------------------
@@ -1382,24 +1467,48 @@ class ChromiumBaseOptions(BaseOptions):
                 )
             )
         self.add_arguments(
-            "--user-data-dir=%s" % value.directory,
-            "--profile-directory=%s" % value.profile,
+            "--user-data-dir=%s" % value.directory_for_driver,
+            "--profile-directory=%s" % value.profile_for_driver,
         )
         self._profile = value
 
-    def set_profile(self, directory: str, profile: str) -> ChromiumProfile:
+    def set_profile(
+        self,
+        directory: str,
+        profile: str,
+        temporary: bool = False,
+    ) -> ChromiumProfile:
         """Set the profile configuration for the Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
         :param directory: `<str>` The main directory contains the profile folder.
         :param profile: `<str>` The name of the profile folder.
+        :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `False`.
+            - If `True`, an identical temporary profile will be created based on the
+              given 'directory' and 'profile'. After all related sessions are closed,
+              the temporary profile will be deleted automatically, leaving the original
+              profile untouched.
+            - If `False`, the original profile will be used directly. Any changes made
+              during the session will be saved to the profile.
+            - *Notice*: In some rare cases (such as KeyboardInterrupt exception), the
+              temporary profile might not be deleted properly. In this case, a warning
+              message will be printed to the console, warning user to manually delete
+              the remaining temporary files if necessary.
+
         :return `<ChromiumProfile>`: The profile instance.
 
         ### Explain:
-        >>> # . this method is equivalent to:
+        >>> # . when 'temporary=False', this method is equivalent to:
             driver.options.add_arguments(
                 "--user-data-dir=%s" % directory,
                 "--profile-directory=%s" % profile,
+            )
+
+        >>> # . when 'temporary=True', this method is equivalent to:
+            # 1. copy the profile to a temporary directory
+            driver.options.add_arguments(
+                "--user-data-dir=%s" % temp_directory,
+                "--profile-directory=%s" % temp_profile,
             )
 
         ### Example:
@@ -1415,7 +1524,7 @@ class ChromiumBaseOptions(BaseOptions):
             directory="/home/<username>/.config/google-chrome"
             profile="Default"
         """
-        self.profile = ChromiumProfile(directory, profile)
+        self.profile = ChromiumProfile(directory, profile, temporary)
         return self._profile
 
     def rem_profile(self) -> None:
