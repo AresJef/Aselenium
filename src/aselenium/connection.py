@@ -41,12 +41,13 @@ HEADERS: dict[str, str] = {
 class Connection:
     """Represents a connection to a remote server (Browser driver)."""
 
-    def __init__(self, session: ClientSession) -> None:
+    def __init__(self, session: ClientSession, session_timeout: int | float) -> None:
         """The connection to a remote server (Browser driver).
 
         :param session: `<ClientSession>` The async session of the connection.
         """
         self._session: ClientSession = session
+        self._session_timeout: int | float = session_timeout
 
     # Execution ---------------------------------------------------------------------------
     async def execute(
@@ -63,11 +64,12 @@ class Connection:
         :param command: `<str>` The command to execute.
         :param body: `<dict/None>` The body of the command. Defaults to `None`.
         :param keys: `<dict/None>` The keys to substitute in the command. Defaults to `None`.
-        :param timeout: `<int/float/None>` Force timeout of the command. Defaults to `None`.
-            For some webdriver versions, the browser will be frozen when
-            executing certain commands. This parameter sets an extra
-            timeout to throw the `SessionTimeoutError` exception if
-            timeout is reached.
+        :param timeout: `<int/float/None>` Session timeout for command execution. Defaults to `None`.
+            This arguments overwrites the default `options.session_timeout`,
+            which is designed to cope with a frozen session due to unknown
+            errors. For more information about session timeout, please refer
+            to the documentation of `options.session_timeout` attribute.
+
         :return: `<dict>` The response from the command.
         """
         # Map command
@@ -98,6 +100,8 @@ class Connection:
         timeout: int | float | None,
     ) -> dict[str, Any]:
         "(Internal) Send a request to the remote server (Browser driver)."
+        # Adjust timeout
+        timeout = timeout or self._session_timeout
         # Request
         logger.debug("Request: %s %s %s", method, url, body)
         try:
@@ -105,7 +109,7 @@ class Connection:
                 # fmt: off
                 method, url, headers=HEADERS, proxy=None,
                 data=dumps(body).decode() if body else None,
-                timeout=None if timeout is None else ClientTimeout(total=timeout),
+                timeout=ClientTimeout(total=timeout),
                 # fmt: on
             ) as res:
                 # . request data

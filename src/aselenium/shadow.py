@@ -104,11 +104,12 @@ class Shadow:
         :param command: `<str>` The command to execute.
         :param body: `<dict/None>` The body of the command. Defaults to `None`.
         :param keys: `<dict/None>` The keys to substitute in the command. Defaults to `None`.
-        :param timeout: `<int/float/None>` Force timeout of the command. Defaults to `None`.
-            For some webdriver versions, the browser will be frozen when
-            executing certain commands. This parameter sets an extra
-            timeout to throw the `SessionTimeoutError` exception if
-            timeout is reached.
+        :param timeout: `<int/float/None>` Session timeout for command execution. Defaults to `None`.
+            This arguments overwrites the default `options.session_timeout`,
+            which is designed to cope with a frozen session due to unknown
+            errors. For more information about session timeout, please refer
+            to the documentation of `options.session_timeout` attribute.
+
         :return `<dict>`: The response from the command.
         """
         return await self._conn.execute(
@@ -252,7 +253,7 @@ class Shadow:
             # <Element (id='289DEC2B8885F15A2BDD2E92AC0404F3_element_1', session='1e78...', service='http://...')>
         """
         # Locate 1st element
-        timeout = (await self._session.timeouts).implicit
+        timeout = (await self._session._get_timeouts()).implicit
         start_time = unix_time()
         while unix_time() - start_time < timeout:
             for value in values:
@@ -363,9 +364,9 @@ class Shadow:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             if await condition_checker(value):
                 return True
-            await sleep(0.2)
         return False
 
     async def wait_until_elements(
@@ -487,9 +488,9 @@ class Shadow:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             if await check_condition(values, condition_checker):
                 return True
-            await sleep(0.2)
         return False
 
     async def _element_exists_no_wait(self, value: str) -> bool:

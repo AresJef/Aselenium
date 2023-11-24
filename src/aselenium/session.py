@@ -646,6 +646,8 @@ class Session:
         self._id: str | None = None
         self._base_url: str | None = None
         self._body: dict[str, str] | None = None
+        self._timeouts: Timeouts | None = None
+        self._session_timeout: int | float = options._session_timeout
         # Window
         self._window_by_name: dict[str, Window] = {}
         self._window_by_handle: dict[str, Window] = {}
@@ -693,11 +695,12 @@ class Session:
         :param command: `<str>` The command to execute.
         :param body: `<dict/None>` The body of the command. Defaults to `None`.
         :param keys: `<dict/None>` The keys to substitute in the command. Defaults to `None`.
-        :param timeout: `<int/float/None>` Force timeout of the command. Defaults to `None`.
-            For some webdriver versions, the browser will be frozen when
-            executing certain commands. This parameter sets an extra
-            timeout to throw the `SessionTimeoutError` exception if
-            timeout is reached.
+        :param timeout: `<int/float/None>` Session timeout for command execution. Defaults to `None`.
+            This arguments overwrites the default `options.session_timeout`,
+            which is designed to cope with a frozen session due to unknown
+            errors. For more information about session timeout, please refer
+            to the documentation of `options.session_timeout` attribute.
+
         :return: `<dict>` The response from the command.
         """
         return await self._conn.execute(
@@ -722,7 +725,7 @@ class Session:
 
         # Start the service
         await self._service.start()
-        self._conn = Connection(self._service.session)
+        self._conn = Connection(self._service.session, self._session_timeout)
 
         # Start the session
         return await self._start_session("default")
@@ -851,19 +854,20 @@ class Session:
 
         :param url: URL to be loaded.
 
-        :param timeout: `<int/float/None>` Force timeout for page loading. Defaults to `None`.
-            For some webdriver versions, the browser will be frozen when
-            executing page load commands and the native `pageLoad` timeout
-            settings does not work as expected. This parameter sets an
-            extra timeout to throw the `SessionTimeoutError` exception
-            if timeout is reached.
+        :param timeout: `<int/float/None>` Session timeout for page loading. Defaults to `None`.
+            This arguments overwrites the default `options.session_timeout`,
+            which is designed to cope with a frozen session due to unknown
+            errors. For more information about session timeout, please refer
+            to the documentation of `options.session_timeout` attribute. If
+            the webdriver fails to response in time, a `SessionTimeoutError`
+            will be raised.
 
-        :param retry: `<bool>` Whether to retry if page load failed. Defaults to `False`.
-            This parameter only takes effect when the page loading reaches the
-            native `pageLoad` timeout and raises the `WebDriverTimeoutError`.
-            For `SessionTimeoutError` (as mentioned above), exception will be
-            raised immediately. Maximum retry limits to 10, and if the page
-            still not loaded, the `WebDriverTimeoutError` will be raised.
+        :param retry: `<bool>` Whether to retry if failed to load the webpage. Defaults to `False`.
+            Retries are attempted only when the `WebDriverTimeoutError` is
+            raised due to native `pageLoad` timeout. The function does not
+            retry on `SessionTimeoutError` (as mentioned above). The maximum
+            retry limit is 10, and exceeding this limit without successful
+            loading will eventually raise the `WebDriverTimeoutError`.
 
         ### Example:
         >>> await session.load("https://www.google.com")
@@ -890,19 +894,20 @@ class Session:
     ) -> None:
         """Refresh the active page window.
 
-        :param timeout: `<int/float/None>` Force timeout for page loading. Defaults to `None`.
-            For some webdriver versions, the browser will be frozen when
-            executing page load commands and the native `pageLoad` timeout
-            settings does not work as expected. This parameter sets an
-            extra timeout to throw the `SessionTimeoutError` exception
-            if timeout is reached.
+        :param timeout: `<int/float/None>` Session timeout for page loading. Defaults to `None`.
+            This arguments overwrites the default `options.session_timeout`,
+            which is designed to cope with a frozen session due to unknown
+            errors. For more information about session timeout, please refer
+            to the documentation of `options.session_timeout` attribute. If
+            the webdriver fails to response in time, a `SessionTimeoutError`
+            will be raised.
 
-        :param retry: `<bool>` Whether to retry if page load failed. Defaults to `False`.
-            This parameter only takes effect when the page loading reaches the
-            native `pageLoad` timeout and raises the `WebDriverTimeoutError`.
-            For `SessionTimeoutError` (as mentioned above), exception will be
-            raised immediately. Maximum retry limits to 10, and if the page
-            still not loaded, the `WebDriverTimeoutError` will be raised.
+        :param retry: `<bool>` Whether to retry if failed to load the webpage. Defaults to `False`.
+            Retries are attempted only when the `WebDriverTimeoutError` is
+            raised due to native `pageLoad` timeout. The function does not
+            retry on `SessionTimeoutError` (as mentioned above). The maximum
+            retry limit is 10, and exceeding this limit without successful
+            loading will eventually raise the `WebDriverTimeoutError`.
 
         ### Example:
         >>> await session.refresh()
@@ -923,12 +928,13 @@ class Session:
     async def forward(self, timeout: int | float | None = None) -> None:
         """Navigate forwards in the browser history (if possible).
 
-        :param timeout: `<int/float/None>` Force timeout for page loading. Defaults to `None`.
-            For some webdriver versions, the browser will be frozen when
-            executing page load commands and the native `pageLoad` timeout
-            settings does not work as expected. This parameter sets an
-            extra timeout to throw the `SessionTimeoutError` exception
-            if timeout is reached.
+        :param timeout: `<int/float/None>` Session timeout for page loading. Defaults to `None`.
+            This arguments overwrites the default `options.session_timeout`,
+            which is designed to cope with a frozen session due to unknown
+            errors. For more information about session timeout, please refer
+            to the documentation of `options.session_timeout` attribute. If
+            the webdriver fails to response in time, a `SessionTimeoutError`
+            will be raised.
 
         ### Example:
         >>> await session.forward()
@@ -938,12 +944,13 @@ class Session:
     async def backward(self, timeout: int | float | None = None) -> None:
         """Navigate backwards in the browser history (if possible).
 
-        :param timeout: `<int/float/None>` Force timeout for page loading. Defaults to `None`.
-            For some webdriver versions, the browser will be frozen when
-            executing page load commands and the native `pageLoad` timeout
-            settings does not work as expected. This parameter sets an
-            extra timeout to throw the `SessionTimeoutError` exception
-            if timeout is reached.
+        :param timeout: `<int/float/None>` Session timeout for page loading. Defaults to `None`.
+            This arguments overwrites the default `options.session_timeout`,
+            which is designed to cope with a frozen session due to unknown
+            errors. For more information about session timeout, please refer
+            to the documentation of `options.session_timeout` attribute. If
+            the webdriver fails to response in time, a `SessionTimeoutError`
+            will be raised.
 
         ### Example:
         >>> await session.backward()
@@ -1021,9 +1028,9 @@ class Session:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             if await condition_checker():
                 return True
-            await sleep(0.2)
         return False
 
     @property
@@ -1095,9 +1102,9 @@ class Session:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             if await condition_checker():
                 return True
-            await sleep(0.2)
         return False
 
     @property
@@ -1470,19 +1477,9 @@ class Session:
         >>> timeouts = await options.timeouts
             # <Timeouts (implicity=0, pageLoad=300000, script=30000, unit='ms')>
         """
-        res = await self.execute_command(Command.GET_TIMEOUTS)
-        try:
-            return Timeouts(**res["value"], unit="ms")
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse timeouts from "
-                "response: {}".format(self.__class__.__name__, res)
-            ) from err
-        except Exception as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nInvalid timeouts response: "
-                "{}".format(self.__class__.__name__, res["value"])
-            ) from err
+        if self._timeouts is None:
+            await self._refresh_timeouts()
+        return self._timeouts.copy()
 
     async def set_timeouts(
         self,
@@ -1528,8 +1525,9 @@ class Session:
         await self._conn.execute(
             self._base_url, Command.SET_TIMEOUTS, body=timeouts.dict
         )
-        # Return timeouts
-        return await self.timeouts
+        # Refresh & return timeouts
+        await self._refresh_timeouts()
+        return self._timeouts.copy()
 
     async def reset_timeouts(self) -> Timeouts:
         """Reset the timeout settings of the current session to the
@@ -1541,12 +1539,37 @@ class Session:
         >>> timeouts = await session.reset_timeouts()
             # <Timeouts (implicity=0, pageLoad=300000, script=30000, unit='ms')>
         """
+        # Reset timeouts
         await self._conn.execute(
             self._base_url,
             Command.SET_TIMEOUTS,
             body=self._options.timeouts.dict,
         )
-        return await self.timeouts
+        # Refresh & return timeouts
+        await self._refresh_timeouts()
+        return self._timeouts.copy()
+
+    async def _refresh_timeouts(self) -> None:
+        """(Internal) Refresh the timeouts of the current session."""
+        res = await self.execute_command(Command.GET_TIMEOUTS)
+        try:
+            self._timeouts = Timeouts(**res["value"], unit="ms")
+        except KeyError as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nFailed to parse timeouts from "
+                "response: {}".format(self.__class__.__name__, res)
+            ) from err
+        except Exception as err:
+            raise errors.InvalidResponseError(
+                "<{}>\nInvalid timeouts response: "
+                "{}".format(self.__class__.__name__, res["value"])
+            ) from err
+
+    async def _get_timeouts(self) -> Timeouts:
+        """(Internal) Get the cached timeouts of the current session."""
+        if self._timeouts is None:
+            await self._refresh_timeouts()
+        return self._timeouts
 
     # Cookies -----------------------------------------------------------------------------
     @property
@@ -2389,12 +2412,12 @@ class Session:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             element = await self._find_element_no_wait(value, strat)
             if element is not None:
                 return await element.scroll_into_view(
                     timeout - (unix_time() - start_time)
                 )
-            await sleep(0.2)
         return False
 
     def _validate_scroll_strategy(self, by: Any) -> str:
@@ -2454,9 +2477,9 @@ class Session:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             if (alert := await find_alert()) is not None:
                 return alert
-            await sleep(0.2)
         return None
 
     # Frame -------------------------------------------------------------------------------
@@ -2529,9 +2552,9 @@ class Session:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             if await switch(frame_id):
                 return True
-            await sleep(0.2)
         return False
 
     async def default_frame(self) -> bool:
@@ -2741,7 +2764,7 @@ class Session:
         strat = self._validate_selector_strategy(by)
 
         # Locate 1st element
-        timeout = (await self.timeouts).implicit
+        timeout = (await self._get_timeouts()).implicit
         start_time = unix_time()
         while unix_time() - start_time < timeout:
             for value in values:
@@ -2858,9 +2881,9 @@ class Session:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             if await condition_checker(value):
                 return True
-            await sleep(0.2)
         return False
 
     async def wait_until_elements(
@@ -2988,9 +3011,9 @@ class Session:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             if await check_condition(values, condition_checker):
                 return True
-            await sleep(0.2)
         return False
 
     async def _element_exists_no_wait(self, value: str, strat: str) -> bool:
@@ -3114,9 +3137,9 @@ class Session:
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
+            await sleep(0.2)
             if (shadow := await find_shadow()) is not None:
                 return shadow
-            await sleep(0.2)
         return None
 
     # Script ------------------------------------------------------------------------------
@@ -3510,6 +3533,7 @@ class Session:
         self._id = None
         self._base_url = None
         self._body = None
+        self._timeouts = None
         # Window
         self._window_by_name = None
         self._window_by_handle = None

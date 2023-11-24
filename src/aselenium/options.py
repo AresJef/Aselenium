@@ -752,10 +752,61 @@ class BaseOptions:
         """
         self.__caps: dict[str, Any] = {}
         "The final browser capabilities."
+        # Session timeout
+        self._session_timeout: int | float = 360
         # Arguments
         self._arguments: list[str] = []
         # Proxy
         self._proxy: Proxy | None = None
+
+    # Session timeout ---------------------------------------------------------------------
+    @property
+    def session_timeout(self) -> int | float:
+        """Access the hard session timeout (seconds) for the browser `<int/float>`.
+
+        This timeout is not a native timeout settings provided by
+        the webdriver, but a hard timeout over the connection to
+        the webdriver server. It is used to prevent the webdriver
+        from frozen for unknown reasons and blocking the main thread
+        from receiving any response (including timeout errors).
+
+        For example, in some `rare` cases, the webdriver might be stuck
+        when loading a webpage (sometimes due to the network issues,
+        sometime due to conflicting actions from the pop-up alerts, etc).
+        Even with a properly configured 'pageLoad' timeout, the webdriver
+        might still not yeild any responses. In this case, this hard
+        session timeout will be triggered and raise a `SessionTimeoutError`
+        error. If user does not intercepet this error, the webdriver will
+        be terminated and the session will be closed properly (including
+        the browser process).
+
+        The `SessionTimeoutError` exception is a subclass of `TimeoutError`
+        and `AseleniumTimeout`, but different from `WebDriverTimeoutError`,
+        which is raised when a native webdriver timeout (implicit, pageLoad,
+        and script) is triggered.
+
+        The session timeout defaults to `360` seconds, which is 1 min longer
+        than the default `pageLoad` timeout. In most cases, this timeout will
+        not be triggered but act as a last resort to prevent the webdriver
+        from frozen. When settings this timeout, it is highly recommended be
+        larger than all the native webdriver timeouts (implicit, pageLoad,
+        and script).
+        """
+        return self._session_timeout
+
+    @session_timeout.setter
+    def session_timeout(self, value: int | float) -> None:
+        if not isinstance(value, (int, float)):
+            raise errors.InvalidOptionsError(
+                "<{}>\nInvalid session_timeout ({} {}), must be a postive integer "
+                "or float.".format(self.__class__.__name__, repr(value), type(value))
+            )
+        if value <= 0:
+            raise errors.InvalidOptionsError(
+                "<{}>\nInvalid session_timeout ({}), must be "
+                "greater than `0`.".format(self.__class__.__name__, value)
+            )
+        self._session_timeout = value
 
     # Caps: basic -------------------------------------------------------------------------
     @property
