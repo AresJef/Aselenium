@@ -411,8 +411,8 @@ class BaseService:
         return self._url
 
     @property
-    def started(self) -> bool:
-        """Access whether the service is started `<bool>`."""
+    def running(self) -> bool:
+        """Access whether the service is running `<bool>`."""
         return (
             self.process_running and self.port_connectable and self.session_connectable
         )

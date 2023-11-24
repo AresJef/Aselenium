@@ -71,7 +71,7 @@ async def test_edge_options() -> None:
     # . profile
     profile_dir = "/Users/jef/Library/Application Support/Microsoft Edge"
     if os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, "Default")
+        driver.options.set_profile(profile_dir, "Default", TEMP_PROFILE)
         # driver.options.rem_profile()
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
@@ -130,7 +130,7 @@ async def test_chrome_options() -> None:
     # . profile
     profile_dir = "/Users/jef/Library/Application Support/Google/Chrome"
     if os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, "Default")
+        driver.options.set_profile(profile_dir, "Default", TEMP_PROFILE)
         # driver.options.rem_profile()
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
@@ -187,7 +187,7 @@ async def test_chromium_options() -> None:
     # . profile
     profile_dir = "/Users/jef/Library/Application Support/Chromium"
     if os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, "Default")
+        driver.options.set_profile(profile_dir, "Default", TEMP_PROFILE)
         # driver.options.rem_profile()
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
@@ -1812,6 +1812,7 @@ async def test_driver(browser: str = "chrome") -> None:
 if __name__ == "__main__":
     ABS_PATH = os.path.abspath(os.path.dirname(__file__))
     TEST_FOLDER = os.path.join(ABS_PATH, "test_files")
+    TEMP_PROFILE = True
 
     asyncio.run(test_proxy())
     asyncio.run(test_edge_options())

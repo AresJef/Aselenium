@@ -749,7 +749,7 @@ class Session:
                 except CancelledError:
                     cancelled = True
                 except errors.SessionClientError:
-                    if not self._service.started:
+                    if not self._service.running:
                         break
                 except errors.SessionTimeoutError:
                     break
@@ -816,7 +816,7 @@ class Session:
                 )
 
         # Validate service
-        if not self._service.started:
+        if not self._service.running:
             raise errors.InvalidSessionError(
                 "<{}>\nFailed to create new session. Please `start()` "
                 "the service of the session first.".format(self.__class__.__name__)
