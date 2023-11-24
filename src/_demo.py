@@ -1755,6 +1755,7 @@ async def test_driver(browser: str = "chrome") -> None:
     else:
         raise ValueError(f"Browser not supported: '{browser}'")
     # fmt: on
+    driver.options.session_timeout = 120
     driver.options.set_timeouts(implicit=2, pageLoad=20)
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
     print(driver.options)
