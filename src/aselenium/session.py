@@ -105,7 +105,7 @@ class Cookie(CustomDict):
         return "<Cookie (name='%s', data=%s)" % (self.name, self._dict)
 
     def copy(self) -> Cookie:
-        """Copy the cookie object."""
+        """Copy the cookie object `<Cookie>`."""
         return Cookie(**self._dict)
 
 
@@ -3194,7 +3194,7 @@ class Session:
         """Remove a previously cached JavaScript `(NOT an asyncronous method)`.
 
         :param script: `<str/JavaScript>` Accepts both the name of the javascript, or the `<JavaScript>` instance.
-        :return `<bool>`: True if the script is removed from cache, False if script not exist.
+        :return `<bool>`: True if the script is removed from cache, False if script not exists.
 
         ### Example:
         >>> session.remove_script("myscript")  # True / False
@@ -3562,13 +3562,13 @@ class SessionContext:
         """Start & return the session `<Session>`."""
         try:
             await self._session.start()
-        except Exception as err:
+            return self._session
+        except BaseException as err:
             try:
                 await self._session.quit()
-            except Exception:
+            except BaseException:
                 pass
             raise err
-        return self._session
 
     async def __aenter__(self) -> Session:
         return await self.start()
