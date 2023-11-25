@@ -404,13 +404,13 @@ def prettify_dict(dic: dict, lead: str = "  ") -> str:
         for key, val in dic.items():
             if isinstance(val, dict):
                 if val:
-                    reps.append(lead * indent + "%s: {" % key)
+                    reps.append(lead * indent + "%s: {" % repr(key))
                     reps += prettify(val, indent + 1)
                     reps.append(lead * indent + "}")
                 else:
-                    reps.append(lead * indent + "%s: {}" % key)
+                    reps.append(lead * indent + "%s: {}" % repr(key))
             else:
-                reps.append(lead * indent + "%s: %s" % (key, repr(val)))
+                reps.append(lead * indent + "%s: %s" % (repr(key), repr(val)))
         return reps
 
     return "{\n%s\n}" % "\n".join(prettify(dic, 1))
