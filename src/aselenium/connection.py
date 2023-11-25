@@ -108,7 +108,7 @@ class Connection:
             async with self._session.request(
                 # fmt: off
                 method, url, headers=HEADERS, proxy=None,
-                data=dumps(body).decode() if body else None,
+                data=dumps(body) if body else None,
                 timeout=ClientTimeout(total=timeout),
                 # fmt: on
             ) as res:
@@ -137,25 +137,26 @@ class Connection:
                     return {"status": res.status, "value": data}
 
                 # . code: all the rest
-                content_type = res.headers.get("Content-Type")
-                content_type = [] if content_type is None else content_type.split(";")
-                if not any(x.startswith("image/png") for x in content_type):
-                    try:
-                        data = loads(data.strip().encode())
-                    except ValueError:
-                        if 199 < res.status < 300:
-                            status = ErrorCode.SUCCESS
-                        else:
-                            status = ErrorCode.UNKNOWN_ERROR
-                        return {"status": status, "value": data.strip()}
+                content_type = res.headers.get("Content-Type", None)
 
-                    # Some drivers incorrectly return a response
-                    # with no 'value' field when they should return null.
+                # . image/png request
+                if content_type is not None and any(
+                    x.startswith("image/png") for x in content_type.split(";")
+                ):
+                    return {"status": 0, "value": data}
+                # . successful request
+                try:
+                    data = loads(data.strip())
                     if "value" not in data:
                         data["value"] = None
                     return data
-                else:
-                    return {"status": 0, "value": data}
+                # . failed request
+                except ValueError:
+                    if 199 < res.status < 300:
+                        status = ErrorCode.SUCCESS
+                    else:
+                        status = ErrorCode.UNKNOWN_ERROR
+                    return {"status": status, "value": data.strip()}
 
         except errors.AseleniumError:
             raise
