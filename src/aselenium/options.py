@@ -618,29 +618,31 @@ class Timeouts:
 
 
 class ChromiumProfile:
-    """Represents the profile configuration for Chromium based browser.
+    """Represents the user profile for Chromium based browser.
     Such as: Edge, Chrome, Chromium, etc.
     """
 
-    def __init__(self, directory: str, profile: str, temporary: bool = False) -> None:
-        """The profile configuration for Chromium based browser.
+    def __init__(self, directory: str, profile: str, temporary: bool = True) -> None:
+        """The user profile for Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
         :param directory: `<str>` The main directory contains the profile folder.
         :param profile: `<str>` The name of the profile folder.
-        :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `False`.
-            - If `True`, an identical temporary profile will be created based on the
-              given 'directory' and 'profile'. After all related sessions are closed,
-              the temporary profile will be deleted automatically, leaving the original
+        :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `True`.
+            - If `True`, a cloned temporary profile will be created based on the given
+              'directory' and 'profile'. After all related sessions are closed, the
+              temporary profile will be deleted automatically, leaving the original
               profile untouched.
             - If `False`, the original profile will be used directly. Any changes made
               during the session will be saved to the profile.
             - *Notice*: In some rare cases (such as KeyboardInterrupt exception), the
               temporary profile might not be deleted properly. In this case, a warning
               message will be printed to the console, warning user to manually delete
-              the remaining temporary files if necessary.
+              the remaining temporary files if necessary (The temporary profile is always
+              located in the 'Standard Location for Temporary Files' in the system, and
+              most systems should delete these temporary files after a system reboot).
 
-        ### Example:
+        ### Location:
         >>> # . the default profile directory for Chrome on MacOS:
             directory="/Users/<username>/Library/Application Support/Google/Chrome"
             profile="Default"
@@ -653,14 +655,33 @@ class ChromiumProfile:
             directory="/home/<username>/.config/google-chrome"
             profile="Default"
         """
-        self.directory = directory
-        self.profile = profile
+        # Profile directory
+        if not is_path_dir(directory):
+            raise errors.InvalidProfileError(
+                "<{}>\nInvalid profile directory: {} {}".format(
+                    self.__class__.__name__, repr(directory), type(directory)
+                )
+            )
+        self._directory = directory
+        # Profile folder name
+        if not isinstance(profile, str):
+            raise errors.InvalidProfileError(
+                "<{}>\nInvalid name for the profile folder: {} {}".format(
+                    self.__class__.__name__, repr(profile), type(profile)
+                )
+            )
+        full_path = os.path.join(self._directory, profile)
+        if not is_path_dir(full_path):
+            raise errors.InvalidProfileError(
+                "<{}>\nProfile folder not found at: {}".format(
+                    self.__class__.__name__, repr(full_path)
+                )
+            )
+        self._profile = profile
+        # Temporary profile
         self._temp_directory: str = None
         if temporary:
-            self._temp_profile: str = "TEMP_PROFILE"
             self._create_temp_profile()
-        else:
-            self._temp_profile: str = None
 
     # Properties --------------------------------------------------------------------------
     @property
@@ -668,37 +689,10 @@ class ChromiumProfile:
         """Access the main directory contains the profile folder `<str>`."""
         return self._directory
 
-    @directory.setter
-    def directory(self, value: str) -> None:
-        if not is_path_dir(value):
-            raise errors.InvalidProfileError(
-                "<{}>\nInvalid profile directory: {} {}".format(
-                    self.__class__.__name__, repr(value), type(value)
-                )
-            )
-        self._directory = value
-
     @property
     def profile(self) -> str:
         """Access the name of the profile folder `<str>`."""
         return self._profile
-
-    @profile.setter
-    def profile(self, value: str) -> None:
-        if not isinstance(value, str):
-            raise errors.InvalidProfileError(
-                "<{}>\nInvalid name for the profile folder: {} {}".format(
-                    self.__class__.__name__, repr(value), type(value)
-                )
-            )
-        full_path = os.path.join(self._directory, value)
-        if not is_path_dir(full_path):
-            raise errors.InvalidProfileError(
-                "<{}>\nProfile folder not found at: {}".format(
-                    self.__class__.__name__, repr(full_path)
-                )
-            )
-        self._profile = value
 
     @property
     def directory_for_driver(self) -> str:
@@ -725,10 +719,7 @@ class ChromiumProfile:
           the original profile folder name (equivalent to the 'profile'
           attribute).
         """
-        if self._temp_profile is None:
-            return self._profile
-        else:
-            return self._temp_profile
+        return self._profile if self._temp_directory is None else "TEMP_PROFILE"
 
     # Temporary profile -------------------------------------------------------------------
     def _create_temp_profile(self) -> None:
@@ -742,7 +733,11 @@ class ChromiumProfile:
         # Create temporary profile
         self._temp_directory = tempfile.mkdtemp()
         temp_profile_dir = os.path.join(self._temp_directory, "TEMP_PROFILE")
-        shutil.copytree(os.path.join(self._directory, self._profile), temp_profile_dir)
+        shutil.copytree(
+            os.path.join(self._directory, self._profile),
+            temp_profile_dir,
+            ignore=shutil.ignore_patterns("parent.lock", "lock", ".parentlock"),
+        )
         os.chmod(temp_profile_dir, 0o755)
 
     def _delete_temp_profile(self) -> None:
@@ -771,10 +766,11 @@ class ChromiumProfile:
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
-        return "<%s (directory='%s', profile='%s')>" % (
+        return "<%s (directory='%s', profile='%s', temporary=%s)>" % (
             self.__class__.__name__,
-            self._directory,
-            self._profile,
+            self.directory_for_driver,
+            self.profile_for_driver,
+            self._temp_directory is not None,
         )
 
     def __hash__(self) -> int:
@@ -931,13 +927,21 @@ class BaseOptions:
         except KeyError:
             pass
 
-    def get_capability(self, name: str) -> Any | None:
+    def get_capability(self, name: str) -> Any:
         """Get a capability of the browser.
 
         :param name: `<str>` The name of the capability.
-        :return `<Any/None>` The value of the capability, `None` if capability not set.
+        :raises `OptionsNotSetError`: If the capability is not set.
+        :return `<Any>` The value of the capability.
         """
-        return self._capabilities.get(name)
+        try:
+            return self._capabilities[name]
+        except KeyError as err:
+            raise errors.OptionsNotSetError(
+                "<{}>\nCapability {} has not been set.".format(
+                    self.__class__.__name__, repr(name)
+                )
+            ) from err
 
     def _caps_changed(self) -> None:
         """Switch the capabilities status to `changed`, which will
@@ -1353,22 +1357,22 @@ class ChromiumBaseOptions(BaseOptions):
     @property
     def binary_location(self) -> str | None:
         """Access the binary location of the Brwoser executable `<str>`."""
-        return self.get_experimental_option("binary")
+        return self._experimental_options.get("binary")
 
     @binary_location.setter
-    def binary_location(self, src: str | None) -> None:
+    def binary_location(self, value: str | None) -> None:
         # Remove binary location
-        if src is None:
+        if value is None:
             self.rem_experimental_options("binary")
             return None  # exit
 
         # Set binary location
-        if not is_path_file(src):
+        if not is_path_file(value):
             raise errors.InvalidOptionsError(
                 "<{}>\nBrowser 'binary_location' not found at: "
-                "{}".format(self.__class__.__name__, repr(src))
+                "{}".format(self.__class__.__name__, repr(value))
             )
-        self.add_experimental_options(binary=src)
+        self.add_experimental_options(binary=value)
 
     # Options: debugger -------------------------------------------------------------------
     @property
@@ -1378,7 +1382,7 @@ class ChromiumBaseOptions(BaseOptions):
         ChromeDriver will try to connect to this devtools instance
         during an active wait. For example: `"hostname:port"`.
         """
-        return self.get_experimental_option("debuggerAddress")
+        return self._experimental_options.get("debuggerAddress")
 
     @debugger_address.setter
     def debugger_address(self, address: str | None) -> None:
@@ -1394,7 +1398,7 @@ class ChromiumBaseOptions(BaseOptions):
             )
         self.add_experimental_options(debuggerAddress=address)
 
-    # Caps: experimental options ----------------------------------------------------------
+    # Options: experimental options -------------------------------------------------------
     @property
     def experimental_options(self) -> dict[str, Any]:
         """Access the experimental options of the browser `<dict>`."""
@@ -1429,15 +1433,23 @@ class ChromiumBaseOptions(BaseOptions):
         except KeyError:
             pass
 
-    def get_experimental_option(self, name: str) -> Any | None:
+    def get_experimental_option(self, name: str) -> Any:
         """Get an experimental option of the browser.
 
         :param name: `<str>` The name of the experimental option.
-        :return `<Any/None>` The value of the experimental option, `None` if option not set.
+        :raises `OptionsNotSetError`: If the experimental option is not set.
+        :return `<Any>` The value of the experimental option.
         """
-        return self._experimental_options.get(name)
+        try:
+            return self._experimental_options[name]
+        except KeyError as err:
+            raise errors.OptionsNotSetError(
+                "<{}>\nExperimental option {} has not been set.".format(
+                    self.__class__.__name__, repr(name)
+                )
+            ) from err
 
-    # # Caps: profile -----------------------------------------------------------------------
+    # Options: profile --------------------------------------------------------------------
     @property
     def profile(self) -> ChromiumProfile | None:
         """Access the profile of the browser `<ChromiumProfile>`.
@@ -1456,6 +1468,7 @@ class ChromiumBaseOptions(BaseOptions):
                 and not arg.startswith("--profile-directory=")
             ]
             self._profile = None
+            self._caps_changed()
             return None  # exit
 
         # Set profile
@@ -1471,29 +1484,32 @@ class ChromiumBaseOptions(BaseOptions):
             "--profile-directory=%s" % value.profile_for_driver,
         )
         self._profile = value
+        self._caps_changed()
 
     def set_profile(
         self,
         directory: str,
         profile: str,
-        temporary: bool = False,
+        temporary: bool = True,
     ) -> ChromiumProfile:
-        """Set the profile configuration for the Chromium based browser.
+        """Set the user profile for the Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
         :param directory: `<str>` The main directory contains the profile folder.
         :param profile: `<str>` The name of the profile folder.
-        :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `False`.
-            - If `True`, an identical temporary profile will be created based on the
-              given 'directory' and 'profile'. After all related sessions are closed,
-              the temporary profile will be deleted automatically, leaving the original
+        :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `True`.
+            - If `True`, a cloned temporary profile will be created based on the given
+              'directory' and 'profile'. After all related sessions are closed, the
+              temporary profile will be deleted automatically, leaving the original
               profile untouched.
             - If `False`, the original profile will be used directly. Any changes made
               during the session will be saved to the profile.
             - *Notice*: In some rare cases (such as KeyboardInterrupt exception), the
               temporary profile might not be deleted properly. In this case, a warning
               message will be printed to the console, warning user to manually delete
-              the remaining temporary files if necessary.
+              the remaining temporary files if necessary (The temporary profile is always
+              located in the 'Standard Location for Temporary Files' in the system, and
+              most systems should delete these temporary files after a system reboot).
 
         :return `<ChromiumProfile>`: The profile instance.
 
@@ -1511,7 +1527,7 @@ class ChromiumBaseOptions(BaseOptions):
                 "--profile-directory=%s" % temp_profile,
             )
 
-        ### Example:
+        ### Location:
         >>> # . the default profile directory for Chrome on MacOS:
             directory="/Users/<username>/Library/Application Support/Google/Chrome"
             profile="Default"
@@ -1523,6 +1539,10 @@ class ChromiumBaseOptions(BaseOptions):
         >>> # . the default profile directory for Chrome on Linux:
             directory="/home/<username>/.config/google-chrome"
             profile="Default"
+
+        ### Example:
+        >>> # . set profile
+            options.set_profile(directory, profile, True)
         """
         self.profile = ChromiumProfile(directory, profile, temporary)
         return self._profile
@@ -1532,7 +1552,7 @@ class ChromiumBaseOptions(BaseOptions):
 
         ### Example:
         >>> # . set profile
-            options.set_profile(directory, profile)
+            options.set_profile(directory, profile, True)
 
         >>> # . remove the profile
             options.rem_profile()
@@ -1563,6 +1583,22 @@ class ChromiumBaseOptions(BaseOptions):
             )
         self._preferences[name] = value
         self._caps_changed()
+
+    def get_preference(self, name: str) -> Any:
+        """Get a preference value of the browser.
+
+        :param name: `<str>` The name of the preference.
+        :raises `OptionsNotSetError`: If the preference is not set.
+        :return `<Any>` The value of the preference.
+        """
+        try:
+            return self._preferences[name]
+        except KeyError as err:
+            raise errors.OptionsNotSetError(
+                "<{}>\nPreference {} has not been set.".format(
+                    self.__class__.__name__, repr(name)
+                )
+            ) from err
 
     def rem_preference(self, name: str) -> None:
         """Remove a preference of the browser.
@@ -1653,10 +1689,4 @@ class ChromiumBaseOptions(BaseOptions):
 
         # Update caps status
         if added:
-            self._caps_changed()
-
-    def reset_extensions(self) -> None:
-        """Reset browser extensions to default (no extensions)."""
-        if self._extensions:
-            self._extensions.clear()
             self._caps_changed()
