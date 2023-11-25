@@ -70,8 +70,8 @@ async def test_edge_options() -> None:
     )
     # . profile
     profile_dir = "/Users/jef/Library/Application Support/Microsoft Edge"
-    if os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, "Default", TEMP_PROFILE)
+    if TEST_PROFILE and os.path.isdir(profile_dir):
+        driver.options.set_profile(profile_dir, "Default", True)
         # driver.options.rem_profile()
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
@@ -129,8 +129,8 @@ async def test_chrome_options() -> None:
     )
     # . profile
     profile_dir = "/Users/jef/Library/Application Support/Google/Chrome"
-    if os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, "Default", TEMP_PROFILE)
+    if TEST_PROFILE and os.path.isdir(profile_dir):
+        driver.options.set_profile(profile_dir, "Default", True)
         # driver.options.rem_profile()
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
@@ -186,8 +186,8 @@ async def test_chromium_options() -> None:
     )
     # . profile
     profile_dir = "/Users/jef/Library/Application Support/Chromium"
-    if os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, "Default", TEMP_PROFILE)
+    if TEST_PROFILE and os.path.isdir(profile_dir):
+        driver.options.set_profile(profile_dir, "Default", True)
         # driver.options.rem_profile()
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
@@ -213,7 +213,7 @@ async def test_firefox_options() -> None:
     print(" Firefox Options ".center(80, "-"))
     driver = Firefox("/Users/jef/Downloads/geckodriver/geckodriver")
     # . browser version
-    driver.options.browser_version = "119.0.1"
+    driver.options.browser_version = "120.0"
     # . platform name
     driver.options.platform_name = "mac"
     # . accept Insecure Certs
@@ -239,14 +239,22 @@ async def test_firefox_options() -> None:
     driver.options.unhandled_prompt_behavior = "ignore"
     # . browser binary
     driver.options.binary_location = "/Applications/Firefox.app/Contents/MacOS/firefox"
+    # . profile
+    profile_dir = "/Users/jef/Library/Application Support/Firefox/Profiles/684o1n0x.default-release-1700386926530"
+    if TEST_PROFILE and os.path.isdir(profile_dir):
+        driver.options.set_profile(profile_dir, True)
+        # driver.options.rem_profile()
+        print_options = False
+    else:
+        print_options = True
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
     # Final options
-    print(driver.options)
+    if print_options:
+        print(driver.options)
 
     # Test driver
     async with driver.acquire() as s:
-        print(s)
         await s.load("https://www.baidu.com")
         await s.load("https://whatismyipaddress.com/", retry=True)
         await asyncio.sleep(5)
@@ -284,7 +292,6 @@ async def test_safari_options() -> None:
 
     # Test driver
     async with driver.acquire() as s:
-        print(s)
         await s.load("https://www.baidu.com")
         await s.load("https://whatismyipaddress.com/", retry=True)
         await asyncio.sleep(5)
@@ -1730,13 +1737,15 @@ async def test_driver(browser: str = "chrome") -> None:
             for file in os.listdir(TEST_FOLDER)
             if file.endswith("xpi")
         ]
-        res = await s.install_addons(*addons)
-        print("install_addons:\t", bool(res), await s.addons, sep="\t")
+        await s.install_addons(*addons)
+        print("install_addons:\t", len(s.addons) == 2, s.addons, sep="\t")
         await asyncio.sleep(5)
 
-        await s.uninstall_addons(*await s.addons)
-        res = await s.addons
-        print("uninstall_addons:", not res, res, sep="\t")
+        await s.uninstall_addon(s.addons[0].id)
+        print("uninstall_addon:", len(s.addons) == 1, s.addons, sep="\t")
+
+        await s.uninstall_addon(s.addons[0])
+        print("uninstall_addon:", not s.addons, s.addons, sep="\t")
         await asyncio.sleep(5)
         print("-" * 80)
         print()
@@ -1812,7 +1821,7 @@ async def test_driver(browser: str = "chrome") -> None:
 if __name__ == "__main__":
     ABS_PATH = os.path.abspath(os.path.dirname(__file__))
     TEST_FOLDER = os.path.join(ABS_PATH, "test_files")
-    TEMP_PROFILE = True
+    TEST_PROFILE = True
 
     asyncio.run(test_proxy())
     asyncio.run(test_edge_options())
