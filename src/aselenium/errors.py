@@ -658,7 +658,7 @@ def error_handler(res: dict[str, Any]) -> None:
     value = res.get("value")
     if isinstance(value, str) and isinstance(status, int):
         try:
-            value: dict = loads(value.encode())
+            value: dict = loads(value)
             if len(value) == 1:
                 value = value["value"]
             if not (status := value.get("error")):
