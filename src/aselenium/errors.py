@@ -61,6 +61,10 @@ class UnsupportedOptionsError(InvalidOptionsError):
     """Exception raised for unsupported options."""
 
 
+class OptionsNotSetError(InvalidOptionsError, KeyError):
+    """Exception raised for options not set."""
+
+
 # Services
 class ServiceError(AseleniumError):
     """Exception raised for errors for service."""
