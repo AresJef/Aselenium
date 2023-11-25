@@ -150,6 +150,13 @@ class Command:
     SAFARI_SET_PERMISSIONS: str = "safariSetPermissions"
     SAFARI_ATTACH_DEBUGGER: str = "safariAttachDebugger"
 
+    ### Firefox Specific ###
+    FIREFOX_GET_CONTEXT: str = "firefoxGetContext"
+    FIREFOX_SET_CONTEXT: str = "firefoxSetContext"
+    FIREFOX_INSTALL_ADDON: str = "firefoxInstallAddon"
+    FIREFOX_UNINSTALL_ADDON: str = "firefoxUninstallAddon"
+    FIREFOX_FULL_PAGE_SCREENSHOT: str = "firefoxFullPageScreenshot"
+
 
 COMMANDS: dict[str, tuple[str, str]] = {
     # Sesssion - Start | format: "{CMD}"
@@ -272,6 +279,14 @@ COMMANDS: dict[str, tuple[str, str]] = {
     # Chromium - Application | format: "/session/$sessionId{CMD}"
     Command.LAUNCH_APP: ("POST", "/chromium/launch_app"),
     # fmt : on
+
+    ### Firefox Specific ###
+    # Session | format: "/session/$sessionId{CMD}"
+    Command.FIREFOX_GET_CONTEXT: ("GET", "/moz/context"),
+    Command.FIREFOX_SET_CONTEXT: ("POST", "/moz/context"),
+    Command.FIREFOX_INSTALL_ADDON:  ("POST", "/moz/addon/install"),
+    Command.FIREFOX_UNINSTALL_ADDON: ("POST", "/moz/addon/uninstall"),
+    Command.FIREFOX_FULL_PAGE_SCREENSHOT:  ("GET", "/moz/screenshot/full"),
     
     ### Safari Specific ###
     # Session | format: "/session/$sessionId{CMD}"

@@ -23,7 +23,7 @@ from aselenium.actions import Actions
 from aselenium.alert import Alert
 from aselenium.connection import Connection
 from aselenium.element import Element, ElementRect
-from aselenium.options import BaseOptions, ChromiumBaseOptions, Timeouts, Proxy
+from aselenium.options import BaseOptions, ChromiumBaseOptions, Timeouts, Proxy, ChromiumProfile
 from aselenium.service import BaseService, ChromiumBaseService
 from aselenium.session import (
     Cookie, DevToolsCMD, JavaScript, Network, Permission, Viewport, Window, 
@@ -37,6 +37,7 @@ from aselenium.webdriver import WebDriver, ChromiumBaseWebDriver
 from aselenium.edge import Edge, EdgeOptions, EdgeService, EdgeSession
 from aselenium.chrome import Chrome, ChromeOptions, ChromeService, ChromeSession
 from aselenium.chromium import Chromium, ChromiumOptions, ChromiumService, ChromiumSession
+from aselenium.firefox import Firefox, FirefoxOptions, FirefoxProfile, FirefoxService, FirefoxSession
 from aselenium.safari import Safari, SafariOptions, SafariService, SafariSession
 
 # Errors
@@ -47,7 +48,7 @@ from aselenium.errors import (
     AseleniumTimeout, WebDriverTimeoutError,
     # . options
     OptionsError, InvalidOptionsError, InvalidCapabilitiesError, 
-    InvalidOptionsProxyError, InvalidOptionsArgumentError, InvalidOptionsExtensionError,
+    InvalidProxyError, InvalidExtensionError,
     # . service
     ServiceError, ServiceExecutableNotFoundError, ServiceStartError, ServiceStopError, 
     ServiceSocketError, ServiceSocketOSError, ServiceProcessError, ServiceProcessOSError, 
@@ -75,20 +76,22 @@ from aselenium.errors import (
 __all__ = [
     # Common
     "Actions", "Alert", "Connection", "Element", "ElementRect", "BaseOptions", 
-    "ChromiumBaseOptions", "Timeouts", "Proxy", "BaseService", "ChromiumBaseService", 
-    "Cookie", "DevToolsCMD", "JavaScript", "Network", "Permission", "Viewport", 
-    "Window", "WindowRect", "Session", "SessionContext", "ChromiumBaseSession", 
-    "ChromiumBaseSessionContext", "DefaultTimeouts", "DefaultNetworkConditions", 
-    "Shadow", "KeyboardKeys", "MouseButtons", "WebDriver", "ChromiumBaseWebDriver",
+    "ChromiumBaseOptions", "Timeouts", "Proxy", "ChromiumProfile", "BaseService", 
+    "ChromiumBaseService", "Cookie", "DevToolsCMD", "JavaScript", "Network", 
+    "Permission", "Viewport", "Window", "WindowRect", "Session", "SessionContext", 
+    "ChromiumBaseSession", "ChromiumBaseSessionContext", "DefaultTimeouts", 
+    "DefaultNetworkConditions", "Shadow", "KeyboardKeys", "MouseButtons", 
+    "WebDriver", "ChromiumBaseWebDriver",
     # Browser
     "Edge", "EdgeOptions", "EdgeService", "EdgeSession", 
     "Chrome", "ChromeOptions", "ChromeService", "ChromeSession", 
     "Chromium", "ChromiumOptions", "ChromiumService", "ChromiumSession",
+    "Firefox", "FirefoxOptions", "FirefoxProfile", "FirefoxService", "FirefoxSession",
     "Safari", "SafariOptions", "SafariService", "SafariSession",
     # Errors
     "AseleniumError", "AseleniumTimeout", "WebDriverTimeoutError", "OptionsError", 
-    "InvalidOptionsError", "InvalidCapabilitiesError", "InvalidOptionsProxyError", 
-    "InvalidOptionsArgumentError", "InvalidOptionsExtensionError", "ServiceError", 
+    "InvalidOptionsError", "InvalidCapabilitiesError", "InvalidProxyError", 
+    "InvalidExtensionError", "ServiceError", 
     "ServiceExecutableNotFoundError", "ServiceStartError", "ServiceStopError", 
     "ServiceSocketError", "ServiceSocketOSError", "ServiceProcessError", 
     "ServiceProcessOSError", "ServiceProcessTimeoutError", "WebDriverError", 
@@ -116,15 +119,17 @@ __all__ = [
 (
     # Common
     Actions, Alert, Connection, Element, ElementRect, BaseOptions, 
-    ChromiumBaseOptions, Timeouts, Proxy, BaseService, ChromiumBaseService, 
-    Cookie, DevToolsCMD, JavaScript, Network, Permission, Viewport, Window, 
-    WindowRect, Session, SessionContext, ChromiumBaseSession, 
-    ChromiumBaseSessionContext, DefaultTimeouts, DefaultNetworkConditions, 
-    Shadow, KeyboardKeys, MouseButtons, WebDriver, ChromiumBaseWebDriver,
+    ChromiumBaseOptions, Timeouts, Proxy, ChromiumProfile, BaseService, 
+    ChromiumBaseService, Cookie, DevToolsCMD, JavaScript, Network, 
+    Permission, Viewport, Window, WindowRect, Session, SessionContext, 
+    ChromiumBaseSession, ChromiumBaseSessionContext, DefaultTimeouts, 
+    DefaultNetworkConditions, Shadow, KeyboardKeys, MouseButtons, 
+    WebDriver, ChromiumBaseWebDriver,
     # Browser
     Edge, EdgeOptions, EdgeService, EdgeSession, 
     Chrome, ChromeOptions, ChromeService, ChromeSession, 
     Chromium, ChromiumOptions, ChromiumService, ChromiumSession,
     Safari, SafariOptions, SafariService, SafariSession,
+    Firefox, FirefoxOptions, FirefoxProfile, FirefoxService, FirefoxSession,
 )  # pyflakes
 # fmt: on
