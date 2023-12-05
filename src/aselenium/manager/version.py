@@ -28,7 +28,7 @@ __all__ = ["ChromiumVersion", "FirefoxVersion", "GeckoVersion"]
 class Version:
     """Represents a version (numeric only)."""
 
-    _VERSION_PATTERN: Pattern = compile(r"\d+\.?\d*.?\d*")
+    _VERSION_PATTERN: Pattern = compile(r"\d+\.?\d*\.?\d*")
     _VERSION_SEGMENTS: int = 3
 
     def __init__(self, version: str | Version) -> None:
@@ -47,7 +47,7 @@ class Version:
         """(Internal) Parse the version."""
         # Parse version
         try:
-            matchs = self._VERSION_PATTERN.search(version)
+            matches = self._VERSION_PATTERN.search(version)
         except AttributeError as err:
             raise NotImplementedError(
                 "<Version> Class attribute '_VERSION_PATTERN' "
@@ -66,7 +66,7 @@ class Version:
                 "Invalid version: {} {}".format(repr(version), type(version))
             ) from err
         try:
-            self._version = matchs.group(0).strip(".")
+            self._version = matches.group(0).rstrip(".")
             self._versions_str: list[str] = self._version.split(".")
             versions_int = [int(part) for part in self._versions_str]
         except Exception as err:
@@ -144,6 +144,9 @@ class Version:
 
     # Special Methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
+        return self._version.__repr__()
+
+    def __str__(self) -> str:
         return self._version
 
     def __hash__(self) -> int:
@@ -190,7 +193,7 @@ class Version:
 class ChromiumVersion(Version):
     """Represents a Chromium based browser/webdriver version."""
 
-    _VERSION_PATTERN: Pattern = compile(r"\d+\.?\d*.?\d*.?\d*")
+    _VERSION_PATTERN: Pattern = compile(r"\d+\.?\d*\.?\d*\.?\d*")
     _VERSION_SEGMENTS: int = 4
 
     def __init__(self, version: Any) -> None:

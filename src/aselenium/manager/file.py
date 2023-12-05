@@ -892,10 +892,18 @@ class File:
         """(Internal) Find the target executable from the
         extracted files `<str>`. Return `None` if not found.
         """
-        # Determine executable name
+        # Find windows executable
         if self._os_name == "win":
             match_name = self._WIN_EXECUTABLE_NAME
-        elif self._os_name == "mac":
+            for file in files:
+                name = file.split("/")[-1]
+                path = join_path(base_dir, file)
+                if is_path_file(path) and name == match_name:
+                    return path
+            return None
+
+        # Find unix executable
+        if self._os_name == "mac":
             match_name = self._MAC_EXECUTABLE_NAME
         else:
             match_name = self._LINUX_EXECUTABLE_NAME
@@ -949,8 +957,8 @@ class ChromeBinaryFile(File):
     """Represents a downloaded Chrome browser file."""
 
     _MAC_EXECUTABLE_NAME: str = "Google Chrome for Testing"
-    _WIN_EXECUTABLE_NAME: str = "chrome"
-    _LINUX_EXECUTABLE_NAME: str = "chrome.exe"
+    _WIN_EXECUTABLE_NAME: str = "chrome.exe"
+    _LINUX_EXECUTABLE_NAME: str = "chrome"
 
     def __init__(self, os_name: str, url: str, content: bytes) -> None:
         super().__init__("chrome", os_name, url, content)
