@@ -1914,9 +1914,9 @@ class FirefoxDriverManager(DriverManager):
         """(Internal) Raise an unavailable driver error."""
         if version < self._GECKODRIVER_MIN_VERSION:
             raise errors.InvalidDriverVersionError(
-                "<{}>\nGeokodriver version below '{}' is "
-                "not supported by the manager.".format(
-                    self.__class__.__name__, self._GECKODRIVER_MIN_VERSION
+                "<{}>\nGeokodriver version below '{}' is not supported "
+                "by the manager. Target version: '{}'".format(
+                    self.__class__.__name__, self._GECKODRIVER_MIN_VERSION, version
                 )
             )
         else:

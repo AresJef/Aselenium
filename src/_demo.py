@@ -140,7 +140,7 @@ async def test_driver_manager() -> None:
         await install("0")
 
         await install("latest")
-        await install("0.29.1")
+        # await install("0.30.0")
         driver = Firefox(mgr.driver_location)
         driver.options.binary_location = mgr.browser_location
 
@@ -152,9 +152,9 @@ async def test_driver_manager() -> None:
         print()
 
     await edge_driver_mgr()
-    # await chrome_driver_mgr()
-    # await chromium_driver_mgr()
-    # await firefox_driver_mgr()
+    await chrome_driver_mgr()
+    await chromium_driver_mgr()
+    await firefox_driver_mgr()
 
 
 async def test_proxy() -> None:
