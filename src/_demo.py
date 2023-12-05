@@ -1,8 +1,165 @@
 import asyncio, os
+from time import perf_counter
 from aselenium import KeyboardKeys, Session, Proxy
 from aselenium import Edge, Chrome, Chromium, Firefox, Safari
 from aselenium import ChromiumBaseWebDriver, ChromiumBaseSession
 from aselenium import ChromiumBaseSession, SafariSession, FirefoxSession
+
+
+async def test_driver_manager() -> None:
+    from aselenium.manager.driver import EdgeDriverManager
+    from aselenium.manager.driver import ChromeDriverManager
+    from aselenium.manager.driver import ChromiumDriverManager
+    from aselenium.manager.driver import FirefoxDriverManager
+
+    async def edge_driver_mgr() -> None:
+        async def install(version: str, channel: str, binary: str = None) -> None:
+            t1 = perf_counter()
+            res = await mgr.install(version, channel, binary)
+            t2 = perf_counter()
+            print(f"Install Edge:\t{version} & {channel}\t{res}")
+            print(f"Driver Dir:\t{mgr.driver_location}")
+            print(f"Driver Ver:\t{mgr.driver_version}")
+            print(f"Browser Dir:\t{mgr.browser_location}")
+            print(f"Browser Ver:\t{mgr.browser_version}")
+            print(f"Install Time:\t{t2 - t1}s")
+            print()
+
+        print()
+        print(" Edge Driver Manager ".center(80, "-"))
+        mgr = EdgeDriverManager(max_cache_size=None)
+        await install("build", "stable")
+        await install("build", "beta")
+        await install("build", "dev")
+        await install("patch", "dev")
+        await install("110", "stable")
+        b = "/Applications/Microsoft Edge Dev.app/Contents/MacOS/Microsoft Edge Dev"
+        await install("110", "stable", b)
+        await install("patch", "stable", b)
+        print("-" * 80)
+        print()
+
+        # await install("120", "stable")
+        # driver = Edge(mgr.driver_location)
+        # driver.options.binary_location = mgr.browser_location
+        # async with driver.acquire() as s:
+        #     print(mgr.driver_version, mgr.driver_location)
+        #     print(mgr.browser_version, mgr.browser_location)
+        #     await s.load("https://www.baidu.com")
+
+    async def chrome_driver_mgr() -> None:
+        async def install(version: str, channel: str, binary: str = None) -> None:
+            t1 = perf_counter()
+            res = await mgr.install(version, channel, binary)
+            t2 = perf_counter()
+            print(f"Install Edge:\t{version} & {channel}\t{res}")
+            print(f"Driver Dir:\t{mgr.driver_location}")
+            print(f"Driver Ver:\t{mgr.driver_version}")
+            print(f"Browser Dir:\t{mgr.browser_location}")
+            print(f"Browser Ver:\t{mgr.browser_version}")
+            print(f"Install Time:\t{t2 - t1}s")
+            print()
+
+        print()
+        print(" Chrome Driver Manager ".center(80, "-"))
+        mgr = ChromeDriverManager(max_cache_size=None)
+        mgr.proxy = "http://127.0.0.1:7890"
+        await install("build", "stable")
+        await install("build", "beta")
+        await install("build", "dev")
+        await install("patch", "dev")
+        await install("110", "stable")
+        b = "/Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev"
+        await install("110", "stable", b)
+        await install("patch", "stable", b)
+        await install("114", "cft")
+        await install("115.0.5763.0", "cft")
+        await install("113.0.5672", "cft")
+        await install("119.0.6045", "cft")
+        print("-" * 80)
+        print()
+
+        # await install("120", "stable")
+        # driver = Chrome(mgr.driver_location)
+        # driver.options.binary_location = mgr.browser_location
+        # async with driver.acquire() as s:
+        #     print(mgr.driver_version, mgr.driver_location)
+        #     print(mgr.browser_version, mgr.browser_location)
+        #     await s.load("https://www.baidu.com")
+
+    async def chromium_driver_mgr() -> None:
+        async def install(version: str, binary: str = None) -> None:
+            t1 = perf_counter()
+            res = await mgr.install(version, binary)
+            t2 = perf_counter()
+            print(f"Install Edge:\t{version}\t{res}")
+            print(f"Driver Dir:\t{mgr.driver_location}")
+            print(f"Driver Ver:\t{mgr.driver_version}")
+            print(f"Browser Dir:\t{mgr.browser_location}")
+            print(f"Browser Ver:\t{mgr.browser_version}")
+            print(f"Install Time:\t{t2 - t1}s")
+            print()
+
+        print()
+        print(" Chromium Driver Manager ".center(80, "-"))
+        mgr = ChromiumDriverManager(max_cache_size=None)
+        await install("build")
+        await install("major")
+        await install("patch")
+        await install("115")
+        await install("110")
+        b = "/Applications/Chromium.app/Contents/MacOS/Chromium"
+        await install("build", b)
+        b = "/Applications/Chromium.app/Contents/MacOS/Chromium"
+        await install("patch", b)
+        print("-" * 80)
+        print()
+
+        # await install("119")
+        # driver = Chromium(mgr.driver_location)
+        # driver.options.binary_location = mgr.browser_location
+        # async with driver.acquire() as s:
+        #     print(mgr.driver_version, mgr.driver_location)
+        #     print(mgr.browser_version, mgr.browser_location)
+        #     await s.load("https://www.baidu.com")
+
+    async def firefox_driver_mgr() -> None:
+        async def install(version: str, binary: str = None) -> None:
+            t1 = perf_counter()
+            res = await mgr.install(version, binary)
+            t2 = perf_counter()
+            print(f"Install Edge:\t{version}\t{res}")
+            print(f"Driver Dir:\t{mgr.driver_location}")
+            print(f"Driver Ver:\t{mgr.driver_version}")
+            print(f"Browser Dir:\t{mgr.browser_location}")
+            print(f"Browser Ver:\t{mgr.browser_version}")
+            print(f"Install Time:\t{t2 - t1}s")
+            print()
+
+        print()
+        print(" Firefox Driver Manager ".center(80, "-"))
+        mgr = FirefoxDriverManager(max_cache_size=None)
+        await install("auto")
+        await install("latest")
+        for version in list(mgr._GECKODRIVER_TABLE.keys())[:-1]:
+            await install(version)
+        await install("0.30")
+        await install("0")
+        print("-" * 80)
+        print()
+
+        # await install("0.29.1")
+        # driver = Firefox(mgr.driver_location)
+        # driver.options.binary_location = mgr.browser_location
+        # async with driver.acquire() as s:
+        #     print(mgr.driver_version, mgr.driver_location)
+        #     print(mgr.browser_version, mgr.browser_location)
+        #     await s.load("https://www.baidu.com")
+
+    await edge_driver_mgr()
+    await chrome_driver_mgr()
+    await chromium_driver_mgr()
+    await firefox_driver_mgr()
 
 
 async def test_proxy() -> None:
@@ -156,7 +313,7 @@ async def test_chromium_options() -> None:
     print(" Chromium Options ".center(80, "-"))
     driver = Chromium("/Users/jef/Downloads/chromiumdriver_mac64/chromedriver")
     # . browser version
-    driver.options.browser_version = "119.0.6045.123"
+    driver.options.browser_version = "118.0.5982.0"
     # . platform name
     driver.options.platform_name = "mac"
     # . accept Insecure Certs
@@ -244,13 +401,16 @@ async def test_firefox_options() -> None:
     if TEST_PROFILE and os.path.isdir(profile_dir):
         driver.options.set_profile(profile_dir, True)
         # driver.options.rem_profile()
-        print_options = False
+        profile_args = True
     else:
-        print_options = True
+        profile_args = False
     # . arguments
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
     # Final options
-    if print_options:
+    if profile_args:
+        text = repr(driver.options)
+        print(text[:1000] + "..." + text[-100:])
+    else:
         print(driver.options)
 
     # Test driver
@@ -1823,15 +1983,16 @@ if __name__ == "__main__":
     TEST_FOLDER = os.path.join(ABS_PATH, "test_files")
     TEST_PROFILE = True
 
-    asyncio.run(test_proxy())
-    asyncio.run(test_edge_options())
-    asyncio.run(test_chrome_options())
-    asyncio.run(test_chromium_options())
-    asyncio.run(test_firefox_options())
-    asyncio.run(test_safari_options())
-    asyncio.run(test_cancellation())
-    asyncio.run(test_driver("edge"))
-    asyncio.run(test_driver("chrome"))
-    asyncio.run(test_driver("chromium"))
-    asyncio.run(test_driver("firefox"))
-    asyncio.run(test_driver("safari"))
+    asyncio.run(test_driver_manager())
+    # asyncio.run(test_proxy())
+    # asyncio.run(test_edge_options())
+    # asyncio.run(test_chrome_options())
+    # asyncio.run(test_chromium_options())
+    # asyncio.run(test_firefox_options())
+    # asyncio.run(test_safari_options())
+    # asyncio.run(test_cancellation())
+    # asyncio.run(test_driver("edge"))
+    # asyncio.run(test_driver("chrome"))
+    # asyncio.run(test_driver("chromium"))
+    # asyncio.run(test_driver("firefox"))
+    # asyncio.run(test_driver("safari"))

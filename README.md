@@ -20,9 +20,11 @@ Only support for python 3.10 and above.
 ### Acknowledgements
 aselenium is based on several open-source repositories.
 - [aiohttp](https://github.com/aio-libs/aiohttp)
+- [psutil](https://github.com/giampaolo/psutil)
 - [orjson](https://github.com/ijl/orjson)
 
 aselenium is inspired from and makes modifications of the 
 following open-source repositories:
 - [arsenic](https://github.com/HENNGE/arsenic)
 - [selenium](https://github.com/SeleniumHQ/selenium)
+- [webdriver-manager](https://github.com/SergeyPirogov/webdriver_manager)

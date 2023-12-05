@@ -18,6 +18,7 @@
 # -*- coding: UTF-8 -*-
 from typing import Any
 from asyncio import TimeoutError
+from re import Pattern, compile, IGNORECASE
 from orjson import loads
 from aiohttp import ClientError
 
@@ -34,6 +35,80 @@ class AseleniumTimeout(AseleniumError, TimeoutError):
 
 class WebDriverTimeoutError(AseleniumTimeout):
     """Thrown when a webdriver does not complete in enough time."""
+
+
+# Platform error
+class PlatformError(AseleniumError):
+    """Base exception class for all platform errors."""
+
+
+class UnsupportedPlatformError(PlatformError):
+    """Exception raised for unsupported platform."""
+
+
+# Driver Manager error
+class DriverManagerError(AseleniumError):
+    """Base exception class for all driver manager errors."""
+
+
+class InvalidDriverCacheError(DriverManagerError, ValueError):
+    """Exception raised for invalid driver cache."""
+
+
+class InvalidDriverCacheDirectoryError(InvalidDriverCacheError):
+    """Exception raised for invalid driver cache directory."""
+
+
+class InvalidDriverMaxCacheSizeError(InvalidDriverCacheError):
+    """Exception raised for invalid driver max cache size."""
+
+
+class DriverInstallationError(DriverManagerError):
+    """Exception raised for driver installation error."""
+
+
+class DriverRequestFailedError(DriverManagerError):
+    """Exception raised for proxy error."""
+
+
+class DriverRequestRateLimitError(DriverRequestFailedError):
+    """Exception raised for rate limit error."""
+
+
+class InvalidDownloadFileError(DriverRequestFailedError):
+    """Exception raised for invalid driver file."""
+
+
+class DriverDownloadFailedError(DriverRequestFailedError):
+    """Exception raised for driver download failed error."""
+
+
+class InvalidVersionError(DriverManagerError, ValueError):
+    """Exception raised for invalid driver version."""
+
+
+class InvalidDriverVersionError(InvalidVersionError):
+    """Exception raised for invalid driver version."""
+
+
+class InvalidBrowserVersionError(InvalidVersionError):
+    """Exception raised for invalid browser version."""
+
+
+class BrowserVersionNotDetectedError(InvalidVersionError):
+    """Exception raised for browser version not detected error."""
+
+
+class BrowserBinaryNotDetectedError(DriverManagerError):
+    """Exception raised for browser binary not found error."""
+
+
+class BrowserDownloadFailedError(DriverRequestFailedError):
+    """Exception raised for browser download failed error."""
+
+
+class InvalidDriverChannelError(DriverManagerError, ValueError):
+    """Exception raised for invalid driver channel."""
 
 
 # Options
@@ -185,6 +260,10 @@ class InvalidSessionError(SessionError, NotFoundError):
 class InvalidSessionIdError(InvalidSessionError):
     """Occurs if the given session id is not in the list of active sessions,
     meaning the session either does not exist or that it's not active."""
+
+
+class IncompatibleWebdriverError(InvalidSessionError):
+    """Occurs if the given webdriver is not compatible with the current browser version."""
 
 
 class SessionDataError(SessionError, UnicodeDecodeError):
@@ -687,8 +766,10 @@ def error_handler(res: dict[str, Any]) -> None:
     if isinstance(value, str):
         raise error(value)
 
-    # Construct - screen & stacktrace
+    # Construct - screen
     screen = value.get("screen")
+
+    # Construct - stacktrace
     strace = value.get("stackTrace") or value.get("stacktrace")
     if strace:
         if isinstance(strace, str):
@@ -713,7 +794,7 @@ def error_handler(res: dict[str, Any]) -> None:
         stacktrace = None
 
     # Raise error
-    if error == UnexpectedAlertFoundError:
+    if error is UnexpectedAlertFoundError:
         if "data" in value:
             alert_text = value["data"].get("text")
         elif "alert" in value:
@@ -721,5 +802,41 @@ def error_handler(res: dict[str, Any]) -> None:
         else:
             alert_text = None
         raise error(message, screen, stacktrace, alert_text)
+    elif error is InvalidSessionError:
+        raise_invalid_session_error(error, message, screen, stacktrace)
+    else:
+        raise error(message, screen, stacktrace)
+
+
+# Incompatible webdriver error
+INCOMPATIBLE_DRIVER_PATTERN: Pattern = compile(
+    "session not created: this version .+ only supports .+ version .+", IGNORECASE
+)
+"""
+Edge error message:
+This version of Microsoft Edge WebDriver only supports Microsoft Edge version 110
+Current browser version is 119.0.2151.97 with binary path ~
+
+Chrome error message:
+aselenium.errors.IncompatibleWebdriverError: session not created: This version of ChromeDriver only supports Chrome version 116
+Current browser version is 119.0.6045.199 with binary path ~
+"""
+
+
+def raise_invalid_session_error(
+    error: type[Exception],
+    message: str,
+    screen: str | None,
+    stacktrace: list[str] | None,
+) -> None:
+    """Raise the InvalidSessionError.
+
+    If the error is for incompatible webdriver, raise `IncompatibleWebdriverError`,
+    which is a subclass of `InvalidSessionError`. Otherwise, raise the original error.
+    """
+    # Match imcompatible webdriver error
+    matches = INCOMPATIBLE_DRIVER_PATTERN.search(message)
+    if matches is not None:
+        raise IncompatibleWebdriverError(message, screen, stacktrace)
     else:
         raise error(message, screen, stacktrace)
