@@ -744,7 +744,7 @@ class Session:
             # . stop session
             while True:
                 try:
-                    await self.execute_command(Command.QUIT, timeout=3)
+                    await self.execute_command(Command.QUIT, timeout=1)
                     break
                 except CancelledError:
                     cancelled = True

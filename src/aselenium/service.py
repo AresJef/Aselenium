@@ -395,11 +395,13 @@ class BaseService:
         """(Internal) Shutdown the remote connection of the session."""
         while True:
             try:
-                await self._session.post("/shutdown")
+                await self._session.post("/shutdown", timeout=1)
                 break
             except CancelledError:
                 continue  # retry
             except ClientConnectorError:
+                return None  # exit
+            except TimeoutError:
                 return None  # exit
 
     # Service -----------------------------------------------------------------------------
