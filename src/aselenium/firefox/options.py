@@ -35,11 +35,15 @@ __all__ = ["FirefoxProfile", "FirefoxOptions"]
 class FirefoxProfile:
     """Represents the user profile for Firefox."""
 
-    def __init__(self, directory: str, temporary: bool = True) -> None:
+    def __init__(self, directory: str | None = None, temporary: bool = True) -> None:
         """The user profile for Firefox.
 
-        :param directory: `<str>` The directory of the Firefox profile.
+        :param directory: `<str/None>` The directory of the Firefox profile. Defaults to `None`.
+            Accepts `<st>` the directory of a Firefox profile, or `None` to create
+            a blank temporary profile.
+
         :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `True`.
+            - Only applicable if 'directory' is specified.
             - If `True`, a cloned temporary profile will be created based on the given
               'directory'. After all related sessions are closed, the temporary profile
               will be deleted automatically, leaving the original profile untouched.
@@ -63,18 +67,21 @@ class FirefoxProfile:
             directory="/home/<username>/.mozilla/firefox/<profile_folder>"
         """
         # Profile directory
-        if not is_path_dir(directory):
+        self._temp_directory: str = None
+        self._temp_profile_dir: str = None
+        if directory is None:
+            self._create_temp_profile(directory)
+            self._directory = self._temp_profile_dir
+        elif is_path_dir(directory):
+            if temporary:
+                self._create_temp_profile(directory)
+            self._directory = directory
+        else:
             raise errors.InvalidProfileError(
                 "<{}>\nInvalid profile directory: {} {}".format(
                     self.__class__.__name__, repr(directory), type(directory)
                 )
             )
-        self._directory: str = directory
-        # Temporary profile
-        self._temp_directory: str = None
-        self._temp_profile_dir: str = None
-        if temporary:
-            self._create_temp_profile()
         # Extensions
         self._extension_details: dict[str, FirefoxAddon] = {}
         self._extensions_dir = os.path.join(self.directory_for_driver, "extensions")
@@ -124,7 +131,7 @@ class FirefoxProfile:
         return self.__encode
 
     # Temporary profile -------------------------------------------------------------------
-    def _create_temp_profile(self) -> None:
+    def _create_temp_profile(self, profile_dir: str | None) -> None:
         """(Internal) Create a temporary profile
         based on the original profile.
         """
@@ -137,14 +144,14 @@ class FirefoxProfile:
 
         # Create temporary profile
         self._temp_profile_dir = os.path.join(self._temp_directory, "TEMP_PROFILE")
-        if self._directory is not None:
+        if profile_dir is None:
+            os.makedirs(self._temp_profile_dir)
+        else:
             shutil.copytree(
-                self._directory,
+                profile_dir,
                 self._temp_profile_dir,
                 ignore=shutil.ignore_patterns("parent.lock", "lock", ".parentlock"),
             )
-        else:
-            os.makedirs(self._temp_profile_dir)
         os.chmod(self._temp_profile_dir, 0o755)
 
     def _delete_temp_profile(self) -> None:
@@ -240,8 +247,9 @@ class FirefoxOptions(BaseOptions):
         options = deepcopy(self._experimental_options)
         if self._preferences:
             options["prefs"] = self.preferences
-        if self._profile:
-            options["profile"] = self._profile.encode
+        if self._profile is None:
+            self.profile = None
+        options["profile"] = self._profile.encode
         if self._arguments:
             options["args"] = self.arguments
         caps[self.KEY] = options
@@ -289,19 +297,16 @@ class FirefoxOptions(BaseOptions):
 
     # Options: profile --------------------------------------------------------------------
     @property
-    def profile(self) -> FirefoxProfile | None:
-        """Access the profile of the browser `<FirefoxProfile>`.
-        Returns `None` if profile is not configured.
-        """
+    def profile(self) -> FirefoxProfile:
+        """Access the profile of the browser `<FirefoxProfile>`."""
         return self._profile
 
     @profile.setter
     def profile(self, value: FirefoxProfile | None) -> None:
         # Remove profile
         if value is None:
-            if self._profile is not None:
-                self._profile = None
-                self._caps_changed()
+            self._profile = FirefoxProfile(None, True)
+            self._caps_changed()
             return None  # exit
 
         # Set profile
@@ -315,11 +320,15 @@ class FirefoxOptions(BaseOptions):
         self._profile = value
         self._caps_changed()
 
-    def set_profile(self, directory: str, temporary: bool = True) -> FirefoxProfile:
+    def set_profile(self, directory: str | None, temporary: bool = True) -> FirefoxProfile:
         """Set the user profile for Firefox.
 
-        :param directory: `<str>` The directory of the Firefox profile.
+        :param directory: `<str/None>` The directory of the Firefox profile.
+            Accepts `<st>` the directory of a Firefox profile, or `None` to create
+            a blank temporary profile.
+
         :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `True`.
+            - Only applicable if 'directory' is specified.
             - If `True`, a cloned temporary profile will be created based on the given
               'directory'. After all related sessions are closed, the temporary profile
               will be deleted automatically, leaving the original profile untouched.

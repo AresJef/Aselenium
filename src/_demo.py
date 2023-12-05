@@ -147,13 +147,18 @@ async def test_driver_manager() -> None:
         async with driver.acquire() as s:
             print(mgr.driver_version, mgr.driver_location)
             print(mgr.browser_version, mgr.browser_location)
+
+            print(s.options.profile)
+            print(s.options.profile.directory)
+            print(s.options.profile.directory_for_driver)
+
             await s.load("https://www.baidu.com")
         print("-" * 80)
         print()
 
-    await edge_driver_mgr()
-    await chrome_driver_mgr()
-    await chromium_driver_mgr()
+    # await edge_driver_mgr()
+    # await chrome_driver_mgr()
+    # await chromium_driver_mgr()
     await firefox_driver_mgr()
 
 
