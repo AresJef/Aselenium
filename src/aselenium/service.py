@@ -16,8 +16,8 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+import os
 from typing import Any
-from os import environ
 from platform import system
 from errno import ENOENT, EACCES
 from time import time as unix_time
@@ -71,7 +71,7 @@ class BaseService:
         self._close_fds: bool = self._kwargs.pop("close_fds", system() != "Windows")
         self._port: int = -1
         self._port_str: str = None
-        self._env: Any = environ
+        self._env: Any = os.environ
         self._process: Process | None = None
         # Session
         self._session: ClientSession | None = None
@@ -429,7 +429,7 @@ class BaseService:
             while (unix_time() - start_time) < self._timeout:
                 if not self.process_running:
                     raise errors.ServiceProcessError(
-                        "<{}>\nService exited unexpectedly: {}".format(
+                        "<{}> Service exited unexpectedly: {}".format(
                             self.__class__.__name__,
                             self._process.returncode if self._process else 0,
                         )
@@ -450,7 +450,7 @@ class BaseService:
         except Exception as err:
             try:
                 await self.stop()
-            except Exception:
+            except BaseException:
                 pass
             raise err
 
