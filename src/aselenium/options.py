@@ -691,11 +691,6 @@ class ChromiumProfile:
         return self._directory
 
     @property
-    def profile(self) -> str:
-        """Access the name of the profile folder `<str>`."""
-        return self._profile
-
-    @property
     def directory_for_driver(self) -> str:
         """Access the main directory to be used by the webdriver `<str>`.
 
@@ -709,6 +704,11 @@ class ChromiumProfile:
             return self._directory
         else:
             return self._temp_directory
+
+    @property
+    def profile(self) -> str:
+        """Access the name of the profile folder `<str>`."""
+        return self._profile
 
     @property
     def profile_for_driver(self) -> str:
@@ -1462,12 +1462,7 @@ class ChromiumBaseOptions(BaseOptions):
     def profile(self, value: ChromiumProfile | None) -> None:
         # Remove profile
         if value is None:
-            self._arguments = [
-                arg
-                for arg in self._arguments
-                if not arg.startswith("--user-data-dir=")
-                and not arg.startswith("--profile-directory=")
-            ]
+            self._remove_profile_arguments()
             self._profile = None
             self._caps_changed()
             return None  # exit
@@ -1480,6 +1475,7 @@ class ChromiumBaseOptions(BaseOptions):
                     self.__class__.__name__, repr(value), type(value)
                 )
             )
+        self._remove_profile_arguments()
         self.add_arguments(
             "--user-data-dir=%s" % value.directory_for_driver,
             "--profile-directory=%s" % value.profile_for_driver,
@@ -1559,6 +1555,15 @@ class ChromiumBaseOptions(BaseOptions):
             options.rem_profile()
         """
         self.profile = None
+
+    def _remove_profile_arguments(self) -> None:
+        """(Internal) Remove previously setted profile arguments."""
+        self._arguments = [
+            arg
+            for arg in self._arguments
+            if not arg.startswith("--user-data-dir=")
+            and not arg.startswith("--profile-directory=")
+        ]
 
     # Options: preferences ----------------------------------------------------------------
     @property

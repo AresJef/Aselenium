@@ -240,8 +240,6 @@ class FirefoxOptions(BaseOptions):
         options = deepcopy(self._experimental_options)
         if self._preferences:
             options["prefs"] = self.preferences
-        if self._profile:
-            options["profile"] = self._profile.encode
         if self._arguments:
             options["args"] = self.arguments
         caps[self.KEY] = options
@@ -289,7 +287,7 @@ class FirefoxOptions(BaseOptions):
 
     # Options: profile --------------------------------------------------------------------
     @property
-    def profile(self) -> FirefoxProfile | None:
+    def profile(self) -> FirefoxProfile:
         """Access the profile of the browser `<FirefoxProfile>`.
         Returns `None` if profile is not configured.
         """
@@ -299,9 +297,9 @@ class FirefoxOptions(BaseOptions):
     def profile(self, value: FirefoxProfile | None) -> None:
         # Remove profile
         if value is None:
-            if self._profile is not None:
-                self._profile = None
-                self._caps_changed()
+            self._remove_profile_arguments()
+            self._profile = None
+            self._caps_changed()
             return None  # exit
 
         # Set profile
@@ -312,6 +310,8 @@ class FirefoxOptions(BaseOptions):
                     self.__class__.__name__, repr(value), type(value)
                 )
             )
+        self._remove_profile_arguments()
+        self.add_arguments("-profile %s" % value.directory_for_driver)
         self._profile = value
         self._caps_changed()
 
@@ -362,6 +362,24 @@ class FirefoxOptions(BaseOptions):
             options.rem_profile()
         """
         self.profile = None
+
+    def _remove_profile_arguments(self) -> None:
+        """(Internal) Remove previously setted profile arguments."""
+        arguments = []
+        length, idx = len(self._arguments), 0
+        while idx < length:
+            arg = self._arguments[idx]
+            if arg.startswith("-profile"):
+                if arg == "-profile":
+                    try:
+                        if is_path_dir(self._arguments[idx + 1]):
+                            idx += 1  # skip the profile directory
+                    except IndexError:
+                        pass
+            else:
+                arguments.append(arg)
+            idx += 1
+        self._arguments = arguments
 
     # Options: preferences ----------------------------------------------------------------
     @property
