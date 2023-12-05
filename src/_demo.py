@@ -33,19 +33,17 @@ async def test_driver_manager() -> None:
         await install("build", "dev")
         await install("patch", "dev")
         await install("110", "stable")
-        b = "/Applications/Microsoft Edge Dev.app/Contents/MacOS/Microsoft Edge Dev"
-        await install("110", "stable", b)
-        await install("patch", "stable", b)
+
+        # await install("119", "dev")
+        await install("build", "stable")
+        driver = Edge(mgr.driver_location)
+        driver.options.binary_location = mgr.browser_location
+        async with driver.acquire() as s:
+            print(mgr.driver_version, mgr.driver_location)
+            print(mgr.browser_version, mgr.browser_location)
+            await s.load("https://www.baidu.com")
         print("-" * 80)
         print()
-
-        # await install("120", "stable")
-        # driver = Edge(mgr.driver_location)
-        # driver.options.binary_location = mgr.browser_location
-        # async with driver.acquire() as s:
-        #     print(mgr.driver_version, mgr.driver_location)
-        #     print(mgr.browser_version, mgr.browser_location)
-        #     await s.load("https://www.baidu.com")
 
     async def chrome_driver_mgr() -> None:
         async def install(version: str, channel: str, binary: str = None) -> None:
@@ -63,29 +61,27 @@ async def test_driver_manager() -> None:
         print()
         print(" Chrome Driver Manager ".center(80, "-"))
         mgr = ChromeDriverManager(max_cache_size=None)
-        mgr.proxy = "http://127.0.0.1:7890"
         await install("build", "stable")
         await install("build", "beta")
         await install("build", "dev")
         await install("patch", "dev")
         await install("110", "stable")
-        b = "/Applications/Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev"
-        await install("110", "stable", b)
-        await install("patch", "stable", b)
         await install("114", "cft")
         await install("115.0.5763.0", "cft")
         await install("113.0.5672", "cft")
         await install("119.0.6045", "cft")
+
+        await install("build", "dev")
+        await install("115.0.5763.0", "cft")
+        # await install("117", "stable")
+        driver = Chrome(mgr.driver_location)
+        driver.options.binary_location = mgr.browser_location
+        async with driver.acquire() as s:
+            print(mgr.driver_version, mgr.driver_location)
+            print(mgr.browser_version, mgr.browser_location)
+            await s.load("https://www.baidu.com")
         print("-" * 80)
         print()
-
-        # await install("120", "stable")
-        # driver = Chrome(mgr.driver_location)
-        # driver.options.binary_location = mgr.browser_location
-        # async with driver.acquire() as s:
-        #     print(mgr.driver_version, mgr.driver_location)
-        #     print(mgr.browser_version, mgr.browser_location)
-        #     await s.load("https://www.baidu.com")
 
     async def chromium_driver_mgr() -> None:
         async def install(version: str, binary: str = None) -> None:
@@ -108,20 +104,17 @@ async def test_driver_manager() -> None:
         await install("patch")
         await install("115")
         await install("110")
-        b = "/Applications/Chromium.app/Contents/MacOS/Chromium"
-        await install("build", b)
-        b = "/Applications/Chromium.app/Contents/MacOS/Chromium"
-        await install("patch", b)
+
+        await install("build")
+        # await install("119")
+        driver = Chromium(mgr.driver_location)
+        driver.options.binary_location = mgr.browser_location
+        async with driver.acquire() as s:
+            print(mgr.driver_version, mgr.driver_location)
+            print(mgr.browser_version, mgr.browser_location)
+            await s.load("https://www.baidu.com")
         print("-" * 80)
         print()
-
-        # await install("119")
-        # driver = Chromium(mgr.driver_location)
-        # driver.options.binary_location = mgr.browser_location
-        # async with driver.acquire() as s:
-        #     print(mgr.driver_version, mgr.driver_location)
-        #     print(mgr.browser_version, mgr.browser_location)
-        #     await s.load("https://www.baidu.com")
 
     async def firefox_driver_mgr() -> None:
         async def install(version: str, binary: str = None) -> None:
@@ -145,21 +138,23 @@ async def test_driver_manager() -> None:
             await install(version)
         await install("0.30")
         await install("0")
+
+        await install("latest")
+        await install("0.29.1")
+        driver = Firefox(mgr.driver_location)
+        driver.options.binary_location = mgr.browser_location
+
+        async with driver.acquire() as s:
+            print(mgr.driver_version, mgr.driver_location)
+            print(mgr.browser_version, mgr.browser_location)
+            await s.load("https://www.baidu.com")
         print("-" * 80)
         print()
 
-        # await install("0.29.1")
-        # driver = Firefox(mgr.driver_location)
-        # driver.options.binary_location = mgr.browser_location
-        # async with driver.acquire() as s:
-        #     print(mgr.driver_version, mgr.driver_location)
-        #     print(mgr.browser_version, mgr.browser_location)
-        #     await s.load("https://www.baidu.com")
-
     await edge_driver_mgr()
-    await chrome_driver_mgr()
-    await chromium_driver_mgr()
-    await firefox_driver_mgr()
+    # await chrome_driver_mgr()
+    # await chromium_driver_mgr()
+    # await firefox_driver_mgr()
 
 
 async def test_proxy() -> None:
