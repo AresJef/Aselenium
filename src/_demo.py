@@ -143,15 +143,9 @@ async def test_driver_manager() -> None:
         # await install("0.30.0")
         driver = Firefox(mgr.driver_location)
         driver.options.binary_location = mgr.browser_location
-
         async with driver.acquire() as s:
             print(mgr.driver_version, mgr.driver_location)
             print(mgr.browser_version, mgr.browser_location)
-
-            print(s.options.profile)
-            print(s.options.profile.directory)
-            print(s.options.profile.directory_for_driver)
-
             await s.load("https://www.baidu.com")
         print("-" * 80)
         print()

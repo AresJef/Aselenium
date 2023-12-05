@@ -656,13 +656,14 @@ class ChromiumProfile:
             profile="Default"
         """
         # Profile directory
+        self._directory: str = directory
+        self._temp_directory: str = None
         if not is_path_dir(directory):
             raise errors.InvalidProfileError(
-                "<{}>\nInvalid profile directory: {} {}".format(
+                "<{}> Invalid profile directory: {} {}".format(
                     self.__class__.__name__, repr(directory), type(directory)
                 )
             )
-        self._directory = directory
         # Profile folder name
         if not isinstance(profile, str):
             raise errors.InvalidProfileError(
