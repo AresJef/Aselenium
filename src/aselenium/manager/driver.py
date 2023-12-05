@@ -514,7 +514,7 @@ class DriverManager:
         try:
             return self._parse_browser_version(res)
         except errors.InvalidDriverVersionError:
-            self._raise_browser_version_not_detected_error(browser_location)
+            self._raise_invalid_browser_location_error(browser_location)
 
     @property
     def browser_location(self) -> str:
@@ -834,35 +834,33 @@ class DriverManager:
             )
         )
 
-    def _raise_invalid_browser_location_error(self, path: str) -> None:
+    def _raise_invalid_browser_location_error(self, path: Any) -> None:
         """(Internal) Raise an invalid binary location error."""
-        raise errors.BrowserBinaryNotDetectedError(
-            "<{}>\n{} [{}] ({}{}{}) binary not exists at: {}. Please make sure the "
-            "browser has been installed correctly or specify the browser location.".format(
-                self.__class__.__name__,
-                self._name,
-                self._channel,
-                self._os_name,
-                self._os_arch,
-                "_arm" if self._os_is_arm else "",
-                repr(path),
+        if path is None:
+            raise errors.BrowserBinaryNotDetectedError(
+                "<{}>\n{} [{}] ({}{}{}) binary is not detected in the system. Please make sure the "
+                "browser has been installed correctly or specify the browser location manually.".format(
+                    self.__class__.__name__,
+                    self._name,
+                    self._channel,
+                    self._os_name,
+                    self._os_arch,
+                    "_arm" if self._os_is_arm else "",
+                )
             )
-        )
-
-    def _raise_browser_version_not_detected_error(self, path: str) -> None:
-        """(Internal) Raise an invalid browser version error."""
-        raise errors.BrowserVersionNotDetectedError(
-            "<{}>\n{} [{}] ({}{}{}) version not detected at: {}. Please make sure the "
-            "browser has been installed correctly or specify the browser location.".format(
-                self.__class__.__name__,
-                self._name,
-                self._channel,
-                self._os_name,
-                self._os_arch,
-                "_arm" if self._os_is_arm else "",
-                repr(path),
+        else:
+            raise errors.BrowserBinaryNotDetectedError(
+                "<{}>\n{} [{}] ({}{}{}) binary location is invalid: {}. Please make sure the "
+                "browser has been installed correctly or specify the browser location manually.".format(
+                    self.__class__.__name__,
+                    self._name,
+                    self._channel,
+                    self._os_name,
+                    self._os_arch,
+                    "_arm" if self._os_is_arm else "",
+                    repr(path),
+                )
             )
-        )
 
     def _raise_browser_download_failed_error(self, version: Version, url: str) -> None:
         """(Internal) Raise a browser download failed error."""
