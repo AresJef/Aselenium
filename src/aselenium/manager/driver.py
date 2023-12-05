@@ -1614,11 +1614,15 @@ class FirefoxDriverManager(DriverManager):
     _GECKODRIVER_LINUXARM_ARCH_VERSION: GeckoVersion = GeckoVersion("0.32.0")
     """Version below this does not provide arm64 driver for Linux."""
     _GECKODRIVER_MAX_VERSION: GeckoVersion = None
-    """The maximum version of GeckoDriver available."""
+    """The maximum version of GeckoDriver available by the manager."""
+    _GECKODRIVER_MIN_VERSION: GeckoVersion = GeckoVersion("0.30.0")
+    """The minimum version of GeckoDriver supported by the manager."""
     _GECKODRIVER_TABLE: dict[GeckoVersion, dict[str, FirefoxVersion]] = None
     """The compatibility table between Firefox and GeckoDriver."""
     _GECKODRIVER_TABLE_MAX_VERSION: GeckoVersion = None
     """The maximum version of GeckoDriver recorded in the compatibility table."""
+    _FIREFOX_MIN_VERSION: FirefoxVersion = FirefoxVersion("78.0.0")
+    """Firefox version below this is not supported by the manager."""
     # fmt: on
 
     def __init__(
@@ -1839,6 +1843,11 @@ class FirefoxDriverManager(DriverManager):
 
         For example: `'win64.zip'`, `'mac64-aarch64.tar.gz'`, `'linux64.tar.gz'`.
         """
+        # Validate version
+        if driver_version < self._GECKODRIVER_MIN_VERSION:
+            self._raise_driver_unavailable_error(driver_version)
+
+        # Generate arch
         if self._os_name == OSType.WIN:
             if self._os_is_arm:
                 if driver_version < self._GECKODRIVER_WINARM_VERSION:
@@ -1847,7 +1856,9 @@ class FirefoxDriverManager(DriverManager):
             else:
                 return "win" + self._os_arch + ".zip"
         elif self._os_name == OSType.MAC:
-            if self._os_is_arm and driver_version >= self._GECKODRIVER_MACARM_VERSION:
+            if self._os_is_arm:
+                if driver_version < self._GECKODRIVER_MACARM_VERSION:
+                    self._raise_driver_unavailable_error(driver_version)
                 return "macos-aarch64.tar.gz"
             else:
                 return "macos.tar.gz"
@@ -1880,7 +1891,8 @@ class FirefoxDriverManager(DriverManager):
                 and b_versions["max_firefox_version"] >= browser_version
             ):
                 return d_version
-        self._raise_driver_compatibility_error(browser_version)
+
+        self._raise_browser_unsupported_error(browser_version)
 
     # Version Utils -----------------------------------------------------------------------
     def _parse_driver_version(self, version: Any) -> GeckoVersion:
@@ -1898,28 +1910,50 @@ class FirefoxDriverManager(DriverManager):
             self._raise_invalid_browser_version_error(version)
 
     # Exceptions --------------------------------------------------------------------------
-    def _raise_driver_compatibility_error(self, version: Version) -> None:
-        """(Internal) Raise a failed to find compatible driver error."""
-        raise errors.InvalidBrowserVersionError(
-            "<{}>\nFailed to find compatible geckodriver for {} '{}' ({}{}{}).".format(
-                self.__class__.__name__,
-                self._name,
-                version,
-                self._os_name,
-                self._os_arch,
-                "_arm" if self._os_is_arm else "",
-            )
-        )
-
     def _raise_driver_unavailable_error(self, version: Version) -> None:
         """(Internal) Raise an unavailable driver error."""
-        raise errors.InvalidDriverVersionError(
-            "<{}>\nGeokodriver version '{}' is not available for {} ({}{}{}).".format(
-                self.__class__.__name__,
-                version,
-                self._name,
-                self._os_name,
-                self._os_arch,
-                "_arm" if self._os_is_arm else "",
+        if version < self._GECKODRIVER_MIN_VERSION:
+            raise errors.InvalidDriverVersionError(
+                "<{}>\nGeokodriver version below '{}' is "
+                "not supported by the manager.".format(
+                    self.__class__.__name__, self._GECKODRIVER_MIN_VERSION
+                )
             )
-        )
+        else:
+            raise errors.InvalidDriverVersionError(
+                "<{}>\nGeokodriver version '{}' is not available for {} ({}{}{}).".format(
+                    self.__class__.__name__,
+                    version,
+                    self._name,
+                    self._os_name,
+                    self._os_arch,
+                    "_arm" if self._os_is_arm else "",
+                )
+            )
+
+    def _raise_browser_unsupported_error(self, version: Version) -> None:
+        """(Internal) Raise a failed to find compatible driver error."""
+        if version < self._FIREFOX_MIN_VERSION:
+            raise errors.InvalidBrowserVersionError(
+                "<{}>\n{} ({}{}{}) version '{}' is not supported by the manager. "
+                "Please upgrade the browser to version >= '{}'.".format(
+                    self.__class__.__name__,
+                    self.__name__,
+                    self._os_name,
+                    self._os_arch,
+                    "_arm" if self._os_is_arm else "",
+                    version,
+                    self._FIREFOX_MIN_VERSION,
+                )
+            )
+        else:
+            raise errors.InvalidBrowserVersionError(
+                "<{}>\nFailed to find compatible geckodriver for {} '{}' ({}{}{}).".format(
+                    self.__class__.__name__,
+                    self._name,
+                    version,
+                    self._os_name,
+                    self._os_arch,
+                    "_arm" if self._os_is_arm else "",
+                )
+            )
