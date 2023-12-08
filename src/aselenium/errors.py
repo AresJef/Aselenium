@@ -58,6 +58,10 @@ class DriverManagerError(AseleniumError):
     """Base exception class for all driver manager errors."""
 
 
+class DriverManagerTimeoutError(DriverManagerError, AseleniumTimeout):
+    """Exception raised for driver manager timeout error."""
+
+
 class DriverInstallationError(DriverManagerError, AseleniumInvalidValueError):
     """Exception raised for driver installation error."""
 
@@ -70,16 +74,16 @@ class DriverRequestFailedError(DriverManagerError):
     """Exception raised for proxy error."""
 
 
+class DriverRequestTimeoutError(DriverRequestFailedError, DriverManagerTimeoutError):
+    """Exception raised for proxy error."""
+
+
 class DriverRequestRateLimitError(DriverRequestFailedError):
     """Exception raised for rate limit error."""
 
 
 class DriverDownloadFailedError(DriverRequestFailedError):
     """Exception raised for driver download failed error."""
-
-
-class InvalidDownloadFileError(DriverRequestFailedError):
-    """Exception raised for invalid driver file."""
 
 
 class InvalidVersionError(DriverManagerError, AseleniumInvalidValueError):
@@ -98,8 +102,16 @@ class BrowserBinaryNotDetectedError(DriverManagerError, AseleniumFileNotFoundErr
     """Exception raised for browser binary not found error."""
 
 
-class BrowserDownloadFailedError(DriverRequestFailedError):
+class BrowserDownloadFailedError(DriverDownloadFailedError):
     """Exception raised for browser download failed error."""
+
+
+class FileDownloadTimeoutError(DriverDownloadFailedError, DriverManagerTimeoutError):
+    """Exception raised for driver download timeout error."""
+
+
+class InvalidDownloadFileError(DriverRequestFailedError, OSError):
+    """Exception raised for invalid driver file."""
 
 
 # Options -----------------------------------------------------------------------------------------------

@@ -70,17 +70,20 @@ from aselenium.errors import PlatformError, UnsupportedPlatformError
 # . driver manager
 from aselenium.errors import (
     DriverManagerError,
+    DriverManagerTimeoutError,
     DriverInstallationError,
     DriverExecutableNotDetectedError,
     DriverRequestFailedError,
+    DriverRequestTimeoutError,
     DriverRequestRateLimitError,
     DriverDownloadFailedError,
-    InvalidDownloadFileError,
     InvalidVersionError,
     InvalidDriverVersionError,
     InvalidBrowserVersionError,
     BrowserBinaryNotDetectedError,
     BrowserDownloadFailedError,
+    FileDownloadTimeoutError,
+    InvalidDownloadFileError,
 )
 
 # . options
@@ -196,10 +199,10 @@ __all__ = [
     # . platform
     "PlatformError", "UnsupportedPlatformError",
     # . driver manager
-    "DriverManagerError", "DriverInstallationError", "DriverExecutableNotDetectedError",
-    "DriverRequestFailedError", "DriverRequestRateLimitError", "DriverDownloadFailedError",
-    "InvalidDownloadFileError", "InvalidVersionError", "InvalidDriverVersionError",
-    "InvalidBrowserVersionError", "BrowserBinaryNotDetectedError", "BrowserDownloadFailedError",
+    "DriverManagerError", "DriverManagerTimeoutError", "DriverInstallationError", "DriverExecutableNotDetectedError",
+    "DriverRequestFailedError", "DriverRequestTimeoutError", "DriverRequestRateLimitError", "DriverDownloadFailedError",
+    "InvalidVersionError", "InvalidDriverVersionError", "InvalidBrowserVersionError", "BrowserBinaryNotDetectedError", 
+    "BrowserDownloadFailedError", "FileDownloadTimeoutError", "InvalidDownloadFileError", 
     # . options
     "OptionsError", "InvalidOptionsError", "InvalidProxyError", "InvalidProfileError", "OptionsNotSetError",
     # . service

@@ -84,7 +84,7 @@ class DriverManager:
         directory: str | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
-        download_timeout: int | float = 120,
+        download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
         """The webdriver manager.
@@ -102,7 +102,7 @@ class DriverManager:
               webdrivers will be deleted.
 
         :param request_timeout: `<int/float>` The timeout in seconds for api requests. Defaults to `10`.
-        :param download_timeout: `<int/float>` The timeout in seconds for file download. Defaults to `120`.
+        :param download_timeout: `<int/float>` The timeout in seconds for file download. Defaults to `300`.
         :param proxy: `<str/None>` The proxy for http requests. Defaults to `None`.
             This might be needed for some users that cannot access the webdriver api directly
             due to internet restrictions. Only accepts proxy startswith `'http://'`.
@@ -208,7 +208,7 @@ class DriverManager:
     @property
     def download_timeout(self) -> int | float:
         """Access the timeout in seconds for file download.
-        Defaults to `120` seconds `<int/float>`.
+        Defaults to `300` seconds `<int/float>`.
         """
         return self._download_timeout.total
 
@@ -274,6 +274,13 @@ class DriverManager:
                         return None
         except errors.DriverRequestFailedError:
             raise
+        except TimeoutError as err:
+            raise errors.DriverRequestTimeoutError(
+                "<{}>\nTimeout when requesting text from: '{}'. Try to increase "
+                "the `request_timeout` settings: {}s.".format(
+                    self.__class__.__name__, url, self.requests_timeout
+                )
+            )
         except ClientConnectorError as err:
             if "Cannot connect to host" in str(err):
                 raise errors.DriverRequestFailedError(
@@ -314,6 +321,13 @@ class DriverManager:
                         return None
         except errors.DriverRequestFailedError:
             raise
+        except TimeoutError as err:
+            raise errors.DriverRequestTimeoutError(
+                "<{}>\nTimeout when requesting json from: '{}'. Try to increase "
+                "the `request_timeout` settings: {}s.".format(
+                    self.__class__.__name__, url, self.requests_timeout
+                )
+            )
         except ClientConnectorError as err:
             if "Cannot connect to host" in str(err):
                 raise errors.DriverRequestFailedError(
@@ -351,6 +365,13 @@ class DriverManager:
                         return None
         except errors.DriverRequestFailedError:
             raise
+        except TimeoutError as err:
+            raise errors.DriverRequestTimeoutError(
+                "<{}>\nTimeout when requesting url from: '{}'. Try to increase "
+                "the `request_timeout` settings: {}s.".format(
+                    self.__class__.__name__, url, self.requests_timeout
+                )
+            )
         except ClientConnectorError as err:
             if "Cannot connect to host" in str(err):
                 raise errors.DriverRequestFailedError(
@@ -388,6 +409,13 @@ class DriverManager:
                         return None
         except errors.DriverRequestFailedError:
             raise
+        except TimeoutError as err:
+            raise errors.FileDownloadTimeoutError(
+                "<{}>\nTimeout when downloading file from: '{}'. Try to increase "
+                "the `download_timeout` settings: {}s.".format(
+                    self.__class__.__name__, url, self.download_timeout
+                )
+            )
         except ClientConnectorError as err:
             if "Cannot connect to host" in str(err):
                 raise errors.DriverRequestFailedError(
@@ -846,7 +874,7 @@ class DriverManager:
 
     def _raise_driver_download_failed_error(self, version: Version, url: str) -> None:
         """(Internal) Raise a driver download failed error."""
-        raise errors.DriverRequestFailedError(
+        raise errors.DriverDownloadFailedError(
             "<{}>\nFailed to download webdriver '{}' "
             "for {} [{}] ({}{}{}) from url: '{}'.".format(
                 self.__class__.__name__,
@@ -946,7 +974,7 @@ class ChromiumBaseDriverManager(DriverManager):
         directory: str | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
-        download_timeout: int | float = 120,
+        download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
         super().__init__(
@@ -1209,7 +1237,7 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
         directory: str | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
-        download_timeout: int | float = 120,
+        download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
         super().__init__(
@@ -1313,7 +1341,7 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
         directory: str | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
-        download_timeout: int | float = 120,
+        download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
         super().__init__(
@@ -1571,7 +1599,7 @@ class ChromiumDriverManager(ChromiumBaseDriverManager):
         directory: str | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
-        download_timeout: int | float = 120,
+        download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
         super().__init__(
@@ -1669,7 +1697,7 @@ class FirefoxDriverManager(DriverManager):
         directory: str | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
-        download_timeout: int | float = 120,
+        download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
         super().__init__(
@@ -2013,7 +2041,7 @@ class SafariDriverManager(DriverManager):
         directory: str | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
-        download_timeout: int | float = 120,
+        download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
         super().__init__(
