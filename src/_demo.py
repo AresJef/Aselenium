@@ -161,33 +161,33 @@ async def test_driver_options(browser: T) -> None:
 
 async def test_driver_profile(browser: T) -> None:
     def get_profile_dir(browser: T) -> str | None:
-        if browser == "chrome":
-            if platform.system() == "Darwin":
+        syst = platform.system()
+        if syst == "Darwin":
+            if browser == "chrome":
                 return "/Users/jef/Library/Application Support/Google/Chrome"
-            elif platform.system() == "Windows":
-                return r"C:\Users\jef\AppData\Local\Google\Chrome\User Data"
-            elif platform.system() == "Linux":
-                return "/home/jef/.config/google-chrome"
-        elif browser == "chromium":
-            if platform.system() == "Darwin":
+            elif browser == "chromium":
                 return "/Users/jef/Library/Application Support/Chromium"
-            elif platform.system() == "Windows":
-                return r"C:\Users\jef\AppData\Local\Chromium\User Data"
-            elif platform.system() == "Linux":
-                return "/home/jef/.config/chromium"
-        elif browser == "edge":
-            if platform.system() == "Darwin":
+            elif browser == "edge":
                 return "/Users/jef/Library/Application Support/Microsoft Edge"
-            elif platform.system() == "Windows":
-                return r"C:\Users\jef\AppData\Local\Microsoft\Edge\User Data"
-            elif platform.system() == "Linux":
-                return "/home/jef/.config/microsoft-edge"
-        elif browser == "firefox":
-            if platform.system() == "Darwin":
+            elif browser == "firefox":
                 return "/Users/jef/Library/Application Support/Firefox/Profiles/684o1n0x.default-release-1700386926530"
-            elif platform.system() == "Windows":
+        elif syst == "Windows":
+            if browser == "chrome":
+                return r"C:\Users\jef\AppData\Local\Google\Chrome\User Data"
+            elif browser == "chromium":
+                return r"C:\Users\jef\AppData\Local\Chromium\User Data"
+            elif browser == "edge":
+                return r"C:\Users\jef\AppData\Local\Microsoft\Edge\User Data"
+            elif browser == "firefox":
                 return r"C:\Users\jef\AppData\Roaming\Mozilla\Firefox\Profiles\684o1n0x.default-release-1700386926530"
-            elif platform.system() == "Linux":
+        elif syst == "Linux":
+            if browser == "chrome":
+                return "/home/jef/.config/google-chrome"
+            elif browser == "chromium":
+                return "/home/jef/.config/chromium"
+            elif browser == "edge":
+                return "/home/jef/.config/microsoft-edge"
+            elif browser == "firefox":
                 return (
                     "/home/jef/.mozilla/firefox/684o1n0x.default-release-1700386926530"
                 )
@@ -212,10 +212,13 @@ async def test_driver_profile(browser: T) -> None:
 
     print("-" * 80)
     print(f"{driver.__class__.__name__} Profile Test")
+    print("- " * 40)
     async with driver.acquire() as session:
+        print(driver.options.profile)
         await session.load("https://www.baidu.com")
         await session.load("https://whatismyipaddress.com/", retry=True)
         await asyncio.sleep(5)
+    print("- " * 40)
     print("Profile Test Success")
     print("-" * 80)
     print()
