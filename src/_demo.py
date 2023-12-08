@@ -7,6 +7,7 @@ from aselenium import ChromeSession, FirefoxSession, SafariSession
 from aselenium import KeyboardKeys
 
 T = Literal["chrome", "chromium", "edge", "firefox", "safari"]
+SYSTEM = platform.system()
 cancell_switch = False
 
 
@@ -83,7 +84,7 @@ async def test_driver_manager(browser: T) -> None:
         await manager_test(Firefox, version="0")
 
     # Safari Test
-    if browser == "safari" and platform.system() == "Darwin":
+    if browser == "safari" and SYSTEM == "Darwin":
         await manager_test(Safari, channel="stable")
         await manager_test(Safari, channel="dev")
 
@@ -104,7 +105,7 @@ async def test_driver_options(browser: T) -> None:
             https_proxy="http://127.0.0.1:7890",
             socks_proxy="socks5://127.0.0.1:7890",
         )
-        if platform.system() == "Darwin":
+        if SYSTEM == "Darwin":
             driver.options.proxy = proxy
         # . timeout
         driver.options.set_timeouts(implicit=5, pageLoad=10)
@@ -156,15 +157,14 @@ async def test_driver_options(browser: T) -> None:
         await options_test(Firefox, version="auto")
         await options_test(Firefox, version="latest")
     # Safari Test
-    if browser == "safari" and platform.system() == "Darwin":
+    if browser == "safari" and SYSTEM == "Darwin":
         await options_test(Safari, channel="stable")
         await options_test(Safari, channel="dev")
 
 
 async def test_driver_profile(browser: T) -> None:
     def get_profile_dir(browser: T) -> str | None:
-        syst = platform.system()
-        if syst == "Darwin":
+        if SYSTEM == "Darwin":
             if browser == "chrome":
                 return "/Users/jef/Library/Application Support/Google/Chrome"
             elif browser == "chromium":
@@ -173,7 +173,7 @@ async def test_driver_profile(browser: T) -> None:
                 return "/Users/jef/Library/Application Support/Microsoft Edge"
             elif browser == "firefox":
                 return "/Users/jef/Library/Application Support/Firefox/Profiles/684o1n0x.default-release-1700386926530"
-        elif syst == "Windows":
+        elif SYSTEM == "Windows":
             if browser == "chrome":
                 return r"C:\Users\jef\AppData\Local\Google\Chrome\User Data"
             elif browser == "chromium":
@@ -182,7 +182,7 @@ async def test_driver_profile(browser: T) -> None:
                 return r"C:\Users\jef\AppData\Local\Microsoft\Edge Beta\User Data"
             elif browser == "firefox":
                 return r"C:\Users\jef\AppData\Roaming\Mozilla\Firefox\Profiles\bestyaik.default-release"
-        elif syst == "Linux":
+        elif SYSTEM == "Linux":
             if browser == "chrome":
                 return "/home/jef/.config/google-chrome"
             elif browser == "chromium":
@@ -285,7 +285,7 @@ async def test_driver_cancellation(browser: T) -> None:
         await test_cancellation(Firefox, version="latest")
 
     # Safari Test
-    if browser == "safari" and platform.system() == "Darwin":
+    if browser == "safari" and SYSTEM == "Darwin":
         await test_cancellation(Safari, channel="stable")
         await test_cancellation(Safari, channel="dev")
 
@@ -1681,7 +1681,7 @@ async def test_driver_automation(browser: T) -> None:
         driver = Edge()
     elif browser == "firefox":
         driver = Firefox()
-    elif browser == "safari" and platform.system() == "Darwin":
+    elif browser == "safari" and SYSTEM == "Darwin":
         driver = Safari()
     else:
         return None
@@ -1694,7 +1694,7 @@ async def test_driver_automation(browser: T) -> None:
         )
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
     FORCE_TIMEOUT = 30
-    if platform.system() == "Darwin":
+    if SYSTEM == "Darwin":
         CONTROL_KEY = KeyboardKeys.COMMAND
     else:
         CONTROL_KEY = KeyboardKeys.CONTROL
