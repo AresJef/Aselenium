@@ -7,6 +7,7 @@ from aselenium import ChromeSession, FirefoxSession, SafariSession
 from aselenium import KeyboardKeys
 
 T = Literal["chrome", "chromium", "edge", "firefox", "safari"]
+cancell_switch = False
 
 
 async def test_driver_manager(browser: T) -> None:
@@ -230,24 +231,34 @@ async def test_driver_profile(browser: T) -> None:
 
 async def test_driver_cancellation(browser: T) -> None:
     async def test_cancellation(driver_cls: type[Edge], **kwargs) -> None:
+        global cancell_switch
+
+        async def acquire_session(driver, **kwargs) -> None:
+            global cancell_switch
+
+            async with driver.acquire(**kwargs) as session:
+                cancell_switch = True
+                while True:
+                    await session.load("https://whatismyipaddress.com/", retry=True)
+
         print("-" * 80)
         driver = driver_cls()
         print(f"{driver.__class__.__name__} Cancellation Test: {kwargs}")
         t1 = perf_counter()
+        cancell_switch = False
         task = asyncio.create_task(acquire_session(driver, **kwargs))
+        while not cancell_switch:
+            await asyncio.sleep(0.5)
         await asyncio.sleep(2)
         task.cancel()
+        cancell_switch = False
         try:
             await task
         except asyncio.CancelledError:
-            print(f"{driver.__class__.__name__} Cancelled Successfully")
+            t2 = perf_counter()
+            print(f"{driver.__class__.__name__} Cancelled Successfully: {t2 - t1}")
         print("-" * 80)
         print()
-
-    async def acquire_session(driver, **kwargs) -> None:
-        async with driver.acquire(**kwargs) as session:
-            while True:
-                await session.load("https://www.baidu.com", retry=True)
 
     # Chrome Test
     if browser == "chrome":
