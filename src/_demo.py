@@ -103,7 +103,8 @@ async def test_driver_options(browser: T) -> None:
             https_proxy="http://127.0.0.1:7890",
             socks_proxy="socks5://127.0.0.1:7890",
         )
-        driver.options.proxy = proxy
+        if platform.system() == "Darwin":
+            driver.options.proxy = proxy
         # . timeout
         driver.options.set_timeouts(implicit=5, pageLoad=10)
         # . strict file interactability
@@ -177,9 +178,9 @@ async def test_driver_profile(browser: T) -> None:
             elif browser == "chromium":
                 return r"C:\Users\jef\AppData\Local\Chromium\User Data"
             elif browser == "edge":
-                return r"C:\Users\jef\AppData\Local\Microsoft\Edge\User Data"
+                return r"C:\Users\jef\AppData\Local\Microsoft\Edge Beta\User Data"
             elif browser == "firefox":
-                return r"C:\Users\jef\AppData\Roaming\Mozilla\Firefox\Profiles\684o1n0x.default-release-1700386926530"
+                return r"C:\Users\jef\AppData\Roaming\Mozilla\Firefox\Profiles\bestyaik.default-release"
         elif syst == "Linux":
             if browser == "chrome":
                 return "/home/jef/.config/google-chrome"
@@ -1666,10 +1667,10 @@ async def test_driver_automation(browser: T) -> None:
         driver = Edge()
     elif browser == "firefox":
         driver = Firefox()
-    elif browser == "safari":
+    elif browser == "safari" and platform.system() == "Darwin":
         driver = Safari()
     else:
-        raise ValueError(f"Browser not supported: '{browser}'")
+        return None
     # fmt: on
     driver.options.session_timeout = 120
     driver.options.set_timeouts(implicit=2, pageLoad=20)
@@ -1727,31 +1728,31 @@ if __name__ == "__main__":
     ABS_PATH = os.path.abspath(os.path.dirname(__file__))
     TEST_FOLDER = os.path.join(ABS_PATH, "test_files")
 
-    # asyncio.run(test_driver_manager("chrome"))
-    # asyncio.run(test_driver_manager("chromium"))
-    # asyncio.run(test_driver_manager("edge"))
-    # asyncio.run(test_driver_manager("firefox"))
-    # asyncio.run(test_driver_manager("safari"))
+    asyncio.run(test_driver_manager("chrome"))
+    asyncio.run(test_driver_manager("chromium"))
+    asyncio.run(test_driver_manager("edge"))
+    asyncio.run(test_driver_manager("firefox"))
+    asyncio.run(test_driver_manager("safari"))
 
-    # asyncio.run(test_driver_options("chrome"))
-    # asyncio.run(test_driver_options("chromium"))
-    # asyncio.run(test_driver_options("edge"))
-    # asyncio.run(test_driver_options("firefox"))
-    # asyncio.run(test_driver_options("safari"))
+    asyncio.run(test_driver_options("chrome"))
+    asyncio.run(test_driver_options("chromium"))
+    asyncio.run(test_driver_options("edge"))
+    asyncio.run(test_driver_options("firefox"))
+    asyncio.run(test_driver_options("safari"))
 
     asyncio.run(test_driver_profile("chrome"))
     asyncio.run(test_driver_profile("chromium"))
     asyncio.run(test_driver_profile("edge"))
     asyncio.run(test_driver_profile("firefox"))
 
-    # asyncio.run(test_driver_cancellation("chrome"))
-    # asyncio.run(test_driver_cancellation("chromium"))
-    # asyncio.run(test_driver_cancellation("edge"))
-    # asyncio.run(test_driver_cancellation("firefox"))
-    # asyncio.run(test_driver_cancellation("safari"))
+    asyncio.run(test_driver_cancellation("chrome"))
+    asyncio.run(test_driver_cancellation("chromium"))
+    asyncio.run(test_driver_cancellation("edge"))
+    asyncio.run(test_driver_cancellation("firefox"))
+    asyncio.run(test_driver_cancellation("safari"))
 
-    # asyncio.run(test_driver_automation("chrome"))
-    # asyncio.run(test_driver_automation("chromium"))
-    # asyncio.run(test_driver_automation("edge"))
-    # asyncio.run(test_driver_automation("firefox"))
-    # asyncio.run(test_driver_automation("safari"))
+    asyncio.run(test_driver_automation("chrome"))
+    asyncio.run(test_driver_automation("chromium"))
+    asyncio.run(test_driver_automation("edge"))
+    asyncio.run(test_driver_automation("firefox"))
+    asyncio.run(test_driver_automation("safari"))
