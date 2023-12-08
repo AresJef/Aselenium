@@ -62,7 +62,7 @@ class Safari(WebDriver):
             directory=None,
             max_cache_size=None,
             request_timeout=10,
-            download_timeout=120,
+            download_timeout=300,
             proxy=None,
             service_timeout=service_timeout,
             *service_args,

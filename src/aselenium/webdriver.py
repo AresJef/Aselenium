@@ -153,7 +153,7 @@ class WebDriver:
         directory: str | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
-        download_timeout: int | float = 120,
+        download_timeout: int | float = 300,
         proxy: str | None = None,
         service_timeout: int = 10,
         *service_args: Any,
@@ -176,7 +176,7 @@ class WebDriver:
               webdrivers will be deleted.
 
         :param request_timeout: `<int/float>` The timeout in seconds for api requests. Defaults to `10`.
-        :param download_timeout: `<int/float>` The timeout in seconds for file download. Defaults to `120`.
+        :param download_timeout: `<int/float>` The timeout in seconds for file download. Defaults to `300`.
         :param proxy: `<str/None>` The proxy for http requests. Defaults to `None`.
             This might be needed for some users that cannot access the webdriver api directly
             due to internet restrictions. Only accepts proxy startswith `'http://'`.

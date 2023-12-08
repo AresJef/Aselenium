@@ -46,7 +46,7 @@ class Firefox(WebDriver):
         directory: str | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
-        download_timeout: int | float = 120,
+        download_timeout: int | float = 300,
         proxy: str | None = None,
         service_timeout: int = 10,
         *service_args: Any,
