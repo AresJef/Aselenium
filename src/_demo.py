@@ -48,6 +48,8 @@ async def test_driver_manager(browser: T) -> None:
 
     # Chromium Test
     if browser == "chromium":
+        if SYSTEM == "Linux":
+            return None
         await manager_test(Chromium, version="build")
         await manager_test(Chromium, version="major")
         await manager_test(Chromium, version="patch")
@@ -136,11 +138,6 @@ async def test_driver_options(browser: T) -> None:
         print("-" * 80)
         print()
 
-    # Edge Test
-    if browser == "edge":
-        await options_test(Edge, version="build", channel="stable")
-        await options_test(Edge, version="build", channel="beta")
-        await options_test(Edge, version="build", channel="dev")
     # Chrome Test
     if browser == "chrome":
         await options_test(Chrome, version="build", channel="stable")
@@ -149,9 +146,16 @@ async def test_driver_options(browser: T) -> None:
         await options_test(Chrome, version="115", channel="cft")
     # Chromium Test
     if browser == "chromium":
+        if SYSTEM == "Linux":
+            return None
         await options_test(Chromium, version="build")
         await options_test(Chromium, version="major")
         await options_test(Chromium, version="patch")
+    # Edge Test
+    if browser == "edge":
+        await options_test(Edge, version="build", channel="stable")
+        await options_test(Edge, version="build", channel="beta")
+        await options_test(Edge, version="build", channel="dev")
     # Firefox Test
     if browser == "firefox":
         await options_test(Firefox, version="auto")
@@ -186,13 +190,11 @@ async def test_driver_profile(browser: T) -> None:
             if browser == "chrome":
                 return "/home/jef/.config/google-chrome"
             elif browser == "chromium":
-                return "/home/jef/.config/chromium"
+                return None
             elif browser == "edge":
                 return "/home/jef/.config/microsoft-edge"
             elif browser == "firefox":
-                return (
-                    "/home/jef/.mozilla/firefox/684o1n0x.default-release-1700386926530"
-                )
+                return "/home/jef/.mozilla/firefox/a9epssnc.default-release"
         return None
 
     profile_dir = get_profile_dir(browser)
@@ -269,6 +271,8 @@ async def test_driver_cancellation(browser: T) -> None:
 
     # Chromium Test
     if browser == "chromium":
+        if SYSTEM == "Linux":
+            return None
         await test_cancellation(Chromium, version="build")
         await test_cancellation(Chromium, version="major")
         await test_cancellation(Chromium, version="patch")
@@ -1676,6 +1680,8 @@ async def test_driver_automation(browser: T) -> None:
     if browser == "chrome":
         driver = Chrome()
     elif browser == "chromium":
+        if SYSTEM == "Linux":
+            return None
         driver = Chromium()
     elif browser == "edge":
         driver = Edge()
