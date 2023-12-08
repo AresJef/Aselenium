@@ -210,10 +210,15 @@ async def test_driver_profile(browser: T) -> None:
             driver = Edge()
         driver.options.set_profile(profile_dir, "Default")
 
+    print("-" * 80)
+    print(f"{driver.__class__.__name__} Profile Test")
     async with driver.acquire() as session:
         await session.load("https://www.baidu.com")
         await session.load("https://whatismyipaddress.com/", retry=True)
         await asyncio.sleep(5)
+    print("Profile Test Success")
+    print("-" * 80)
+    print()
 
 
 async def test_driver_cancellation(browser: T) -> None:
@@ -1723,27 +1728,27 @@ if __name__ == "__main__":
     # asyncio.run(test_driver_manager("chromium"))
     # asyncio.run(test_driver_manager("edge"))
     # asyncio.run(test_driver_manager("firefox"))
-    # # asyncio.run(test_driver_manager("safari"))
+    # asyncio.run(test_driver_manager("safari"))
 
     # asyncio.run(test_driver_options("chrome"))
     # asyncio.run(test_driver_options("chromium"))
     # asyncio.run(test_driver_options("edge"))
     # asyncio.run(test_driver_options("firefox"))
-    # # asyncio.run(test_driver_options("safari"))
+    # asyncio.run(test_driver_options("safari"))
 
-    # asyncio.run(test_driver_profile("chrome"))
-    # asyncio.run(test_driver_profile("chromium"))
-    # asyncio.run(test_driver_profile("edge"))
-    # asyncio.run(test_driver_profile("firefox"))
+    asyncio.run(test_driver_profile("chrome"))
+    asyncio.run(test_driver_profile("chromium"))
+    asyncio.run(test_driver_profile("edge"))
+    asyncio.run(test_driver_profile("firefox"))
 
     # asyncio.run(test_driver_cancellation("chrome"))
     # asyncio.run(test_driver_cancellation("chromium"))
     # asyncio.run(test_driver_cancellation("edge"))
     # asyncio.run(test_driver_cancellation("firefox"))
-    # # asyncio.run(test_driver_cancellation("safari"))
+    # asyncio.run(test_driver_cancellation("safari"))
 
-    asyncio.run(test_driver_automation("chrome"))
-    asyncio.run(test_driver_automation("chromium"))
-    asyncio.run(test_driver_automation("edge"))
-    asyncio.run(test_driver_automation("firefox"))
+    # asyncio.run(test_driver_automation("chrome"))
+    # asyncio.run(test_driver_automation("chromium"))
+    # asyncio.run(test_driver_automation("edge"))
+    # asyncio.run(test_driver_automation("firefox"))
     # asyncio.run(test_driver_automation("safari"))
