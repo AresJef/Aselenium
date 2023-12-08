@@ -546,7 +546,7 @@ async def test_driver_automation(browser: T) -> None:
         print("Load 'demo.guru99.com/")
         url = "https://demo.guru99.com/test/delete_customer.php"
         await s.load(url, timeout=FORCE_TIMEOUT, retry=True)
-        PAUSE = 1
+        PAUSE = 3
 
         print("nill alert:", await s.get_alert(1) is None, sep="\t")
         el1 = await s.find_element("input[name='cusid']")
