@@ -2090,18 +2090,8 @@ class Session:
         rect.y = y
 
         # Set new window rect
-        window_state_retry = 0
-        while True:
-            try:
-                res = await self.execute_command(
-                    Command.SET_WINDOW_RECT, body=rect.dict
-                )
-                return self._create_window_rect(res)
-            except errors.ChangeWindowStateError as err:
-                if window_state_retry >= 10:
-                    raise err
-                window_state_retry += 1
-                await sleep(0.2)
+        res = await self._change_windows_state(Command.SET_WINDOW_RECT, rect.dict, 10)
+        return self._create_window_rect(res)
 
     async def maximize_window(self) -> WindowRect:
         """Maximize the active window.
@@ -2112,7 +2102,7 @@ class Session:
         >>> rect = await session.maximize_window()
             # <WindowRect (width=1512, height=944, x=0, y=38)>
         """
-        res = await self.execute_command(Command.W3C_MAXIMIZE_WINDOW)
+        res = await self._change_windows_state(Command.W3C_MAXIMIZE_WINDOW, None, 10)
         return self._create_window_rect(res)
 
     async def minimize_window(self) -> None:
@@ -2121,7 +2111,7 @@ class Session:
         ### Example:
         >>> await session.minimize_window()
         """
-        await self.execute_command(Command.MINIMIZE_WINDOW)
+        await self._change_windows_state(Command.MINIMIZE_WINDOW, None, 10)
 
     async def fullscreen_window(self) -> None:
         """Set the active window to fullscreen.
@@ -2129,7 +2119,24 @@ class Session:
         ### Example:
         >>> await session.fullscreen_window()
         """
-        await self.execute_command(Command.FULLSCREEN_WINDOW)
+        await self._change_windows_state(Command.FULLSCREEN_WINDOW, None, 10)
+
+    async def _change_windows_state(
+        self,
+        command: str,
+        body: dict | None,
+        retry: int,
+    ) -> Any:
+        """(Internal) Change the state of the active window with retry."""
+        window_state_retry = 0
+        while True:
+            try:
+                return await self.execute_command(command, body=body)
+            except errors.ChangeWindowStateError:
+                if window_state_retry >= retry:
+                    raise
+                window_state_retry += 1
+                await sleep(0.2)
 
     def _create_window_rect(self, res: dict) -> WindowRect:
         """(Internal) Parse & create window rect from response.
