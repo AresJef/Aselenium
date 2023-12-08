@@ -116,7 +116,7 @@ async def test_driver_options(browser: T) -> None:
         # . experimental options
         if browser != "firefox":
             driver.options.add_experimental_options(
-                excludeSwitches=["enable-automation"]
+                excludeSwitches=["enable-automation", "enable-logging"]
             )
         # Final options
         print()
@@ -210,6 +210,9 @@ async def test_driver_profile(browser: T) -> None:
         else:
             driver = Edge()
         driver.options.set_profile(profile_dir, "Default")
+        driver.options.add_experimental_options(
+            excludeSwitches=["enable-automation", "enable-logging"]
+        )
 
     print("-" * 80)
     print(f"{driver.__class__.__name__} Profile Test")
@@ -1061,10 +1064,10 @@ async def test_driver_automation(browser: T) -> None:
         print()
 
         print("[el] send (text):", await el.send("Hello world!", pause=0.5), sep="\t")
-        print("[el] send (ctl + a):", await el.send(KeyboardKeys.COMMAND, "a", pause=0.5), sep="\t")
-        print("[el] send (ctl + c):", await el.send(KeyboardKeys.COMMAND, "c", pause=0.5), sep="\t")
+        print("[el] send (ctl + a):", await el.send(CONTROL_KEY, "a", pause=0.5), sep="\t")
+        print("[el] send (ctl + c):", await el.send(CONTROL_KEY, "c", pause=0.5), sep="\t")
         print("[el] send (del):", await el.send(KeyboardKeys.DELETE, pause=0.5), sep="\t")
-        print("[el] send (ctl + v):", await el.send(KeyboardKeys.COMMAND, "v", pause=0.5), sep="\t")
+        print("[el] send (ctl + v):", await el.send(CONTROL_KEY, "v", pause=0.5), sep="\t")
         print("[el] send (enter):", await el.send(KeyboardKeys.ENTER, pause=0.5), sep="\t")
         el = await s.find_element("#kw", by="css")
         print("[el] clear:\t", await el.clear(pause=0.5), sep="\t")
@@ -1403,10 +1406,10 @@ async def test_driver_automation(browser: T) -> None:
                 .move_to(element=sch_btn)
                 .click(pause=1)
                 .send_keys("hellow world!", pause=1)
-                .key_down(KeyboardKeys.COMMAND)
+                .key_down(CONTROL_KEY)
                 .key_down("a")
                 .key_up("a")
-                .key_up(KeyboardKeys.COMMAND, pause=1)
+                .key_up(CONTROL_KEY, pause=1)
                 .send_keys(KeyboardKeys.DELETE, pause=1)
                 .send_keys("Hello World!", pause=1)
                 .send_keys(KeyboardKeys.ENTER, pause=1)
@@ -1674,8 +1677,16 @@ async def test_driver_automation(browser: T) -> None:
     # fmt: on
     driver.options.session_timeout = 120
     driver.options.set_timeouts(implicit=2, pageLoad=20)
+    if browser in ("chrome", "chromium", "edge"):
+        driver.options.add_experimental_options(
+            excludeSwitches=["enable-automation", "enable-logging"]
+        )
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
     FORCE_TIMEOUT = 30
+    if platform.system() == "Darwin":
+        CONTROL_KEY = KeyboardKeys.COMMAND
+    else:
+        CONTROL_KEY = KeyboardKeys.CONTROL
 
     async with driver.acquire() as s:
         # Base info
