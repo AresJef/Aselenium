@@ -2136,7 +2136,7 @@ class Session:
                 if window_state_retry >= retry:
                     raise
                 window_state_retry += 1
-                await sleep(0.2)
+                await sleep(0.5)
 
     def _create_window_rect(self, res: dict) -> WindowRect:
         """(Internal) Parse & create window rect from response.
