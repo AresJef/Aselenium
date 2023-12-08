@@ -2090,19 +2090,18 @@ class Session:
         rect.y = y
 
         # Set new window rect
+        window_state_retry = 0
         while True:
             try:
                 res = await self.execute_command(
                     Command.SET_WINDOW_RECT, body=rect.dict
                 )
                 return self._create_window_rect(res)
-            except errors.UnknownError as err:
-                # . retry on close fullscreen error
-                if ErrorCode.FAILED_TO_CLOSE_FULLSCREEN in str(err):
-                    await sleep(0.2)
-                # . raise on other errors
-                else:
+            except errors.ChangeWindowStateError as err:
+                if window_state_retry >= 10:
                     raise err
+                window_state_retry += 1
+                await sleep(0.2)
 
     async def maximize_window(self) -> WindowRect:
         """Maximize the active window.

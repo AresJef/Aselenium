@@ -257,6 +257,10 @@ class WindowError(WebDriverError):
     """Base exception class for all window errors."""
 
 
+class ChangeWindowStateError(WindowError):
+    """Exception raised when failed to change window state."""
+
+
 class WindowNotFountError(WindowError, WebdriverNotFoundError):
     """Thrown when window target to be switched doesn't exist."""
 
@@ -613,12 +617,10 @@ class ErrorCode:
     UNKNOWN_METHOD = "unknown method exception"
     # "unsupported operation"]
     METHOD_NOT_ALLOWED = 405
-    # "current state is 'maximized'"
-    FAILED_TO_CLOSE_FULLSCREEN = "current state is 'maximized'"
-    # "network conditions must be set before it can be retrieved"
-    NETWORK_CONDITIONS_NOT_SET = (
-        "network conditions must be set before it can be retrieved"
-    )
+    # "failed to change window state"
+    FAILED_TO_CHANGE_WINDOW_STATE = "failed to change window state"
+    # "network conditions must be set before"
+    NETWORK_CONDITIONS_NOT_SET = "network conditions must be set before"
     # "unrecognized permission state"
     INVALID_PERMISSION_STATE = "unrecognized permission state"
     # "Invalid PermissionDescriptor name"
@@ -722,22 +724,24 @@ def error_handler(res: dict[str, Any]) -> None:
                 message = value.get("value") or value.get("message")
                 if isinstance(message, dict):
                     value = message
-                    message = message.get("message")
+                    message = message.get("message", "Unknown error")
             else:
-                message = value.get("message")
+                message = value.get("message", "Unknown error")
         except ValueError:
             try:
-                message = res.get("message", value.get("message"))
+                message = res.get("message", value.get("message", "Unknown error"))
             except AttributeError:
                 message = str(value)
     else:
-        message = res.get("message", value.get("message"))
+        message = res.get("message", value.get("message", "Unknown error"))
 
     # Map error
     error = WEBDRIVER_ERROR_MAP.get(status, WebDriverError)
     if error is UnknownError:
         if ErrorCode.INTERNET_DISCONNECTED in message:
             error = InternetDisconnectedError
+        elif ErrorCode.FAILED_TO_CHANGE_WINDOW_STATE in message:
+            error = ChangeWindowStateError
 
     # Raise error
     if isinstance(value, str):
