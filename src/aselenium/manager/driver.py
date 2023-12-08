@@ -1779,7 +1779,6 @@ class FirefoxDriverManager(DriverManager):
                     if max_version == self._GECKODRIVER_TABLE_MAX_VERSION:
                         if version == "latest":  # request latest version from github
                             driver_version = await self._request_driver_version(None)
-
                         else:  # set to maximum recorded version
                             driver_version = self._GECKODRIVER_MAX_VERSION
                     else:
@@ -1825,7 +1824,7 @@ class FirefoxDriverManager(DriverManager):
             else:
                 url = self._MOZILLA_GITHUBAPI_URL + "/tags/v" + version.patch
             res = await self._request_reponse_json(url)
-            return None if res is None else res["tag_name"]
+            return await request_from_url(version) if res is None else res["tag_name"]
 
         async def request_from_url(version: GeckoVersion | None) -> GeckoVersion:
             # Request from github url
