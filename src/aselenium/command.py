@@ -17,8 +17,6 @@
 
 # -*- coding: UTF-8 -*-
 
-__all__ = ["Command", "COMMANDS"]
-
 
 # Driver Commands ---------------------------------------------------------------------------------
 class Command:

@@ -1,528 +1,273 @@
-import asyncio, os
+from typing import Literal
+import asyncio, platform, os
 from time import perf_counter
-from aselenium import KeyboardKeys, Session, Proxy
-from aselenium import Edge, Chrome, Chromium, Firefox, Safari
-from aselenium import ChromiumBaseWebDriver, ChromiumBaseSession
-from aselenium import ChromiumBaseSession, SafariSession, FirefoxSession
+from aselenium import Chrome, Firefox, Chromium, Edge, Safari
+from aselenium import IncompatibleWebdriverError, Proxy, Session
+from aselenium import ChromeSession, FirefoxSession, SafariSession
+from aselenium import KeyboardKeys
+
+T = Literal["chrome", "chromium", "edge", "firefox", "safari"]
 
 
-async def test_driver_manager() -> None:
-    from aselenium.manager.driver import EdgeDriverManager
-    from aselenium.manager.driver import ChromeDriverManager
-    from aselenium.manager.driver import ChromiumDriverManager
-    from aselenium.manager.driver import FirefoxDriverManager
-
-    async def edge_driver_mgr() -> None:
-        async def install(version: str, channel: str, binary: str = None) -> None:
-            t1 = perf_counter()
-            res = await mgr.install(version, channel, binary)
+async def test_driver_manager(browser: T) -> None:
+    async def manager_test(driver_cls: type[Edge], **kwargs) -> None:
+        print("-" * 80)
+        driver = driver_cls()
+        print(f"{driver.__class__.__name__} Driver Manager Test: {kwargs}")
+        print("- " * 40)
+        t1 = perf_counter()
+        async with driver.acquire(**kwargs) as session:
             t2 = perf_counter()
-            print(f"Install Edge:\t{version} & {channel}\t{res}")
-            print(f"Driver Dir:\t{mgr.driver_location}")
-            print(f"Driver Ver:\t{mgr.driver_version}")
-            print(f"Browser Dir:\t{mgr.browser_location}")
-            print(f"Browser Ver:\t{mgr.browser_version}")
-            print(f"Install Time:\t{t2 - t1}s")
-            print()
-
-        print()
-        print(" Edge Driver Manager ".center(80, "-"))
-        mgr = EdgeDriverManager(max_cache_size=None)
-        await install("build", "stable")
-        await install("build", "beta")
-        await install("build", "dev")
-        await install("patch", "dev")
-        await install("110", "stable")
-
-        # await install("119", "dev")
-        await install("build", "stable")
-        driver = Edge(mgr.driver_location)
-        driver.options.binary_location = mgr.browser_location
-        async with driver.acquire() as s:
-            print(mgr.driver_version, mgr.driver_location)
-            print(mgr.browser_version, mgr.browser_location)
-            await s.load("https://www.baidu.com")
+            print(session.driver_version, session.driver_location)
+            print(session.browser_version, session.browser_location)
+            await session.load("https://www.baidu.com")
+        print("- " * 40)
+        print("Driver Manager Test Success:", t2 - t1)
         print("-" * 80)
         print()
 
-    async def chrome_driver_mgr() -> None:
-        async def install(version: str, channel: str, binary: str = None) -> None:
-            t1 = perf_counter()
-            res = await mgr.install(version, channel, binary)
-            t2 = perf_counter()
-            print(f"Install Edge:\t{version} & {channel}\t{res}")
-            print(f"Driver Dir:\t{mgr.driver_location}")
-            print(f"Driver Ver:\t{mgr.driver_version}")
-            print(f"Browser Dir:\t{mgr.browser_location}")
-            print(f"Browser Ver:\t{mgr.browser_version}")
-            print(f"Install Time:\t{t2 - t1}s")
+    # Chrome Test
+    if browser == "chrome":
+        await manager_test(Chrome, version="build", channel="stable")
+        await manager_test(Chrome, version="build", channel="beta")
+        await manager_test(Chrome, version="build", channel="dev")
+        await manager_test(Chrome, version="patch", channel="dev")
+        try:
+            await manager_test(Chrome, version="110", channel="stable")
+        except IncompatibleWebdriverError:
+            print("-" * 80)
+            print("Chrome IncompatibleWebdriver Test Success")
+            print("-" * 80)
+            print()
+        await manager_test(Chrome, version="114", channel="cft")
+        await manager_test(Chrome, version="115.0.5763", channel="cft")
+        await manager_test(Chrome, version="113.0.5672", channel="cft")
+        await manager_test(Chrome, version="119.0.6045", channel="cft")
+
+    # Chromium Test
+    if browser == "chromium":
+        await manager_test(Chromium, version="build")
+        await manager_test(Chromium, version="major")
+        await manager_test(Chromium, version="patch")
+        try:
+            await manager_test(Chromium, version="110")
+        except IncompatibleWebdriverError:
+            print("-" * 80)
+            print("Chromium IncompatibleWebdriver Test Success")
+            print("-" * 80)
             print()
 
-        print()
-        print(" Chrome Driver Manager ".center(80, "-"))
-        mgr = ChromeDriverManager(max_cache_size=None)
-        await install("build", "stable")
-        await install("build", "beta")
-        await install("build", "dev")
-        await install("patch", "dev")
-        await install("110", "stable")
-        await install("114", "cft")
-        await install("115.0.5763.0", "cft")
-        await install("113.0.5672", "cft")
-        await install("119.0.6045", "cft")
-
-        await install("build", "dev")
-        await install("115.0.5763.0", "cft")
-        # await install("117", "stable")
-        driver = Chrome(mgr.driver_location)
-        driver.options.binary_location = mgr.browser_location
-        async with driver.acquire() as s:
-            print(mgr.driver_version, mgr.driver_location)
-            print(mgr.browser_version, mgr.browser_location)
-            await s.load("https://www.baidu.com")
-        print("-" * 80)
-        print()
-
-    async def chromium_driver_mgr() -> None:
-        async def install(version: str, binary: str = None) -> None:
-            t1 = perf_counter()
-            res = await mgr.install(version, binary)
-            t2 = perf_counter()
-            print(f"Install Edge:\t{version}\t{res}")
-            print(f"Driver Dir:\t{mgr.driver_location}")
-            print(f"Driver Ver:\t{mgr.driver_version}")
-            print(f"Browser Dir:\t{mgr.browser_location}")
-            print(f"Browser Ver:\t{mgr.browser_version}")
-            print(f"Install Time:\t{t2 - t1}s")
+    # Edge Test
+    if browser == "edge":
+        await manager_test(Edge, version="build", channel="stable")
+        await manager_test(Edge, version="build", channel="beta")
+        await manager_test(Edge, version="build", channel="dev")
+        await manager_test(Edge, version="patch", channel="dev")
+        try:
+            await manager_test(Edge, version="110", channel="stable")
+        except IncompatibleWebdriverError:
+            print("-" * 80)
+            print("Edge IncompatibleWebdriver Test Success")
+            print("-" * 80)
             print()
 
-        print()
-        print(" Chromium Driver Manager ".center(80, "-"))
-        mgr = ChromiumDriverManager(max_cache_size=None)
-        await install("build")
-        await install("major")
-        await install("patch")
-        await install("115")
-        await install("110")
+    # Firefox Test
+    if browser == "firefox":
+        await manager_test(Firefox, version="auto")
+        await manager_test(Firefox, version="latest")
+        driver = Firefox()
+        for version in list(driver.manager._GECKODRIVER_TABLE.keys())[:-1]:
+            await manager_test(Firefox, version=version)
+        await manager_test(Firefox, version="0.30")
+        await manager_test(Firefox, version="0")
 
-        await install("build")
-        # await install("119")
-        driver = Chromium(mgr.driver_location)
-        driver.options.binary_location = mgr.browser_location
-        async with driver.acquire() as s:
-            print(mgr.driver_version, mgr.driver_location)
-            print(mgr.browser_version, mgr.browser_location)
-            await s.load("https://www.baidu.com")
+    # Safari Test
+    if browser == "safari" and platform.system() == "Darwin":
+        await manager_test(Safari, channel="stable")
+        await manager_test(Safari, channel="dev")
+
+
+async def test_driver_options(browser: T) -> None:
+    async def options_test(driver_cls: type[Edge], **kwargs) -> None:
         print("-" * 80)
+        driver = driver_cls()
+        print(f"{driver.__class__.__name__} Options Test: {kwargs}")
+        print("- " * 40)
+        # . accept Insecure Certs
+        driver.options.accept_insecure_certs = True
+        # . page Load Strategy
+        driver.options.page_load_strategy = "eager"
+        # . proxy
+        proxy = Proxy(
+            http_proxy="http://127.0.0.1:7890",
+            https_proxy="http://127.0.0.1:7890",
+            socks_proxy="socks5://127.0.0.1:7890",
+        )
+        driver.options.proxy = proxy
+        # . timeout
+        driver.options.set_timeouts(implicit=5, pageLoad=10)
+        # . strict file interactability
+        driver.options.strict_file_interactability = True
+        # . prompt behavior
+        driver.options.unhandled_prompt_behavior = "dismiss"
+        # . arguments
+        driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
+        # . experimental options
+        if browser != "firefox":
+            driver.options.add_experimental_options(
+                excludeSwitches=["enable-automation"]
+            )
+        # Final options
         print()
-
-    async def firefox_driver_mgr() -> None:
-        async def install(version: str, binary: str = None) -> None:
-            t1 = perf_counter()
-            res = await mgr.install(version, binary)
-            t2 = perf_counter()
-            print(f"Install Edge:\t{version}\t{res}")
-            print(f"Driver Dir:\t{mgr.driver_location}")
-            print(f"Driver Ver:\t{mgr.driver_version}")
-            print(f"Browser Dir:\t{mgr.browser_location}")
-            print(f"Browser Ver:\t{mgr.browser_version}")
-            print(f"Install Time:\t{t2 - t1}s")
-            print()
-
-        print()
-        print(" Firefox Driver Manager ".center(80, "-"))
-        mgr = FirefoxDriverManager(max_cache_size=None)
-        await install("auto")
-        await install("latest")
-        for version in list(mgr._GECKODRIVER_TABLE.keys())[:-1]:
-            await install(version)
-        await install("0.30")
-        await install("0")
-
-        await install("latest")
-        # await install("0.30.0")
-        driver = Firefox(mgr.driver_location)
-        driver.options.binary_location = mgr.browser_location
-        async with driver.acquire() as s:
-            print(mgr.driver_version, mgr.driver_location)
-            print(mgr.browser_version, mgr.browser_location)
-            await s.load("https://www.baidu.com")
-        print("-" * 80)
-        print()
-
-    # await edge_driver_mgr()
-    # await chrome_driver_mgr()
-    # await chromium_driver_mgr()
-    await firefox_driver_mgr()
-
-
-async def test_proxy() -> None:
-    print()
-    print(" Test Proxy ".center(80, "-"))
-    print("DEFAULT Proxy:", Proxy(), "\n")
-    print("AUTODETECT Proxy:", Proxy(auto_detect=True), "\n")
-    print("PAC Proxy:", Proxy(True, pac_url="http://url_to_pac_server"), "\n")
-    print(
-        "MANUAL Proxy:",
-        proxy := Proxy(
-            True,
-            pac_url="http://url_to_pac_server",
-            ftp_proxy="ftp://ftp_proxy_server:port",
-            http_proxy="http://http_proxy_server:port",
-            https_proxy="https://https_proxy_server:port",
-            socks_proxy="socks5://socks_proxy_server:port",
-            socks_username="socks_username",
-            socks_password="socks_password",
-            no_proxy=["address1", "address2"],
-        ),
-        "\n",
-    )
-    proxy.socks_proxy = None
-    print("MANUAL Proxy (changed)", proxy, "\n")
-    proxy.auto_detect = True
-    print("MANUAL Proxy (changed)", proxy, "\n")
-    print("-" * 80)
-    print()
-
-
-async def test_edge_options() -> None:
-    # Edge options
-    print()
-    print(" Edge Options ".center(80, "-"))
-    driver = Edge("/Users/jef/Downloads/msedgedriver-mac-arm64/msedgedriver")
-    # . browser version
-    driver.options.browser_version = "119.0.2151.58"
-    # . platform name
-    driver.options.platform_name = "mac"
-    # . accept Insecure Certs
-    driver.options.accept_insecure_certs = True
-    # . page Load Strategy
-    driver.options.page_load_strategy = "eager"
-    # . proxy
-    proxy = Proxy(
-        http_proxy="http://127.0.0.1:7890",
-        https_proxy="http://127.0.0.1:7890",
-        socks_proxy="socks5://127.0.0.1:7890",
-    )
-    driver.options.proxy = proxy
-    # . timeout
-    driver.options.set_timeouts(implicit=5, pageLoad=10)
-    # . strict file interactability
-    driver.options.strict_file_interactability = True
-    # . prompt behavior
-    driver.options.unhandled_prompt_behavior = "dismiss"
-    driver.options.unhandled_prompt_behavior = "dismiss and notify"
-    driver.options.unhandled_prompt_behavior = "accept"
-    driver.options.unhandled_prompt_behavior = "accept and notify"
-    driver.options.unhandled_prompt_behavior = "ignore"
-    # . browser binary
-    driver.options.binary_location = (
-        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"
-    )
-    # . profile
-    profile_dir = "/Users/jef/Library/Application Support/Microsoft Edge"
-    if TEST_PROFILE and os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, "Default", True)
-        # driver.options.rem_profile()
-    # . arguments
-    driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
-    # . experimental options
-    driver.options.add_experimental_options(excludeSwitches=["enable-automation"])
-    # . webview
-    # driver.options.use_webview = True
-    # Final options
-    print(driver.options)
-
-    # Test driver
-    async with driver.acquire() as s:
-        await s.load("https://www.baidu.com")
-        await s.load("https://whatismyipaddress.com/", retry=True)
-        await asyncio.sleep(5)
-
-    # Finished
-    print("-" * 80)
-    print()
-
-
-async def test_chrome_options() -> None:
-    # Chrome options
-    print()
-    print(" Chrome Options ".center(80, "-"))
-    driver = Chrome("/Users/jef/Downloads/chromedriver-mac-arm64/chromedriver")
-    # . browser version
-    driver.options.browser_version = "119.0.6045.123"
-    # . platform name
-    driver.options.platform_name = "mac"
-    # . accept Insecure Certs
-    driver.options.accept_insecure_certs = True
-    # . page Load Strategy
-    driver.options.page_load_strategy = "eager"
-    # . proxy
-    proxy = Proxy(
-        http_proxy="http://127.0.0.1:7890",
-        https_proxy="http://127.0.0.1:7890",
-        socks_proxy="socks5://127.0.0.1:7890",
-    )
-    driver.options.proxy = proxy
-    # . timeout
-    driver.options.set_timeouts(implicit=5, pageLoad=10)
-    # . strict file interactability
-    driver.options.strict_file_interactability = True
-    # . prompt behavior
-    driver.options.unhandled_prompt_behavior = "dismiss"
-    driver.options.unhandled_prompt_behavior = "dismiss and notify"
-    driver.options.unhandled_prompt_behavior = "accept"
-    driver.options.unhandled_prompt_behavior = "accept and notify"
-    driver.options.unhandled_prompt_behavior = "ignore"
-    # . browser binary
-    driver.options.binary_location = (
-        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
-    )
-    # . profile
-    profile_dir = "/Users/jef/Library/Application Support/Google/Chrome"
-    if TEST_PROFILE and os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, "Default", True)
-        # driver.options.rem_profile()
-    # . arguments
-    driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
-    # . experimental options
-    driver.options.add_experimental_options(excludeSwitches=["enable-automation"])
-    # Final options
-    print(driver.options)
-
-    # Test driver
-    async with driver.acquire() as s:
-        await s.load("https://www.baidu.com")
-        await s.load("https://whatismyipaddress.com/", retry=True)
-        await asyncio.sleep(5)
-
-    # Finished
-    print("-" * 80)
-    print()
-
-
-async def test_chromium_options() -> None:
-    # Chromium options
-    print()
-    print(" Chromium Options ".center(80, "-"))
-    driver = Chromium("/Users/jef/Downloads/chromiumdriver_mac64/chromedriver")
-    # . browser version
-    driver.options.browser_version = "118.0.5982.0"
-    # . platform name
-    driver.options.platform_name = "mac"
-    # . accept Insecure Certs
-    driver.options.accept_insecure_certs = True
-    # . page Load Strategy
-    driver.options.page_load_strategy = "eager"
-    # . proxy
-    proxy = Proxy(
-        http_proxy="http://127.0.0.1:7890",
-        https_proxy="http://127.0.0.1:7890",
-        socks_proxy="socks5://127.0.0.1:7890",
-    )
-    driver.options.proxy = proxy
-    # . timeout
-    driver.options.set_timeouts(implicit=5, pageLoad=10)
-    # . strict file interactability
-    driver.options.strict_file_interactability = True
-    # . prompt behavior
-    driver.options.unhandled_prompt_behavior = "dismiss"
-    driver.options.unhandled_prompt_behavior = "dismiss and notify"
-    driver.options.unhandled_prompt_behavior = "accept"
-    driver.options.unhandled_prompt_behavior = "accept and notify"
-    driver.options.unhandled_prompt_behavior = "ignore"
-    # . browser binary
-    driver.options.binary_location = (
-        "/Applications/Chromium.app/Contents/MacOS/Chromium"
-    )
-    # . profile
-    profile_dir = "/Users/jef/Library/Application Support/Chromium"
-    if TEST_PROFILE and os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, "Default", True)
-        # driver.options.rem_profile()
-    # . arguments
-    driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
-    # . experimental options
-    driver.options.add_experimental_options(excludeSwitches=["enable-automation"])
-    # Final options
-    print(driver.options)
-
-    # Test driver
-    async with driver.acquire() as s:
-        await s.load("https://www.baidu.com")
-        await s.load("https://whatismyipaddress.com/", retry=True)
-        await asyncio.sleep(5)
-
-    # Finished
-    print("-" * 80)
-    print()
-
-
-async def test_firefox_options() -> None:
-    # Firefox options
-    print()
-    print(" Firefox Options ".center(80, "-"))
-    driver = Firefox("/Users/jef/Downloads/geckodriver/geckodriver")
-    # . browser version
-    driver.options.browser_version = "120.0"
-    # . platform name
-    driver.options.platform_name = "mac"
-    # . accept Insecure Certs
-    driver.options.accept_insecure_certs = True
-    # . page Load Strategy
-    driver.options.page_load_strategy = "eager"
-    # . proxy
-    proxy = Proxy(
-        http_proxy="http://127.0.0.1:7890",
-        https_proxy="http://127.0.0.1:7890",
-        socks_proxy="socks5://127.0.0.1:7890",
-    )
-    driver.options.proxy = proxy
-    # . timeout
-    driver.options.set_timeouts(implicit=5, pageLoad=10)
-    # . strict file interactability
-    driver.options.strict_file_interactability = True
-    # . prompt behavior
-    driver.options.unhandled_prompt_behavior = "dismiss"
-    driver.options.unhandled_prompt_behavior = "dismiss and notify"
-    driver.options.unhandled_prompt_behavior = "accept"
-    driver.options.unhandled_prompt_behavior = "accept and notify"
-    driver.options.unhandled_prompt_behavior = "ignore"
-    # . browser binary
-    driver.options.binary_location = "/Applications/Firefox.app/Contents/MacOS/firefox"
-    # . profile
-    profile_dir = "/Users/jef/Library/Application Support/Firefox/Profiles/684o1n0x.default-release-1700386926530"
-    if TEST_PROFILE and os.path.isdir(profile_dir):
-        driver.options.set_profile(profile_dir, True)
-        # driver.options.rem_profile()
-        profile_args = True
-    else:
-        profile_args = False
-    # . arguments
-    driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
-    # Final options
-    if profile_args:
-        text = repr(driver.options)
-        print(text[:1000] + "..." + text[-100:])
-    else:
         print(driver.options)
+        print()
 
-    # Test driver
-    async with driver.acquire() as s:
-        await s.load("https://www.baidu.com")
-        await s.load("https://whatismyipaddress.com/", retry=True)
+        # Test driver
+        async with driver.acquire(**kwargs) as session:
+            await session.load("https://www.baidu.com")
+            await session.load("https://whatismyipaddress.com/", retry=True)
+
+        # Finished
+        print("- " * 40)
+        print(f"Options Test Success: {kwargs}")
+        print("-" * 80)
+        print()
+
+    # Edge Test
+    if browser == "edge":
+        await options_test(Edge, version="build", channel="stable")
+        await options_test(Edge, version="build", channel="beta")
+        await options_test(Edge, version="build", channel="dev")
+    # Chrome Test
+    if browser == "chrome":
+        await options_test(Chrome, version="build", channel="stable")
+        await options_test(Chrome, version="build", channel="beta")
+        await options_test(Chrome, version="build", channel="dev")
+        await options_test(Chrome, version="115", channel="cft")
+    # Chromium Test
+    if browser == "chromium":
+        await options_test(Chromium, version="build")
+        await options_test(Chromium, version="major")
+        await options_test(Chromium, version="patch")
+    # Firefox Test
+    if browser == "firefox":
+        await options_test(Firefox, version="auto")
+        await options_test(Firefox, version="latest")
+    # Safari Test
+    if browser == "safari" and platform.system() == "Darwin":
+        await options_test(Safari, channel="stable")
+        await options_test(Safari, channel="dev")
+
+
+async def test_driver_profile(browser: T) -> None:
+    def get_profile_dir(browser: T) -> str | None:
+        if browser == "chrome":
+            if platform.system() == "Darwin":
+                return "/Users/jef/Library/Application Support/Google/Chrome"
+            elif platform.system() == "Windows":
+                return r"C:\Users\jef\AppData\Local\Google\Chrome\User Data"
+            elif platform.system() == "Linux":
+                return "/home/jef/.config/google-chrome"
+        elif browser == "chromium":
+            if platform.system() == "Darwin":
+                return "/Users/jef/Library/Application Support/Chromium"
+            elif platform.system() == "Windows":
+                return r"C:\Users\jef\AppData\Local\Chromium\User Data"
+            elif platform.system() == "Linux":
+                return "/home/jef/.config/chromium"
+        elif browser == "edge":
+            if platform.system() == "Darwin":
+                return "/Users/jef/Library/Application Support/Microsoft Edge"
+            elif platform.system() == "Windows":
+                return r"C:\Users\jef\AppData\Local\Microsoft\Edge\User Data"
+            elif platform.system() == "Linux":
+                return "/home/jef/.config/microsoft-edge"
+        elif browser == "firefox":
+            if platform.system() == "Darwin":
+                return "/Users/jef/Library/Application Support/Firefox/Profiles/684o1n0x.default-release-1700386926530"
+            elif platform.system() == "Windows":
+                return r"C:\Users\jef\AppData\Roaming\Mozilla\Firefox\Profiles\684o1n0x.default-release-1700386926530"
+            elif platform.system() == "Linux":
+                return (
+                    "/home/jef/.mozilla/firefox/684o1n0x.default-release-1700386926530"
+                )
+        return None
+
+    profile_dir = get_profile_dir(browser)
+    if profile_dir is None or not os.path.isdir(profile_dir):
+        return None
+
+    elif browser == "firefox":
+        driver = Firefox()
+        driver.options.set_profile(profile_dir)
+
+    else:
+        if browser == "chrome":
+            driver = Chrome()
+        elif browser == "chromium":
+            driver = Chromium()
+        else:
+            driver = Edge()
+        driver.options.set_profile(profile_dir, "Default")
+
+    async with driver.acquire() as session:
+        await session.load("https://www.baidu.com")
+        await session.load("https://whatismyipaddress.com/", retry=True)
         await asyncio.sleep(5)
 
-    # Finished
-    print("-" * 80)
-    print()
 
-
-async def test_safari_options() -> None:
-    # Safari options
-    print()
-    print(" Safari Options ".center(80, "-"))
-    driver = Safari("/usr/bin/safaridriver")
-    # . browser version
-    driver.options.browser_version = "17.1"
-    # . platform name
-    driver.options.platform_name = "mac"
-    # . accept Insecure Certs
-    driver.options.accept_insecure_certs = True
-    # . page Load Strategy
-    driver.options.page_load_strategy = "eager"
-    # . timeout
-    driver.options.set_timeouts(implicit=5, pageLoad=10)
-    # . strict file interactability
-    driver.options.strict_file_interactability = True
-    # . prompt behavior
-    driver.options.unhandled_prompt_behavior = "dismiss"
-    driver.options.unhandled_prompt_behavior = "dismiss and notify"
-    driver.options.unhandled_prompt_behavior = "accept"
-    driver.options.unhandled_prompt_behavior = "accept and notify"
-    driver.options.unhandled_prompt_behavior = "ignore"
-    # Final options
-    print(driver.options)
-
-    # Test driver
-    async with driver.acquire() as s:
-        await s.load("https://www.baidu.com")
-        await s.load("https://whatismyipaddress.com/", retry=True)
-        await asyncio.sleep(5)
-
-    # Finished
-    print("-" * 80)
-    print()
-
-
-async def test_cancellation() -> None:
-    print()
-    print(" Edge Cancellation ".center(80, "-"))
-    task = asyncio.create_task(test_edge_options())
-    await asyncio.sleep(2)
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
+async def test_driver_cancellation(browser: T) -> None:
+    async def test_cancellation(driver_cls: type[Edge], **kwargs) -> None:
         print("-" * 80)
-        print("Cancelled Successfully")
-    print("-" * 80)
-    print()
-
-    print()
-    print(" Chrome Cancellation ".center(80, "-"))
-    task = asyncio.create_task(test_chrome_options())
-    await asyncio.sleep(2)
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
+        driver = driver_cls()
+        print(f"{driver.__class__.__name__} Cancellation Test: {kwargs}")
+        t1 = perf_counter()
+        task = asyncio.create_task(acquire_session(driver, **kwargs))
+        await asyncio.sleep(2)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            print(f"{driver.__class__.__name__} Cancelled Successfully")
         print("-" * 80)
-        print("Cancelled Successfully")
-    print("-" * 80)
-    print()
+        print()
 
-    print()
-    print(" Chromium Cancellation ".center(80, "-"))
-    task = asyncio.create_task(test_chromium_options())
-    await asyncio.sleep(2)
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        print("-" * 80)
-        print("Cancelled Successfully")
-    print("-" * 80)
-    print()
+    async def acquire_session(driver, **kwargs) -> None:
+        async with driver.acquire(**kwargs) as session:
+            while True:
+                await session.load("https://www.baidu.com", retry=True)
 
-    print()
-    print(" Firefox Cancellation ".center(80, "-"))
-    task = asyncio.create_task(test_firefox_options())
-    await asyncio.sleep(2)
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        print("-" * 80)
-        print("Cancelled Successfully")
-    print("-" * 80)
-    print()
+    # Chrome Test
+    if browser == "chrome":
+        await test_cancellation(Chrome, version="build", channel="stable")
+        await test_cancellation(Chrome, version="build", channel="beta")
+        await test_cancellation(Chrome, version="build", channel="dev")
+        await test_cancellation(Chrome, version="115", channel="cft")
 
-    print()
-    print(" Safari Cancellation ".center(80, "-"))
-    task = asyncio.create_task(test_safari_options())
-    await asyncio.sleep(2)
-    task.cancel()
-    try:
-        await task
-    except asyncio.CancelledError:
-        print("-" * 80)
-        print("Cancelled Successfully")
-    print("-" * 80)
-    print()
+    # Chromium Test
+    if browser == "chromium":
+        await test_cancellation(Chromium, version="build")
+        await test_cancellation(Chromium, version="major")
+        await test_cancellation(Chromium, version="patch")
+
+    # Edge Test
+    if browser == "edge":
+        await test_cancellation(Edge, version="build", channel="stable")
+        await test_cancellation(Edge, version="build", channel="beta")
+        await test_cancellation(Edge, version="build", channel="dev")
+
+    # Firefox Test
+    if browser == "firefox":
+        await test_cancellation(Firefox, version="auto")
+        await test_cancellation(Firefox, version="latest")
+
+    # Safari Test
+    if browser == "safari" and platform.system() == "Darwin":
+        await test_cancellation(Safari, channel="stable")
+        await test_cancellation(Safari, channel="dev")
 
 
-async def test_driver(browser: str = "chrome") -> None:
+async def test_driver_automation(browser: T) -> None:
     async def session_info(s: Session) -> None:
         print(" Session Info ".center(80, "-"))
 
@@ -675,8 +420,8 @@ async def test_driver(browser: str = "chrome") -> None:
         print("cookies:", bool(x := await s.cookies), sep="\t")
         print()
 
-        cookie = await s.get_cookie("ZFY")
-        print("get_cookie:", cookie.name == "ZFY", cookie, sep="\t")
+        cookie = await s.get_cookie("BAIDUID")
+        print("get_cookie:", cookie.name == "BAIDUID", cookie, sep="\t")
         cookie.name = "test"
         await s.add_cookie(cookie)
         cookie = await s.get_cookie("test")
@@ -768,8 +513,8 @@ async def test_driver(browser: str = "chrome") -> None:
         el2 = await s.find_element("#su", by="css")  # search button
         await el2.click()
         await asyncio.sleep(2)
-        print("scroll_by:", await s.scroll_by(0, 300, pause) is None, sep="\t")
-        print("scroll_to:", await s.scroll_to(0, 3000, pause) is None, sep="\t")
+        print("scroll_by:", await s.scroll_by(0, 300, 0.5) is None, sep="\t")
+        print("scroll_to:", await s.scroll_to(0, 3000, 0.5) is None, sep="\t")
         print("scroll_top:", await s.scroll_to_top(500, "pixels") is None, sep="\t")
         print("scroll_bot:", await s.scroll_to_bottom(5, "steps") is None, sep="\t")
         print()
@@ -785,7 +530,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def alert(s: Session) -> None:
         # Skip Safari
-        if isinstance(s, SafariSession):
+        if browser == "safari":
             return None
 
         print(" Alert Commands ".center(80, "-"))
@@ -826,7 +571,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def frame(s: Session) -> None:
         # Skip Safari
-        if isinstance(s, SafariSession):
+        if browser == "safari":
             return None
 
         print(" Frame Commands ".center(80, "-"))
@@ -1335,7 +1080,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def shadow(s: Session) -> None:
         # Skip Safari
-        if isinstance(s, SafariSession):
+        if browser == "safari":
             return None
 
         print(" Shadow Commands ".center(80, "-"))
@@ -1498,7 +1243,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def actions(s: Session) -> None:
         # Skip Safari
-        if isinstance(s, SafariSession):
+        if browser == "safari":
             return None
 
         print(" Actions Commands ".center(80, "-"))
@@ -1700,9 +1445,9 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
-    async def permission(s: ChromiumBaseSession) -> None:
+    async def permission(s: ChromeSession) -> None:
         # Skip Firefox
-        if isinstance(s, FirefoxSession):
+        if browser == "firefox":
             return None
 
         print(" Permission Commands ".center(80, "-"))
@@ -1735,7 +1480,7 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
-    async def network(s: ChromiumBaseSession) -> None:
+    async def network(s: ChromeSession) -> None:
         # Chromium only
         if browser not in ("chrome", "edge", "chromium"):
             return None
@@ -1757,7 +1502,7 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
-    async def chromium_casting(s: ChromiumBaseSession) -> None:
+    async def chromium_casting(s: ChromeSession) -> None:
         # Chromium only
         if browser not in ("chrome", "edge", "chromium"):
             return None
@@ -1775,7 +1520,7 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
-    async def chromium_cdp_cmds(s: ChromiumBaseSession) -> None:
+    async def chromium_cdp_cmds(s: ChromeSession) -> None:
         # Chromium only
         if browser not in ("chrome", "edge", "chromium"):
             return None
@@ -1845,7 +1590,7 @@ async def test_driver(browser: str = "chrome") -> None:
         print("-" * 80)
         print()
 
-    async def logs(s: ChromiumBaseSession) -> None:
+    async def logs(s: ChromeSession) -> None:
         # Chromium only
         if browser not in ("chrome", "edge", "chromium"):
             return None
@@ -1860,7 +1605,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def firefox_context(s: FirefoxSession) -> None:
         # Firefox only
-        if not isinstance(s, FirefoxSession):
+        if browser != "firefox":
             return None
 
         print(" Firefox Context Commands ".center(80, "-"))
@@ -1879,7 +1624,7 @@ async def test_driver(browser: str = "chrome") -> None:
 
     async def firefox_addon(s: FirefoxSession) -> None:
         # Firefox only
-        if not isinstance(s, FirefoxSession):
+        if browser != "firefox":
             return None
 
         print(" Firefox Addon Commands ".center(80, "-"))
@@ -1905,26 +1650,24 @@ async def test_driver(browser: str = "chrome") -> None:
         print()
 
     # fmt: off
-    if browser == "edge":
-        driver = Edge("/Users/jef/Downloads/msedgedriver-mac-arm64/msedgedriver")
-    elif browser == "chrome":
-        driver = Chrome("/Users/jef/Downloads/chromedriver-mac-arm64/chromedriver")
+    if browser == "chrome":
+        driver = Chrome()
     elif browser == "chromium":
-        driver = Chromium("/Users/jef/Downloads/chromiumdriver_mac64/chromedriver")
+        driver = Chromium()
+    elif browser == "edge":
+        driver = Edge()
     elif browser == "firefox":
-        driver = Firefox("/Users/jef/Downloads/geckodriver/geckodriver")
+        driver = Firefox()
     elif browser == "safari":
-        driver = Safari("/usr/bin/safaridriver")
+        driver = Safari()
     else:
         raise ValueError(f"Browser not supported: '{browser}'")
     # fmt: on
     driver.options.session_timeout = 120
     driver.options.set_timeouts(implicit=2, pageLoad=20)
     driver.options.add_arguments("--disable-gpu", "--disable-dev-shm-usage")
-    print(driver.options)
     FORCE_TIMEOUT = 30
 
-    pause = 0.5
     async with driver.acquire() as s:
         # Base info
         await session_info(s)
@@ -1975,18 +1718,32 @@ async def test_driver(browser: str = "chrome") -> None:
 if __name__ == "__main__":
     ABS_PATH = os.path.abspath(os.path.dirname(__file__))
     TEST_FOLDER = os.path.join(ABS_PATH, "test_files")
-    TEST_PROFILE = True
 
-    asyncio.run(test_driver_manager())
-    # asyncio.run(test_proxy())
-    # asyncio.run(test_edge_options())
-    # asyncio.run(test_chrome_options())
-    # asyncio.run(test_chromium_options())
-    # asyncio.run(test_firefox_options())
-    # asyncio.run(test_safari_options())
-    # asyncio.run(test_cancellation())
-    # asyncio.run(test_driver("edge"))
-    # asyncio.run(test_driver("chrome"))
-    # asyncio.run(test_driver("chromium"))
-    # asyncio.run(test_driver("firefox"))
-    # asyncio.run(test_driver("safari"))
+    # asyncio.run(test_driver_manager("chrome"))
+    # asyncio.run(test_driver_manager("chromium"))
+    # asyncio.run(test_driver_manager("edge"))
+    # asyncio.run(test_driver_manager("firefox"))
+    # # asyncio.run(test_driver_manager("safari"))
+
+    # asyncio.run(test_driver_options("chrome"))
+    # asyncio.run(test_driver_options("chromium"))
+    # asyncio.run(test_driver_options("edge"))
+    # asyncio.run(test_driver_options("firefox"))
+    # # asyncio.run(test_driver_options("safari"))
+
+    # asyncio.run(test_driver_profile("chrome"))
+    # asyncio.run(test_driver_profile("chromium"))
+    # asyncio.run(test_driver_profile("edge"))
+    # asyncio.run(test_driver_profile("firefox"))
+
+    # asyncio.run(test_driver_cancellation("chrome"))
+    # asyncio.run(test_driver_cancellation("chromium"))
+    # asyncio.run(test_driver_cancellation("edge"))
+    # asyncio.run(test_driver_cancellation("firefox"))
+    # # asyncio.run(test_driver_cancellation("safari"))
+
+    asyncio.run(test_driver_automation("chrome"))
+    asyncio.run(test_driver_automation("chromium"))
+    asyncio.run(test_driver_automation("edge"))
+    asyncio.run(test_driver_automation("firefox"))
+    # asyncio.run(test_driver_automation("safari"))

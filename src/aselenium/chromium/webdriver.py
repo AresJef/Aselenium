@@ -16,13 +16,25 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any
+from typing import Any, Literal
 from aselenium.chromium.options import ChromiumOptions
 from aselenium.chromium.service import ChromiumService
-from aselenium.chromium.session import ChromiumSessionContext
-from aselenium.webdriver import ChromiumBaseWebDriver
+from aselenium.chromium.session import ChromiumSession
+from aselenium.manager.version import ChromiumVersion
+from aselenium.manager.driver import ChromiumDriverManager
+from aselenium.webdriver import ChromiumBaseWebDriver, SessionContext
 
 __all__ = ["Chromium"]
+
+
+# Chromium Session Context ------------------------------------------------------------------------
+class ChromiumSessionContext(SessionContext):
+    """The context manager for a Chromium session."""
+
+    _SESSION_CLS: type[ChromiumSession] = ChromiumSession
+
+    async def __aenter__(self) -> ChromiumSession:
+        return await self.start()
 
 
 # Chromium Webdriver ------------------------------------------------------------------------------
@@ -31,46 +43,76 @@ class Chromium(ChromiumBaseWebDriver):
 
     def __init__(
         self,
-        executable: str,
+        directory: str | None = None,
+        max_cache_size: int | None = None,
+        request_timeout: int | float = 10,
+        download_timeout: int | float = 120,
+        proxy: str | None = None,
         service_timeout: int = 10,
         *service_args: Any,
-        **service_kwargs: Any
+        **service_kwargs: Any,
     ) -> None:
-        """The webdriver for Chromium.
-
-        :param executable: `<str>` The absolute path to the webdriver executable file.
-        :param service_timeout: `<int/float>` Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
-        :param service_args: `<Any>` Additional arguments for the webdriver service.
-        :param service_kwargs: `<Any>` Additional keyword arguments for the webdriver service.
-        """
         super().__init__(
-            executable,
-            ChromiumOptions,
+            ChromiumDriverManager,
             ChromiumService,
+            ChromiumOptions,
+            ChromiumSessionContext,
+            directory,
+            max_cache_size,
+            request_timeout,
+            download_timeout,
+            proxy,
             service_timeout,
             *service_args,
             **service_kwargs,
         )
+
+    # Properties ------------------------------------------------------------------
+    @property
+    def manager(self) -> ChromiumDriverManager:
+        """Access the driver manager `<ChromiumDriverManager>`."""
+        return self._manager
 
     @property
     def options(self) -> ChromiumOptions:
         """Access the webdriver options for the browser `<ChromiumOptions>`."""
         return self._options
 
-    def acquire(self) -> ChromiumSessionContext:
-        """Acquire a new browser session `<ChromiumSession>`.
+    # Acquire ---------------------------------------------------------------------
+    def acquire(
+        self,
+        version: ChromiumVersion | Literal["major", "build", "patch"] = "build",
+        binary: str | None = None,
+    ) -> ChromiumSessionContext:
+        """Acquire a new Chromium session `<ChromiumSession>`.
+
+        :param version: `<str>` Defaults to `'build'`. Accepts the following values:
+            - `'major'`: Install webdriver that has the same major version as the browser.
+            - `'build'`: Install webdriver that has the same major & build version as the browser.
+            - `'patch'`: Install webdriver that has the same major, build & patch version as the browser.
+            - `'118.0.5982.0'`: Install the excat webdriver version regardless of the browser version.
+
+        :param binary: `<str/None>` The path to a specific browser binary. Defaults to `None`.
+            - If `None`, will try to locate the Chromium browser binary installed
+              in the system and use it to determine the webdriver version.
+            - If specified, will use the given browser binary to determine the
+              webdriver version and start the session.
 
         ### Example:
-        >>> async with driver.acquire() as session:
+        >>> from aselenium import Chromium
+            driver = Chromium(
+                # optional: the directory to store the webdriver
+                directory="/path/to/driver/cache/directory"
+                # optional: the maximum number of webdriver to cache
+                max_cache_size=10
+            )
+        >>> # . acquire a chromium session
+            async with driver.acquire("build") as session:
+                # explain: install webdriver that has the same major & build
+                # version as the Chromium browser installed in the system,
+                # and start a new session with the browser.
                 await session.load("https://www.google.com")
-                # . some automated tasks
+                # . do some automated tasks
+                ...
         """
-        return ChromiumSessionContext(
-            self._options,
-            self._service_cls(
-                self._executable,
-                self._service_timeout,
-                *self._service_args,
-                **self._service_kwargs,
-            ),
-        )
+        return super().acquire(version=version, binary=binary)

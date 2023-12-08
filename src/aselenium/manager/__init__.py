@@ -4,13 +4,14 @@ from aselenium.manager.driver import (
     ChromeDriverManager,
     ChromiumDriverManager,
     FirefoxDriverManager,
+    SafariDriverManager,
 )
-from aselenium.manager.file import (
-    EdgeFileManager,
-    ChromeFileManager,
-    FirefoxFileManager,
+from aselenium.manager.version import (
+    ChromiumVersion,
+    FirefoxVersion,
+    GeckoVersion,
+    SafariVersion,
 )
-from aselenium.manager.version import ChromiumVersion, FirefoxVersion, GeckoVersion
 
 __all__ = [
     # Driver Manager
@@ -18,12 +19,10 @@ __all__ = [
     "ChromeDriverManager",
     "ChromiumDriverManager",
     "FirefoxDriverManager",
-    # File Manager
-    "EdgeFileManager",
-    "ChromeFileManager",
-    "FirefoxFileManager",
+    "SafariDriverManager",
     # Version
     "ChromiumVersion",
     "FirefoxVersion",
     "GeckoVersion",
+    "SafariVersion",
 ]

@@ -18,9 +18,9 @@
 # -*- coding: UTF-8 -*-
 from aselenium.edge.options import EdgeOptions
 from aselenium.edge.service import EdgeService
-from aselenium.session import ChromiumBaseSession, ChromiumBaseSessionContext
+from aselenium.session import ChromiumBaseSession
 
-__all__ = ["EdgeSession", "EdgeSessionContext"]
+__all__ = ["EdgeSession"]
 
 
 # Edge Session ------------------------------------------------------------------------------------
@@ -37,18 +37,3 @@ class EdgeSession(ChromiumBaseSession):
     def service(self) -> EdgeService:
         """Access the Edge service `<EdgeService>`."""
         return self._service
-
-
-class EdgeSessionContext(ChromiumBaseSessionContext):
-    """The context manager for an Edge session."""
-
-    def __init__(self, options: EdgeOptions, service: EdgeService) -> None:
-        """The context manager for an Edge session.
-
-        :param options: `<EdgeOptions>` The browser options.
-        :param service: `<EdgeService>` The browser service.
-        """
-        self._session = EdgeSession(options, service)
-
-    async def __aenter__(self) -> EdgeSession:
-        return await self.start()

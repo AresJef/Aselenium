@@ -16,21 +16,22 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from __future__ import annotations
-import os
-from typing import Literal
 from io import BytesIO
+from typing import Literal
+from os import walk as walk_path
+from os.path import join as join_path
 from zipfile import ZipFile, ZIP_DEFLATED, is_zipfile
 from aselenium import errors
 from aselenium.logs import logger
 from aselenium.command import Command
+from aselenium.session import Session
+from aselenium.manager.version import GeckoVersion, FirefoxVersion
+from aselenium.utils import is_path_file, is_path_dir, is_file_dir_exists
 from aselenium.firefox.options import FirefoxOptions
 from aselenium.firefox.service import FirefoxService
 from aselenium.firefox.utils import FirefoxAddon, extract_firefox_addon_details
-from aselenium.session import Session, SessionContext
-from aselenium.utils import is_path_file, is_path_dir, is_file_dir_exists
 
-__all__ = ["FirefoxSession", "FirefoxSessionContext"]
+__all__ = ["FirefoxSession"]
 
 
 # Firefox Session ---------------------------------------------------------------------------------
@@ -51,9 +52,19 @@ class FirefoxSession(Session):
         return self._options
 
     @property
+    def browser_version(self) -> FirefoxVersion:
+        """Access the browser binary version of the session `<FirefoxVersion>`."""
+        return super().browser_version
+
+    @property
     def service(self) -> FirefoxService:
         """Access the Firefox service `<FirefoxService>`."""
         return self._service
+
+    @property
+    def driver_version(self) -> GeckoVersion:
+        """Access the webdriver binary version of the session `<GeckoVersion>`."""
+        return super().driver_version
 
     # Information -------------------------------------------------------------------------
     async def take_full_screenshot(self) -> bytes:
@@ -231,9 +242,9 @@ class FirefoxSession(Session):
                 fp = BytesIO()
                 path_root = len(path) + 1  # account for trailing slash
                 with ZipFile(fp, "w", ZIP_DEFLATED) as zip:
-                    for base, _, files in os.walk(path):
+                    for base, _, files in walk_path(path):
                         for fyle in files:
-                            filename = os.path.join(base, fyle)
+                            filename = join_path(base, fyle)
                             zip.write(filename, filename[path_root:])
                 return self._encode_base64(fp.getvalue(), "utf-8")
             # . packed add-on file
@@ -348,18 +359,3 @@ class FirefoxSession(Session):
         super()._collect_garbage()
         # Add-ons
         self._addon_by_id = None
-
-
-class FirefoxSessionContext(SessionContext):
-    """The context manager for the Firefox session."""
-
-    def __init__(self, options: FirefoxOptions, service: FirefoxService) -> None:
-        """The context manager for a Firefox session.
-
-        :param options: `<FirefoxOptions>` The browser options.
-        :param service: `<FirefoxService>` The browser service.
-        """
-        self._session = FirefoxSession(options, service)
-
-    async def __aenter__(self) -> FirefoxSession:
-        return await self.start()

@@ -31,7 +31,7 @@ from aselenium.utils import is_path_file, is_file_dir_exists, process_keys
 if TYPE_CHECKING:
     from aselenium.session import Session
 
-__all__ = ["Element", "ElementRect", "ELEMENT_KEY"]
+__all__ = ["Element", "ElementRect"]
 
 # Constants ---------------------------------------------------------------------------------------
 ELEMENT_KEY: str = "element-6066-11e4-a52e-4f735466cecf"
@@ -147,7 +147,7 @@ class Element:
             return False
         except errors.InvalidMethodError:
             return False
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to check element existance: {}".format(
                     self.__class__.__name__, err
@@ -169,7 +169,7 @@ class Element:
             return False
         except errors.InvalidMethodError:
             return False
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to check element visibility: {}".format(
                     self.__class__.__name__, err
@@ -191,7 +191,7 @@ class Element:
             return False
         except errors.InvalidMethodError:
             return False
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to check element viewability: {}".format(
                     self.__class__.__name__, err
@@ -295,7 +295,7 @@ class Element:
         # Validate
         for file in files:
             if not is_path_file(file):
-                raise errors.FileNotExistsError(
+                raise errors.AseleniumFileNotFoundError(
                     "<{}>\nInvalid file to upload: {}".format(
                         self.__class__.__name__, repr(file)
                     )
@@ -318,7 +318,7 @@ class Element:
         """
         try:
             self._session._execute_script(javascript.ELEMENT_SUBMIT_FORM, self)
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nElement might not nested inside a form. "
                 "Error: {}".format(self.__class__.__name__, err)
@@ -369,7 +369,7 @@ class Element:
             await self._session._execute_script(
                 javascript.ELEMENT_SCROLL_INTO_VIEW, self
             )
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to scroll into view: {}".format(
                     self.__class__.__name__, err
@@ -681,7 +681,7 @@ class Element:
             )
         except errors.InvalidMethodError:
             return []
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to get element properties: {}".format(
                     self.__class__.__name__, err
@@ -733,7 +733,7 @@ class Element:
             )
         except errors.InvalidMethodError:
             return {}
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to get element css properties: {}".format(
                     self.__class__.__name__, err
@@ -777,7 +777,7 @@ class Element:
             )
         except errors.InvalidMethodError:
             return {}
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to get element attributes: {}".format(
                     self.__class__.__name__, err
@@ -803,7 +803,7 @@ class Element:
             )
         except errors.InvalidMethodError:
             return None
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to get element attribute: {}".format(
                     self.__class__.__name__, err
@@ -1333,7 +1333,7 @@ class Element:
                     self.__class__.__name__, repr(value)
                 )
             ) from err
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidXPathSelectorError(
                 "<{}>\nInvalid 'xpath' selector: {}".format(
                     self.__class__.__name__, repr(value)
@@ -1356,7 +1356,7 @@ class Element:
                     self.__class__.__name__, repr(value)
                 )
             ) from err
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidXPathSelectorError(
                 "<{}>\nInvalid 'xpath' selector: {}".format(
                     self.__class__.__name__, repr(value)

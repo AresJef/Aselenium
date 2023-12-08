@@ -2,12 +2,6 @@
 from aselenium.safari.webdriver import Safari
 from aselenium.safari.options import SafariOptions
 from aselenium.safari.service import SafariService
-from aselenium.safari.session import SafariSession, SafariSessionContext
+from aselenium.safari.session import SafariSession
 
-__all__ = [
-    "Safari",
-    "SafariOptions",
-    "SafariService",
-    "SafariSession",
-    "SafariSessionContext",
-]
+__all__ = ["Safari", "SafariOptions", "SafariService", "SafariSession"]

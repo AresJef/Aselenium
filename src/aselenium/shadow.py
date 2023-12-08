@@ -29,7 +29,7 @@ if TYPE_CHECKING:
     from aselenium.element import Element
     from aselenium.session import Session
 
-__all__ = ["Shadow", "SHADOWROOT_KEY"]
+__all__ = ["Shadow"]
 
 # Constants ---------------------------------------------------------------------------------------
 SHADOWROOT_KEY: str = "shadow-6066-11e4-a52e-4f735466cecf"

@@ -17,28 +17,28 @@
 
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
-import os, platform
-from os import pathsep
 from typing import Any, Literal
 from asyncio import Lock, gather
-from os.path import join as join_path
+from os.path import join as join_path, dirname
+from os import walk as walk_path, pathsep, environ
+from platform import system, architecture, machine
 from subprocess import Popen, PIPE, DEVNULL
-from orjson import loads
 from aiohttp import ClientSession, ClientTimeout, ClientConnectorError
 from aselenium import errors
-from aselenium.utils import is_path_file
 from aselenium.manager.version import Version, ChromiumVersion
-from aselenium.manager.version import GeckoVersion, FirefoxVersion
+from aselenium.manager.version import GeckoVersion, FirefoxVersion, SafariVersion
 from aselenium.manager.file import EdgeFileManager, EdgeDriverFile
 from aselenium.manager.file import FirefoxFileManager, GeckoDriverFile
 from aselenium.manager.file import FileManager, ChromiumBaseFileManager, File
 from aselenium.manager.file import ChromeFileManager, ChromeDriverFile, ChromeBinaryFile
+from aselenium.utils import is_path_file, load_json_file, load_plist_file
 
 __all__ = [
     "EdgeDriverManager",
     "ChromeDriverManager",
     "ChromiumDriverManager",
     "FirefoxDriverManager",
+    "SafariDriverManager",
 ]
 
 
@@ -78,7 +78,7 @@ class DriverManager:
     def __init__(
         self,
         name: str,
-        file_manager_cls: type[FileManager],
+        file_manager_cls: type[FileManager] | None,
         driver_file_cls: type[File] | None,
         binary_file_cls: type[File] | None,
         directory: str | None = None,
@@ -113,7 +113,10 @@ class DriverManager:
         self._channel: str = None
         # File manager
         self.max_cache_size = max_cache_size
-        self._file_manager: FileManager = file_manager_cls(directory)
+        if file_manager_cls is not None:
+            self._file_manager: FileManager = file_manager_cls(directory)
+        else:
+            self._file_manager: FileManager = None
         self._driver_file_cls: type[File] = driver_file_cls
         self._binary_file_cls: type[File] = binary_file_cls
         # Request
@@ -136,7 +139,7 @@ class DriverManager:
         self.__environ_paths: list[str] = None
 
     # Installation ------------------------------------------------------------------------
-    async def install(self, *args) -> str:
+    async def install(self, *args: Any, **kwargs: Any) -> str:
         """Install a webdriver `<str>`."""
         raise NotImplementedError(
             "<DriverManager> `install()` method must be implemented in "
@@ -397,6 +400,15 @@ class DriverManager:
             return None
 
     # Target ------------------------------------------------------------------------------
+    @property
+    def channel(self) -> str:
+        """Access the webdriver channel `<str>`.
+        Please access this attribute after executing the `install()` method.
+        """
+        if self._channel is None:
+            self._raise_installation_error("channel")
+        return self._channel
+
     def _parse_target_version(self, version: Any) -> None:
         """(Internal) Parse the target version for the installation."""
         raise NotImplementedError(
@@ -662,7 +674,7 @@ class DriverManager:
         Excepted values: `'linux'`, `'mac'`, `'win'`.
         """
         if self.__os_name is None:
-            syst = platform.system()
+            syst = system()
             if syst == "Darwin":
                 self.__os_name = OSType.MAC
             elif syst == "Windows":
@@ -683,7 +695,7 @@ class DriverManager:
         Excepted values: `'32'`, `'64'`.
         """
         if self.__os_arch is None:
-            if "64" in platform.architecture()[0]:
+            if "64" in architecture()[0]:
                 self.__os_arch = "64"
             else:
                 self.__os_arch = "32"
@@ -693,7 +705,7 @@ class DriverManager:
     def _os_is_arm(self) -> bool:
         """(Internal) Access whether the platform is arm based `<bool>`."""
         if self.__os_is_arm is None:
-            mach = platform.machine().lower()
+            mach = machine().lower()
             if "arm" in mach:
                 self.__os_is_arm = True
             elif "aarch" in mach:
@@ -717,11 +729,11 @@ class DriverManager:
                     "PROGRAMFILES(ARM)",
                 ]:
                     try:
-                        paths.append(os.environ[env])
+                        paths.append(environ[env])
                     except KeyError:
                         pass
             else:
-                paths = os.environ["PATH"].split(pathsep)
+                paths = environ["PATH"].split(pathsep)
             self.__environ_paths = paths
         return self.__environ_paths
 
@@ -770,7 +782,7 @@ class DriverManager:
 
     def _raise_invalid_channel_error(self) -> None:
         """(Internal) Raise an invalid channel error."""
-        raise errors.InvalidDriverChannelError(
+        raise errors.DriverManagerError(
             "<{}>\nInvalid {} webdriver channel: {}.".format(
                 self.__class__.__name__, self._name, repr(self._channel)
             )
@@ -789,6 +801,34 @@ class DriverManager:
                 "_arm" if self._os_is_arm else "",
             )
         )
+
+    def _raise_invalid_driver_location_error(self, path: Any) -> None:
+        """(Internal) Raise an invalid webdriver location error."""
+        if path is None:
+            raise errors.DriverExecutableNotDetectedError(
+                "<{}>\n{} [{}] ({}{}{}) webdriver is not detected in the system. Please make "
+                "sure the webdriver exists or specify the webdriver location manually.".format(
+                    self.__class__.__name__,
+                    self._name,
+                    self._channel,
+                    self._os_name,
+                    self._os_arch,
+                    "_arm" if self._os_is_arm else "",
+                )
+            )
+        else:
+            raise errors.DriverExecutableNotDetectedError(
+                "<{}>\n{} [{}] ({}{}{}) webdriver location is invalid: {}. Please make "
+                "sure the webdriver exists or specify the webdriver location manually.".format(
+                    self.__class__.__name__,
+                    self._name,
+                    self._channel,
+                    self._os_name,
+                    self._os_arch,
+                    "_arm" if self._os_is_arm else "",
+                    repr(path),
+                )
+            )
 
     def _raise_driver_request_failed_error(self, version: Version) -> None:
         """(Internal) Raise a driver version request failed error."""
@@ -894,8 +934,7 @@ class ChromiumBaseDriverManager(DriverManager):
     """The googleapis url to request the Chrome webdriver."""
     _GOOGLEAPIS_MACARM64_VERIONS: ChromiumVersion = ChromiumVersion("106.0.5249.61")
     """Version below this on MacOS use 'm1' arch instead of 'arm64'."""
-    _AZUREEDGE_ENDPOINT_URL: str = "https://msedgedriver.azureedge.net"
-    """The azureedge url to request the Edge webdriver."""
+
     # fmt: on
 
     def __init__(
@@ -953,7 +992,7 @@ class ChromiumBaseDriverManager(DriverManager):
                           determine the webdriver version.
 
         :param binary: `<str>` The path to a specific browser binary. Defaults to `None`.
-            If specified, will use the given browser binary to determine
+            If specified, will use this given browser binary to determine
             the webdriver version.
 
         :return: `<str>` The path to the installed webdriver executable.
@@ -1143,7 +1182,7 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
     """Represents the webdriver manager for the Edge browser."""
 
     # fmt: off
-    _MAC_BINARY_PATHS: dict[str, str] = {
+    _MAC_BINARY_PATHS: dict[str, list[str]] = {
         ChannelType.STABLE: ["Microsoft Edge.app/Contents/MacOS/Microsoft Edge"],
         ChannelType.BETA: ["Microsoft Edge Beta.app/Contents/MacOS/Microsoft Edge Beta"],
         ChannelType.DEV: ["Microsoft Edge Dev.app/Contents/MacOS/Microsoft Edge Dev"],
@@ -1161,6 +1200,8 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
         ChannelType.DEV: ["microsoft-edge-unstable", "microsoft-edge-dev"],
     }
     """The partial paths to the Edge binary on Linux."""
+    _AZUREEDGE_ENDPOINT_URL: str = "https://msedgedriver.azureedge.net"
+    """The azureedge url to request the Edge webdriver."""
     # fmt: on
 
     def __init__(
@@ -1247,7 +1288,7 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
     """Represents the webdriver manager for the Chrome browser."""
 
     # fmt: off
-    _MAC_BINARY_PATHS: dict[str, str] = {
+    _MAC_BINARY_PATHS: dict[str, list[str]] = {
         ChannelType.STABLE: ["Google Chrome.app/Contents/MacOS/Google Chrome"],
         ChannelType.BETA: ["Google Chrome Beta.app/Contents/MacOS/Google Chrome Beta"],
         ChannelType.DEV: ["Google Chrome Dev.app/Contents/MacOS/Google Chrome Dev"],
@@ -1312,7 +1353,7 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
                           determine the webdriver version.
 
         :param binary: `<str>` The path to a specific browser binary. Defaults to `None`.
-            If specified, will use the given browser binary to determine
+            If specified, will use this given browser binary to determine
             the webdriver version.
 
         :return: `<str>` The path to the installed webdriver executable.
@@ -1331,8 +1372,8 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
 
         ### Chrome for Testing Installation
 
-        :param version: `<str>` Must be a valid Chrome for Testing version. e.g. `'113.0.5672.0'`, `'120'`, etc.
-        :param channel: `<str>` Must be `'cft'` (Chrome for Testing).
+        :param version: `<str>` A valid Chrome for Testing version. e.g. `'113.0.5672.0'`, `'120'`, etc.
+        :param channel: `<str>` Must set to `'cft'` (Chrome for Testing).
         :param binary: `<str>` This argument will be ignored once `channel='cft'`.
         :return: `<str>` The path to the installed webdriver executable.
 
@@ -1511,7 +1552,7 @@ class ChromiumDriverManager(ChromiumBaseDriverManager):
     """Represents the webdriver manager for the Chromium browser."""
 
     # fmt: off
-    _MAC_BINARY_PATHS: dict[str, str] = {
+    _MAC_BINARY_PATHS: dict[str, list[str]] = {
         ChannelType.DEV: ["Chromium.app/Contents/MacOS/Chromium"],
     }
     """The partial paths to the Chromium binary on MacOS."""
@@ -1586,18 +1627,18 @@ class FirefoxDriverManager(DriverManager):
     """Represents the webdriver manager for Firefox browser."""
 
     # fmt: off
-    _MAC_BINARY_PATHS: dict[str, str] = {
+    _MAC_BINARY_PATHS: dict[str, list[str]] = {
         ChannelType.STABLE: [
             "Firefox.app/Contents/MacOS/firefox",
             "Firefox.app/Contents/MacOS/firefox-bin",
         ],
     }
     """The partial paths to the Firefox binary on MacOS."""
-    _WIN_BINARY_PATHS: dict[str, str] = {
+    _WIN_BINARY_PATHS: dict[str, list[str]] = {
         ChannelType.STABLE: ["Mozilla Firefox\\firefox.exe"],
     }
     """The partial paths to the Firefox binary on Windows."""
-    _LINUX_BINARY_PATHS: dict[str, str] = {
+    _LINUX_BINARY_PATHS: dict[str, list[str]] = {
         ChannelType.STABLE: ["firefox", "iceweasel"],
     }
     """The partial paths to the Firefox binary on Linux."""
@@ -1661,11 +1702,8 @@ class FirefoxDriverManager(DriverManager):
             return None  # exit
 
         # Load json file
-        json_file = os.path.join(
-            os.path.dirname(__file__), "geckodriver", "compatibility.json"
-        )
-        with open(json_file, "r") as file:
-            js: dict[str, dict[str, str]] = loads(file.read())
+        json_file = join_path(dirname(__file__), "geckodriver", "compatibility.json")
+        js = load_json_file(json_file)
 
         # Parse compatibility table
         cls._GECKODRIVER_TABLE = {
@@ -1680,18 +1718,19 @@ class FirefoxDriverManager(DriverManager):
     # Installation ------------------------------------------------------------------------
     async def install(
         self,
-        version: GeckoVersion | Literal["latest", "auto"] = "auto",
+        version: GeckoVersion | Literal["latest", "auto"] = "latest",
         binary: str | None = None,
     ) -> str:
         """Install a geckodriver.
 
-        :param version: `<str>` Defaults to `'auto'`. Accepts the following values:
+        :param version: `<str>` Defaults to `'latest'`. Accepts the following values:
             - `'latest'`: Always install the latest available geckodriver that is
-                          compatible with the Firefox browser.
+                          compatible with the Firefox browser from the [Mozilla Github]
+                          repository.
             - `'auto'`:   Install the latest cached geckodriver that is compatible
-                          with the Firefox browser. If no compatible geckodriver is
-                          found in cache, will install the latest compatible geckodriver
-                          from the [Mozilla Github] repository.
+                          with the Firefox browser. If compatible geckodriver does
+                          not exist in cache, will install the latest compatible
+                          geckodriver from the [Mozilla Github] repository.
             - `'0.32.1'`: Install the excat geckodriver version regardless of the
                           Firefox browser version.
 
@@ -1955,3 +1994,185 @@ class FirefoxDriverManager(DriverManager):
                     "_arm" if self._os_is_arm else "",
                 )
             )
+
+
+class SafariDriverManager(DriverManager):
+    """Represents the webdriver manager for the Safari."""
+
+    # fmt: off
+    _MAC_BINARY_PATHS: dict[str, list[str]] = {
+        ChannelType.STABLE: ["/Applications/Safari.app/Contents/MacOS/Safari"],
+        ChannelType.DEV: ["/Applications/Safari Technology Preview.app/Contents/MacOS/Safari Technology Preview"],
+    }
+    """The partial paths to the browser binary on MacOS."""
+    _DRIVER_EXECUTABLE_NAME: str = "safaridriver"
+    """The name of the webdriver executable."""
+    # fmt: on
+
+    def __init__(
+        self,
+        directory: str | None = None,
+        max_cache_size: int | None = None,
+        request_timeout: int | float = 10,
+        download_timeout: int | float = 120,
+        proxy: str | None = None,
+    ) -> None:
+        super().__init__(
+            "Safari",
+            None,
+            None,
+            None,
+            directory,
+            max_cache_size,
+            request_timeout,
+            download_timeout,
+            proxy,
+        )
+        # Target
+        self._target_driver: str | None = None
+
+    # Installation ------------------------------------------------------------------------
+    async def install(
+        self,
+        channel: SafariVersion | Literal["stable", "dev"] = "stable",
+        driver: str | None = None,
+        binary: str | None = None,
+    ) -> str:
+        """Install a webdriver.
+
+        :param channel: `<str>` Defaults to `'stable'`. Accepts the following values:
+            - `'stable'`: Locate the `STABLE` (normal) Safari binary in the system
+                          and use it to determine the webdriver executable.
+            - `'dev'`:    Locate the `DEV` Safari [Technology Preview] binary in the
+                          system and use it to determine the webdriver executable.
+
+        :param driver: `<str>` The path to a specific webdriver executable. Defaults to `None`.
+            If specified, will use this given webdriver executable instead of
+            trying to locate the webdriver executable in the system.
+
+        :param binary: `<str>` The path to a specific Safari binary. Defaults to `None`.
+            If specified, will use this given browser binary to determine
+            the webdriver executable.
+
+        :return: `<str>` The path to the webdriver executable.
+
+        ### Example:
+        >>> from aselenium import SafariDriverManager
+            mgr = SafariDriverManager()
+            driver_executable = await mgr.install("dev")
+            # /Applications/Safari Technology Preview.app/Contents/MacOS/safaridriver
+            mgr.driver_version
+            # 17.4.1
+            mgr.browser_location
+            # /Applications/Safari Technology Preview.app/Contents/MacOS/Safari Technology Preview
+            mgr.browser_version
+            # 17.4.1
+        """
+        # Validate platform
+        if self._os_name != OSType.MAC:
+            raise errors.UnsupportedPlatformError(
+                "<{}>\nSafari webdriver is only available on MacOS system. Please "
+                "choose a different browser to continue automation for {} platform.".format(
+                    self.__class__.__name__, self._os_name.title()
+                )
+            )
+
+        try:
+            # Prase arguments
+            self._channel = channel
+            self._parse_target_driver(driver)
+            self._parse_target_binary(binary)
+
+            # Detect browser location
+            if self._target_binary is None:
+                self._browser_location = self._detect_browser_location()
+            else:
+                self._browser_location = self._target_binary
+
+            # Detect browser version
+            self._browser_version = self._detect_browser_version(self._browser_location)
+
+            # Detect driver location
+            if self._target_driver is None:
+                self._driver_location = self._detect_driver_location()
+            else:
+                self._driver_location = self._target_driver
+            self._driver_version = self._browser_version
+
+            # Return driver location
+            return self._driver_location
+
+        except BaseException:
+            self.reset()
+            raise
+
+    # Target ------------------------------------------------------------------------------
+    def _parse_target_driver(self, driver: Any) -> None:
+        """(Internal) Prase the target webdriver executable for the installation."""
+        if driver is None:
+            self._target_driver = None
+        elif is_path_file(driver) and driver.endswith(self._DRIVER_EXECUTABLE_NAME):
+            self._target_driver = driver
+        else:
+            self._raise_invalid_driver_location_error(driver)
+
+    # Driver ------------------------------------------------------------------------------
+    @property
+    def driver_version(self) -> SafariVersion:
+        """Access the version of the installed webdriver `<SafariVersion>`.
+        Please access this attribute after executing the `install()` method.
+        """
+        return super().driver_version
+
+    def _detect_driver_location(self) -> str:
+        """(Internal) Detect the driver location `<str>`."""
+        # Stable channel - default location
+        if self._channel == ChannelType.STABLE and self._target_binary is None:
+            location = "/usr/bin/safaridriver"
+            if is_path_file(location):
+                return location
+
+        # Application contents - default location
+        base_folder = dirname(self._browser_location)
+        location = join_path(base_folder, self._DRIVER_EXECUTABLE_NAME)
+        if is_path_file(location):
+            return location
+
+        # Application contents - search
+        base_folder = dirname(base_folder)
+        for base_dir, _, files in walk_path(base_folder):
+            if self._DRIVER_EXECUTABLE_NAME in files:
+                return join_path(base_dir, self._DRIVER_EXECUTABLE_NAME)
+
+        # Raise driver not found error
+        if self._target_binary is None:
+            self._raise_invalid_driver_location_error(None)
+        # Return default driver location
+        else:
+            return "/usr/bin/safaridriver"
+
+    # Browser -----------------------------------------------------------------------------
+    @property
+    def browser_version(self) -> SafariVersion:
+        """Access the version of the browser that pairs with the installed
+        driver `<SafariVersion>`. Please access this attribute after
+        executing the `install()` method.
+        """
+        return super().browser_version
+
+    def _detect_browser_version(self, browser_location: str) -> SafariVersion:
+        """(Internal) Detect the browser version `<SafariVersion>`."""
+        try:
+            # Application folder
+            app_dir = browser_location.split("/Contents/MacOS")[0]
+            content_dir = join_path(app_dir, "Contents")
+            # Load plist file
+            try:
+                plist = load_plist_file(join_path(content_dir, "version.plist"))
+            except FileNotFoundError:
+                plist = load_plist_file(join_path(content_dir, "Info.plist"))
+            # Return version
+            return SafariVersion(plist["CFBundleShortVersionString"])
+
+        except Exception:
+            self._raise_invalid_browser_location_error(browser_location)

@@ -18,6 +18,7 @@
 # -*- coding: UTF-8 -*-
 from typing import Any
 from aselenium.service import BaseService
+from aselenium.manager.version import GeckoVersion
 
 __all__ = ["FirefoxService"]
 
@@ -28,12 +29,13 @@ class FirefoxService(BaseService):
 
     def __init__(
         self,
-        executable: str | None = None,
+        driver_version: GeckoVersion,
+        driver_location: str,
         timeout: int | float = 10,
         *args: Any,
         **kwargs: Any
     ) -> None:
-        super().__init__(executable, timeout, *args, **kwargs)
+        super().__init__(driver_version, driver_location, timeout, *args, **kwargs)
         # Process
         self._cdp_port: int = -1
         self._cdp_port_str: str = None
@@ -41,6 +43,12 @@ class FirefoxService(BaseService):
         if "--connect-existing" not in self._args:
             self._args.append("--websocket-port")
             self._args.append(self.cdp_port_str)
+
+    # Driver ------------------------------------------------------------------------------
+    @property
+    def driver_version(self) -> GeckoVersion:
+        """Access the version of the webdriver executable `<GeckoVersion>`."""
+        return self._driver_version
 
     # Socket ------------------------------------------------------------------------------
     @property

@@ -23,21 +23,28 @@ from orjson import loads
 from aiohttp import ClientError
 
 
-# Base exception
+# Base --------------------------------------------------------------------------------------------------
 class AseleniumError(Exception):
     """Base class for exceptions in this module."""
 
 
-# Timeout exception
 class AseleniumTimeout(AseleniumError, TimeoutError):
     """Exception raised for timeout."""
 
 
-class WebDriverTimeoutError(AseleniumTimeout):
-    """Thrown when a webdriver does not complete in enough time."""
+class AseleniumFileNotFoundError(AseleniumError, FileNotFoundError):
+    """The file could not be found at the given path."""
 
 
-# Platform error
+class AseleniumInvalidValueError(AseleniumError, ValueError):
+    """Base exception class for all invalid value errors."""
+
+
+class AseleniumOSError(AseleniumError, OSError):
+    """Base exception class for all OS errors."""
+
+
+# Platform ----------------------------------------------------------------------------------------------
 class PlatformError(AseleniumError):
     """Base exception class for all platform errors."""
 
@@ -46,25 +53,17 @@ class UnsupportedPlatformError(PlatformError):
     """Exception raised for unsupported platform."""
 
 
-# Driver Manager error
+# Driver Manager ----------------------------------------------------------------------------------------
 class DriverManagerError(AseleniumError):
     """Base exception class for all driver manager errors."""
 
 
-class InvalidDriverCacheError(DriverManagerError, ValueError):
-    """Exception raised for invalid driver cache."""
-
-
-class InvalidDriverCacheDirectoryError(InvalidDriverCacheError):
-    """Exception raised for invalid driver cache directory."""
-
-
-class InvalidDriverMaxCacheSizeError(InvalidDriverCacheError):
-    """Exception raised for invalid driver max cache size."""
-
-
-class DriverInstallationError(DriverManagerError):
+class DriverInstallationError(DriverManagerError, AseleniumInvalidValueError):
     """Exception raised for driver installation error."""
+
+
+class DriverExecutableNotDetectedError(DriverManagerError, AseleniumFileNotFoundError):
+    """Exception raised for driver executable not found error."""
 
 
 class DriverRequestFailedError(DriverManagerError):
@@ -75,15 +74,15 @@ class DriverRequestRateLimitError(DriverRequestFailedError):
     """Exception raised for rate limit error."""
 
 
-class InvalidDownloadFileError(DriverRequestFailedError):
-    """Exception raised for invalid driver file."""
-
-
 class DriverDownloadFailedError(DriverRequestFailedError):
     """Exception raised for driver download failed error."""
 
 
-class InvalidVersionError(DriverManagerError, ValueError):
+class InvalidDownloadFileError(DriverRequestFailedError):
+    """Exception raised for invalid driver file."""
+
+
+class InvalidVersionError(DriverManagerError, AseleniumInvalidValueError):
     """Exception raised for invalid driver version."""
 
 
@@ -95,11 +94,7 @@ class InvalidBrowserVersionError(InvalidVersionError):
     """Exception raised for invalid browser version."""
 
 
-class BrowserVersionNotDetectedError(InvalidVersionError):
-    """Exception raised for browser version not detected error."""
-
-
-class BrowserBinaryNotDetectedError(DriverManagerError):
+class BrowserBinaryNotDetectedError(DriverManagerError, AseleniumFileNotFoundError):
     """Exception raised for browser binary not found error."""
 
 
@@ -107,12 +102,8 @@ class BrowserDownloadFailedError(DriverRequestFailedError):
     """Exception raised for browser download failed error."""
 
 
-class InvalidDriverChannelError(DriverManagerError, ValueError):
-    """Exception raised for invalid driver channel."""
-
-
-# Options
-class OptionsError(AseleniumError, ValueError):
+# Options -----------------------------------------------------------------------------------------------
+class OptionsError(AseleniumInvalidValueError):
     """Exception raised for errors in the options module."""
 
 
@@ -120,32 +111,24 @@ class InvalidOptionsError(OptionsError):
     """Exception raised for invalid options."""
 
 
-class InvalidCapabilitiesError(InvalidOptionsError):
-    """Exception raised for invalid capabilities."""
-
-
-class InvalidProxyError(InvalidCapabilitiesError):
+class InvalidProxyError(InvalidOptionsError):
     """Exception raised for invalid proxy."""
 
 
-class InvalidProfileError(InvalidCapabilitiesError):
+class InvalidProfileError(InvalidOptionsError):
     """Exception raised for invalid profile."""
-
-
-class UnsupportedOptionsError(InvalidOptionsError):
-    """Exception raised for unsupported options."""
 
 
 class OptionsNotSetError(InvalidOptionsError, KeyError):
     """Exception raised for options not set."""
 
 
-# Services
+# Services ----------------------------------------------------------------------------------------------
 class ServiceError(AseleniumError):
     """Exception raised for errors for service."""
 
 
-class ServiceExecutableNotFoundError(ServiceError, FileNotFoundError):
+class ServiceExecutableNotFoundError(ServiceError, AseleniumFileNotFoundError):
     """Exception raised for service executable not found error."""
 
 
@@ -157,27 +140,19 @@ class ServiceStopError(ServiceError):
     """Exception raised for errors for stopping service."""
 
 
-class ServiceSocketError(ServiceError):
+class ServiceSocketError(ServiceError, AseleniumOSError):
     """Exception raised for service socket error."""
 
 
-class ServiceSocketOSError(ServiceSocketError, OSError):
-    """Exception raised for service socket os error."""
-
-
-class ServiceProcessError(ServiceError):
+class ServiceProcessError(ServiceError, AseleniumOSError):
     """Exception raised for service process error."""
 
 
-class ServiceProcessOSError(ServiceProcessError, OSError):
-    """Exception raised for service process os error."""
+class ServiceTimeoutError(ServiceError, AseleniumTimeout):
+    """Exception raised for service timeout error."""
 
 
-class ServiceProcessTimeoutError(ServiceProcessError, AseleniumTimeout):
-    """Exception raised for service process timeout."""
-
-
-# WebDriver
+# WebDriver ---------------------------------------------------------------------------------------------
 class WebDriverError(AseleniumError):
     """Base webdriver exception."""
 
@@ -201,7 +176,11 @@ class WebDriverError(AseleniumError):
         return msg
 
 
-class NotFoundError(WebDriverError):
+class WebDriverTimeoutError(WebDriverError, AseleniumTimeout):
+    """Thrown when a webdriver does not complete in enough time."""
+
+
+class WebdriverNotFoundError(WebDriverError):
     """Exception raised when target not found."""
 
 
@@ -210,7 +189,7 @@ class InternetDisconnectedError(WebDriverError):
 
 
 # . Inavlid value error
-class InvalidValueError(WebDriverError, ValueError):
+class InvalidValueError(WebDriverError, AseleniumInvalidValueError):
     """Base exception class for all invalid value errors."""
 
 
@@ -245,21 +224,12 @@ class SessionError(WebDriverError):
     """Base exception class for all session errors."""
 
 
-class SessionShutdownError(SessionError):
-    """Exception raised for session stop error."""
-
-
 class SessionClientError(SessionError, ClientError):
     """Exception raised for session client error."""
 
 
-class InvalidSessionError(SessionError, NotFoundError):
+class InvalidSessionError(SessionError, WebdriverNotFoundError):
     """Exception raised for invalid session error."""
-
-
-class InvalidSessionIdError(InvalidSessionError):
-    """Occurs if the given session id is not in the list of active sessions,
-    meaning the session either does not exist or that it's not active."""
 
 
 class IncompatibleWebdriverError(InvalidSessionError):
@@ -274,62 +244,65 @@ class SessionTimeoutError(SessionError, AseleniumTimeout):
     """Exception raised for session timeout."""
 
 
+class SessionShutdownError(SessionError):
+    """Exception raised for session stop error."""
+
+
+class SessionQuitError(SessionShutdownError, ServiceStopError):
+    """Exception raised for session quit error."""
+
+
 # . Window error
 class WindowError(WebDriverError):
     """Base exception class for all window errors."""
 
 
-class WindowNotFountError(WindowError, NotFoundError):
+class WindowNotFountError(WindowError, WebdriverNotFoundError):
     """Thrown when window target to be switched doesn't exist."""
 
 
-# . Invalid cookie error
-class InvalidCookieError(WebDriverError):
+# . Cookie error
+class CookieError(WebDriverError):
     """Base exception class for all errors relating to cookies."""
 
 
-class InvalidCookieDomainError(InvalidCookieError):
+class UnableToSetCookieError(CookieError, InvalidArgumentError):
+    """Thrown when a driver fails to set a cookie."""
+
+
+class InvalidCookieDomainError(CookieError, InvalidArgumentError):
     """Thrown when attempting to add a cookie under a different domain than the
     current URL."""
 
 
-class UnableToSetInvalidCookieError(InvalidCookieError):
-    """Thrown when a driver fails to set a cookie."""
-
-
-class CookieNotFoundError(InvalidCookieError, NotFoundError):
+class CookieNotFoundError(CookieError, WebdriverNotFoundError):
     """No cookie matching the given path name was found amongst the associated
     cookies of the current browsing context's active document."""
 
 
 # . JavaScript error
-class InvalidScriptError(WebDriverError):
+class JavaScriptError(WebDriverError):
+    """Base exception class for all errors relating to JavaScript."""
+
+
+class InvalidJavaScriptError(JavaScriptError, InvalidArgumentError):
     """Thrown when a javascript error occurs."""
 
 
-class ScriptNotFoundError(InvalidScriptError):
+class JavaScriptNotFoundError(InvalidJavaScriptError, WebdriverNotFoundError):
     """Thrown when a javascript file is not found."""
 
 
-class ScriptTimeoutError(InvalidScriptError, WebDriverTimeoutError):
+class JavaScriptTimeoutError(InvalidJavaScriptError, WebDriverTimeoutError):
     """Thrown when a script does not complete in enough time."""
 
 
-# . Invalid frame error
-class InvalidFrameError(WebDriverError):
-    """Base exception class for all errors relating to invalid frames."""
+# . Element error
+class ElementError(WebDriverError):
+    """Base exception class for all errors relating to elements."""
 
 
-class FrameNotFoundError(InvalidFrameError, NotFoundError):
-    """Thrown when frame target to be switched doesn't exist."""
-
-
-# . Invalid element error
-class InvalidElementError(WebDriverError):
-    """Base exception class for all errors relating to invalid elements."""
-
-
-class InvalidElementStateError(InvalidElementError):
+class InvalidElementStateError(ElementError):
     """Thrown when a command could not be completed because the element is in
     an invalid state.
 
@@ -359,13 +332,13 @@ class ElementNotSelectableError(InvalidElementStateError):
     """
 
 
-class ElementClickInterceptedError(InvalidElementError):
+class ElementClickInterceptedError(InvalidElementStateError):
     """The Element Click command could not be completed because the element
     receiving the events is obscuring the element that was requested to be
     clicked."""
 
 
-class ElementNotFoundError(InvalidElementError, NotFoundError):
+class ElementNotFoundError(ElementError, WebdriverNotFoundError):
     """Thrown when element could not be found.
 
     If you encounter this exception, you may want to check the following:
@@ -392,22 +365,35 @@ class ElementStaleReferenceError(ElementNotFoundError):
     """
 
 
-class ElementCoordinatesError(InvalidElementError, InvalidValueError):
+class ElementCoordinatesError(ElementError, InvalidArgumentError):
     """The element coordinates provided to an interaction's operation are invalid."""
 
 
-# . Invalid shadowroot error
-class InvalidShadowRootError(WebDriverError):
+# . Frame error
+class FrameError(WebDriverError):
+    """Base exception class for all errors relating to invalid frames."""
+
+
+class FrameNotFoundError(FrameError, WebdriverNotFoundError):
+    """Thrown when frame target to be switched doesn't exist."""
+
+
+# . Shadowroot error
+class ShadowRootError(WebDriverError):
     """Base exception class for all errors relating to invalid shadowroot."""
 
 
-class ShadowRootNotFoundError(InvalidShadowRootError, NotFoundError):
+class ShadowRootNotFoundError(ShadowRootError, WebdriverNotFoundError):
     """Thrown when trying to access the shadow root of an element when it does
     not have a shadow root attached."""
 
 
-# . Invalid selector error
-class InvalidSelectorError(InvalidArgumentError):
+# . Selector error
+class SelectorError(WebDriverError):
+    """Base exception class for all errors relating to invalid selector."""
+
+
+class InvalidSelectorError(SelectorError, InvalidArgumentError):
     """Thrown when the selector which is used to find an element does not
     return a WebElement.
 
@@ -429,36 +415,27 @@ class InvalidXPathSelectorError(InvalidSelectorError):
     """
 
 
-# . Invalid network conditions error
-class InvalidNetworkConditionsError(WebDriverError):
+# . Network conditions error
+class NetworkConditionsError(WebDriverError):
     """Base exception class for all errors relating to invalid network conditions."""
 
 
-class NetworkConditionsNotFoundError(InvalidNetworkConditionsError, NotFoundError):
+class NetworkConditionsNotFoundError(NetworkConditionsError, WebdriverNotFoundError):
     """Thrown when trying to access the network conditions of a session when it does
     not have network conditions attached.
     """
 
 
-# . Invalid file error
-class InvalidFileError(WebDriverError):
-    """Base exception class for all errors relating to invalid file."""
-
-
-class FileNotExistsError(InvalidFileError, NotFoundError):
-    """The file could not be found at the given path."""
-
-
 # . Permission error
-class InvalidPermissionError(InvalidArgumentError):
+class BrowserPermissionError(InvalidArgumentError):
     """Base exception class for all errors relating to invalid permission."""
 
 
-class InvalidPermissionNameError(InvalidPermissionError):
+class InvalidPermissionNameError(BrowserPermissionError, InvalidArgumentError):
     """Exception raised when permission name is invalid."""
 
 
-class InvalidPermissionStateError(InvalidPermissionError):
+class InvalidPermissionStateError(BrowserPermissionError, InvalidArgumentError):
     """Exception raised when permission state is invalid."""
 
 
@@ -488,7 +465,7 @@ class UnexpectedAlertFoundError(AlertError):
         return "\nAlert Text: %s%s" % (self.alert_text, super().__str__())
 
 
-class AlertNotFoundError(AlertError, NotFoundError):
+class AlertNotFoundError(AlertError, WebdriverNotFoundError):
     """Thrown when switching to alert that is not present.
 
     This can be caused by calling an operation on the Alert() class when
@@ -518,7 +495,7 @@ class CastingError(WebDriverError):
     """Base exception class for all casting errors."""
 
 
-class CastSinkNotFoundError(CastingError, NotFoundError):
+class CastSinkNotFoundError(CastingError, WebdriverNotFoundError):
     """Thrown when cast sink is not found."""
 
 
@@ -527,7 +504,7 @@ class DevToolsCMDError(WebDriverError):
     """Base exception class for all DevTools Protocol errors."""
 
 
-class DevToolsCMDNotFoundError(DevToolsCMDError, NotFoundError):
+class DevToolsCMDNotFoundError(DevToolsCMDError, WebdriverNotFoundError):
     """Exception raised for DevTools Protocol not found error."""
 
 
@@ -559,7 +536,7 @@ class UnknownCommandError(UnknownError):
     """Thrown when a command does not belong to the current session."""
 
 
-# Error handling
+# Error handling ----------------------------------------------------------------------------------------
 class ErrorCode:
     """Error codes defined in the WebDriver wire protocol."""
 
@@ -669,8 +646,8 @@ WEBDRIVER_ERROR_MAP: dict[int | str, Exception] = {
     "unknown error": UnknownError,
     15: ElementNotSelectableError,
     "element not selectable": ElementNotSelectableError,
-    17: InvalidScriptError,
-    "javascript error": InvalidScriptError,
+    17: InvalidJavaScriptError,
+    "javascript error": InvalidJavaScriptError,
     19: InvalidXPathSelectorError,
     "invalid selector": InvalidXPathSelectorError,
     21: WebDriverTimeoutError,
@@ -679,14 +656,14 @@ WEBDRIVER_ERROR_MAP: dict[int | str, Exception] = {
     "no such window": WindowNotFountError,
     24: InvalidCookieDomainError,
     "invalid cookie domain": InvalidCookieDomainError,
-    25: UnableToSetInvalidCookieError,
-    "unable to set cookie": UnableToSetInvalidCookieError,
+    25: UnableToSetCookieError,
+    "unable to set cookie": UnableToSetCookieError,
     26: UnexpectedAlertFoundError,
     "unexpected alert open": UnexpectedAlertFoundError,
     27: AlertNotFoundError,
     "no such alert": AlertNotFoundError,
-    28: ScriptTimeoutError,
-    "script timeout": ScriptTimeoutError,
+    28: JavaScriptTimeoutError,
+    "script timeout": JavaScriptTimeoutError,
     29: ElementCoordinatesError,
     "invalid element coordinates": ElementCoordinatesError,
     30: ImeNotAvailableError,
@@ -697,6 +674,7 @@ WEBDRIVER_ERROR_MAP: dict[int | str, Exception] = {
     "invalid selector": InvalidSelectorError,
     33: InvalidSessionError,
     "session not created": InvalidSessionError,
+    "invalid session id": InvalidSessionError,
     34: MoveTargetOutOfBoundsError,
     "move target out of bounds": MoveTargetOutOfBoundsError,
     51: InvalidXPathSelectorError,
@@ -716,7 +694,6 @@ WEBDRIVER_ERROR_MAP: dict[int | str, Exception] = {
     "no such shadow root": ShadowRootNotFoundError,
     "insecure certificate": InsecureCertificateError,
     "invalid coordinates": InvalidCoordinatesError,
-    "invalid session id": InvalidSessionIdError,
     "unknown method exception": UnknownMethodError,
 }
 
@@ -770,28 +747,29 @@ def error_handler(res: dict[str, Any]) -> None:
     screen = value.get("screen")
 
     # Construct - stacktrace
-    strace = value.get("stackTrace") or value.get("stacktrace")
-    if strace:
-        if isinstance(strace, str):
-            stacktrace = strace.split("\n")
-        else:
-            stacktrace = []
-            try:
-                frame: dict
-                for frame in strace:
-                    line = frame.get("lineNumber", "")
-                    file = frame.get("fileName", "<anonymous>")
-                    if line:
-                        file = "%s:%s" % (file, line)
-                    meth = frame.get("methodName", "<anonymous>")
-                    if "className" in frame:
-                        meth = f"{frame['className']}.{meth}"
-                    msg = "    at %s (%s)"
-                    stacktrace.append(msg % (meth, file))
-            except TypeError:
-                pass
-    else:
-        stacktrace = None
+    stacktrace = None
+    # strace = value.get("stackTrace") or value.get("stacktrace")
+    # if strace:
+    #     if isinstance(strace, str):
+    #         stacktrace = strace.split("\n")
+    #     else:
+    #         stacktrace = []
+    #         try:
+    #             frame: dict
+    #             for frame in strace:
+    #                 line = frame.get("lineNumber", "")
+    #                 file = frame.get("fileName", "<anonymous>")
+    #                 if line:
+    #                     file = "%s:%s" % (file, line)
+    #                 meth = frame.get("methodName", "<anonymous>")
+    #                 if "className" in frame:
+    #                     meth = f"{frame['className']}.{meth}"
+    #                 msg = "    at %s (%s)"
+    #                 stacktrace.append(msg % (meth, file))
+    #         except TypeError:
+    #             pass
+    # else:
+    #     stacktrace = None
 
     # Raise error
     if error is UnexpectedAlertFoundError:

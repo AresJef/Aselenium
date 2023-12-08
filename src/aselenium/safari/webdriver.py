@@ -16,14 +16,32 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any
-from platform import system
+from typing import Any, Literal
 from aselenium.safari.options import SafariOptions
 from aselenium.safari.service import SafariService
-from aselenium.safari.session import SafariSessionContext
-from aselenium.webdriver import WebDriver
+from aselenium.safari.session import SafariSession
+from aselenium.manager.version import SafariVersion
+from aselenium.manager.driver import SafariDriverManager
+from aselenium.webdriver import WebDriver, SessionContext
 
 __all__ = ["Safari"]
+
+
+# Firefox Session Context -------------------------------------------------------------------------
+class SafariSessionContext(SessionContext):
+    """The context manager for a Safari session."""
+
+    _SESSION_CLS: type[SafariSession] = SafariSession
+
+    def _extra_options_updates(self) -> None:
+        """(Internal) Extra updates to the browser options."""
+        self._options: SafariOptions
+        tech_preview = self._manager.channel == "dev"
+        if self._options.technology_preview != tech_preview:
+            self._options.technology_preview = tech_preview
+
+    async def __aenter__(self) -> SafariSession:
+        return await self.start()
 
 
 # Safari Webdriver --------------------------------------------------------------------------------
@@ -32,51 +50,69 @@ class Safari(WebDriver):
 
     def __init__(
         self,
-        executable: str = "/usr/bin/safaridriver",
         service_timeout: int = 10,
         *service_args: Any,
-        **service_kwargs: Any
+        **service_kwargs: Any,
     ) -> None:
-        """The webdriver for Safari.
-
-        :param executable: `<str>` The absolute path to the webdriver executable file. Defaults to `'/usr/bin/safaridriver'`.
-        :param service_timeout: `<int/float>` Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
-        :param service_args: `<Any>` Additional arguments for the webdriver service.
-        :param service_kwargs: `<Any>` Additional keyword arguments for the webdriver service.
-        """
-        if system() != "Darwin":
-            raise OSError(
-                "<{}> The webdriver for Safari is only supported on macOS, but "
-                "not the current system: '{}'".format(self.__class__.__name__, system())
-            )
         super().__init__(
-            executable,
-            SafariOptions,
+            SafariDriverManager,
             SafariService,
-            service_timeout,
+            SafariOptions,
+            SafariSessionContext,
+            directory=None,
+            max_cache_size=None,
+            request_timeout=10,
+            download_timeout=120,
+            proxy=None,
+            service_timeout=service_timeout,
             *service_args,
             **service_kwargs,
         )
+
+    # Properties ------------------------------------------------------------------
+    @property
+    def manager(self) -> SafariDriverManager:
+        """Access the driver manager `<SafariDriverManager>`."""
+        return self._manager
 
     @property
     def options(self) -> SafariOptions:
         """Access the webdriver options for the browser `<SafariOptions>`."""
         return self._options
 
-    def acquire(self) -> SafariSessionContext:
-        """Acquire a new browser session `<SafariSession>`.
+    # Acquire ---------------------------------------------------------------------
+    def acquire(
+        self,
+        channel: SafariVersion | Literal["stable", "dev"] = "stable",
+        driver: str | None = None,
+        binary: str | None = None,
+    ) -> SafariSessionContext:
+        """Acquire a new Safari session `<SafariSession>`.
+
+        :param channel: `<str>` Defaults to `'stable'`. Accepts the following values:
+            - `'stable'`: Locate the `STABLE` (normal) Safari binary in the system
+                          and use it to determine the webdriver executable.
+            - `'dev'`:    Locate the `DEV` Safari [Technology Preview] binary in the
+                          system and use it to determine the webdriver executable.
+
+        :param driver: `<str>` The path to a specific webdriver executable. Defaults to `None`.
+            If specified, will use this given webdriver executable instead of
+            trying to locate the webdriver executable in the system.
+
+        :param binary: `<str>` The path to a specific Safari binary. Defaults to `None`.
+            If specified, will use this given browser binary to determine
+            the webdriver executable.
 
         ### Example:
-        >>> async with driver.acquire() as session:
-                await session.load("https://www.google.com")
-                # . some automated tasks
+        >>> from aselenium import Safari
+            driver = Safari()
+        >>> # . acquire a safari session
+            async with driver.acquire("dev") as session:
+                # explain: use the Safari Technology Preview binary
+                # and the corresponding webdriver executable to start
+                # the session.
+                await session.get("https://www.google.com")
+                # . do some sutomated tasks
+                ...
         """
-        return SafariSessionContext(
-            self._options,
-            self._service_cls(
-                self._executable,
-                self._service_timeout,
-                *self._service_args,
-                **self._service_kwargs,
-            ),
-        )
+        return super().acquire(channel=channel, driver=driver, binary=binary)

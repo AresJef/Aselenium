@@ -15,9 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
 
-__all__ = ["DefaultTimeouts", "DefaultNetworkConditions", "Constraint"]
+# -*- coding: UTF-8 -*-
 
 
 # Default Timeouts

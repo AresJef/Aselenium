@@ -30,6 +30,6 @@ class SafariService(BaseService):
     def port_args(self) -> list[str]:
         """Access the part arguments for the service Process constructor.
 
-        :return `<list[str]>`: `["-p", str(self.port)]`
+        :return `<list[str]>`: `["-p", self.port_str]`
         """
         return ["-p", self.port_str]

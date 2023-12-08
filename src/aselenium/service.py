@@ -16,8 +16,8 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-import os
 from typing import Any
+from os import environ
 from platform import system
 from errno import ENOENT, EACCES
 from time import time as unix_time
@@ -29,8 +29,7 @@ from psutil import Process as psutil_Process
 from aiohttp import ClientSession, ClientConnectorError
 from aselenium import errors
 from aselenium.utils import is_path_file
-
-__all__ = ["BaseService", "ChromiumBaseService"]
+from aselenium.manager.version import Version, ChromiumVersion
 
 
 # Base Service ------------------------------------------------------------------------------------
@@ -45,23 +44,31 @@ class BaseService:
 
     def __init__(
         self,
-        executable: str | None = None,
+        driver_version: Version,
+        driver_location: str,
         timeout: int | float = 10,
         *args: Any,
         **kwargs: Any,
     ) -> None:
         """The webdriver service.
 
-        Service launch a subprocess as the interim process
-        to communicate with the browser.
+        Service launch a subprocess as the interim process to communicate with the browser.
 
-        :param executable: `<str>` The location for the webdriver executable. Defaults to `None`.
+        :param driver_version: `<Version>` The version of the webdriver executable.
+        :param driver_location: `<str>` The path to the webdriver executable.
         :param timeout: `<int/float>` Timeout in seconds for starting/stopping the service. Defaults to `10`.
         :param args: `<Any>` Additional arguments for `subprocess.Popen` constructor.
         :param kwargs: `<Any>` Additional keyword arguments for `subprocess.Popen` constructor.
         """
-        # Executable
-        self.executable = executable
+        # Driver
+        if not is_path_file(driver_location):
+            raise errors.ServiceExecutableNotFoundError(
+                "`<{}>`\nService webdriver executable not found at: {}".format(
+                    self.__class__.__name__, repr(driver_location)
+                )
+            )
+        self._driver_location = driver_location
+        self._driver_version = driver_version
         # Timeout
         self.timeout = timeout
         # Process
@@ -71,34 +78,23 @@ class BaseService:
         self._close_fds: bool = self._kwargs.pop("close_fds", system() != "Windows")
         self._port: int = -1
         self._port_str: str = None
-        self._env: Any = os.environ
+        self._env: Any = environ
         self._process: Process | None = None
         # Session
         self._session: ClientSession | None = None
         # Service
         self._url: str | None = None
 
-    # Executable --------------------------------------------------------------------------
+    # Driver ------------------------------------------------------------------------------
     @property
-    def executable(self) -> str:
+    def driver_version(self) -> Version:
+        """Access the version of the webdriver executable `<Version>`."""
+        return self._driver_version
+
+    @property
+    def driver_location(self) -> str:
         """Access the location for the webdriver executable `<str>`."""
-        return self._executable
-
-    @executable.setter
-    def executable(self, executable: str | None) -> None:
-        # Reset executable
-        if executable is None:
-            self._executable = None
-            return None  # exit
-
-        # Set executable
-        if not is_path_file(executable):
-            raise errors.ServiceExecutableNotFoundError(
-                "`<{}>`\nService (webdriver) executable not found at: {}".format(
-                    self.__class__.__name__, repr(executable)
-                )
-            )
-        self._executable = executable
+        return self._driver_location
 
     # Timeout -----------------------------------------------------------------------------
     @property
@@ -176,7 +172,7 @@ class BaseService:
             sock.listen(5)
             return sock.getsockname()[1]
         except Exception as err:
-            raise errors.ServiceSocketOSError(
+            raise errors.ServiceSocketError(
                 "<{}>\nFailed to acquire a free socket port for "
                 "the service: {}".format(self.__class__.__name__, err)
             ) from err
@@ -231,7 +227,7 @@ class BaseService:
         try:
             process = await wait_for(
                 create_subprocess_exec(
-                    self._executable,
+                    self._driver_location,
                     *self.port_args,
                     *self._args,
                     env=self._env,
@@ -246,24 +242,28 @@ class BaseService:
             )
             self._process = process
         except TimeoutError:
-            raise errors.ServiceProcessTimeoutError(
+            raise errors.ServiceTimeoutError(
                 "<{}>\nFailed to start process in time: {}s.".format(
                     self.__class__.__name__, self._timeout
                 )
             )
         except OSError as err:
             if err.errno == ENOENT:
-                raise errors.ServiceProcessOSError(
-                    "<{}>\nService (webdriver) executable not found at: '{}'\n"
-                    "Error: {}".format(self.__class__.__name__, self._executable, err)
+                raise errors.ServiceProcessError(
+                    "<{}>\nService webdriver executable not "
+                    "found at: '{}'\nError: {}".format(
+                        self.__class__.__name__, self._driver_location, err
+                    )
                 ) from err
             elif err.errno == EACCES:
-                raise errors.ServiceProcessOSError(
-                    "<{}>\nService (webdriver) executable may not have the correct permissions: '{}'\n"
-                    "Error: {}".format(self.__class__.__name__, self._executable, err)
+                raise errors.ServiceProcessError(
+                    "<{}>\nService webdriver executable may not have the "
+                    "correct permissions: '{}'\nError: {}".format(
+                        self.__class__.__name__, self._driver_location, err
+                    )
                 ) from err
             else:
-                raise errors.ServiceProcessOSError(
+                raise errors.ServiceProcessError(
                     "<{}>\nFailed to start service process: {}".format(
                         self.__class__.__name__, err
                     )
@@ -300,14 +300,14 @@ class BaseService:
                 return None  # exit
             # Failed to kill
             except Exception as err:
-                raise errors.ServiceProcessOSError(
+                raise errors.ServiceProcessError(
                     f"\nFailed to kill service process '{self._process.pid}': {err}"
                 ) from err
             # Verify killed
             try:
                 await wait_for(self._process.wait(), self._timeout)
             except TimeoutError as err:
-                raise errors.ServiceProcessOSError(
+                raise errors.ServiceProcessError(
                     f"\nFailed to stop service process '{self._process.pid}'"
                 ) from err
 
@@ -375,13 +375,13 @@ class BaseService:
             # . shutdown remote
             try:
                 await self._shutdown_remote()
-            except Exception as err:
+            except BaseException as err:
                 exceptions.append(str(err))
 
             # . close session
             try:
                 await self._session.close()
-            except Exception as err:
+            except BaseException as err:
                 exceptions.append(str(err))
 
             # . raise errors
@@ -496,6 +496,12 @@ class BaseService:
 # Chromium Base Service ---------------------------------------------------------------------------
 class ChromiumBaseService(BaseService):
     """The base class for the chromium based webdriver service."""
+
+    # Driver ------------------------------------------------------------------------------
+    @property
+    def driver_version(self) -> ChromiumVersion:
+        """Access the version of the webdriver executable `<ChromiumVersion>`."""
+        return self._driver_version
 
     # Socket ------------------------------------------------------------------------------
     @property

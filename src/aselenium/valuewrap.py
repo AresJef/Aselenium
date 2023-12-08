@@ -20,16 +20,6 @@ from typing import Any, Callable
 from aselenium.element import Element, ELEMENT_KEY
 from aselenium.shadow import Shadow, SHADOWROOT_KEY
 
-__all__ = [
-    "wrap_value",
-    "warp_list",
-    "warp_tuple",
-    "warp_dict",
-    "warp_element",
-    "warp_shadow",
-    "through",
-]
-
 
 def wrap_value(value: Any) -> list[Any] | dict[str, Any] | Any:
     """Wrap value `<Any>` to webdriver protocol `<list/dict>`."""

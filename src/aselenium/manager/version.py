@@ -21,7 +21,7 @@ from typing import Any
 from re import Pattern, compile
 from aselenium import errors
 
-__all__ = ["ChromiumVersion", "FirefoxVersion", "GeckoVersion"]
+__all__ = ["ChromiumVersion", "FirefoxVersion", "GeckoVersion", "SafariVersion"]
 
 
 # Version ------------------------------------------------------------------------------------------
@@ -289,3 +289,8 @@ class FirefoxVersion(Version):
 # Gecko Version ------------------------------------------------------------------------------------
 class GeckoVersion(Version):
     """Represents a Gecko driver version."""
+
+
+# Safari Version -----------------------------------------------------------------------------------
+class SafariVersion(Version):
+    """Represents a Safari browser version."""

@@ -81,7 +81,7 @@ class SafariOptions(BaseOptions):
         else:
             self._capabilities["browserName"] = "safari"
 
-    # Caps: proxy -------------------------------------------------------------------------
+    # Caps: proxy ------------------------------------------------------------------------
     @property
     def proxy(self) -> None:
         """Access browser proxy configurations `<Proxy>`."""
@@ -92,17 +92,4 @@ class SafariOptions(BaseOptions):
         logger.warning(
             "<{}>\nSafari does not support custom proxy "
             "configurations.".format(self.__class__.__name__)
-        )
-
-    # Caps: arguments ---------------------------------------------------------------------
-    def add_arguments(self, *args: str) -> None:
-        logger.warning(
-            "<{}>\nSafari does not support adding custom "
-            "arguments.".format(self.__class__.__name__)
-        )
-
-    def reset_arguments(self) -> None:
-        logger.warning(
-            "<{}>\nSafari does not support adding custom "
-            "arguments.".format(self.__class__.__name__)
         )

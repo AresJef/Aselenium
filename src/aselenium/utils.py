@@ -17,10 +17,14 @@
 
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
+from orjson import loads
+from plistlib import load
 from math import ceil, floor
 from os.path import isfile, isdir, dirname
 from typing import Any, Iterator, KeysView, ValuesView, ItemsView
 from aselenium import errors
+
+__all__ = ["KeyboardKeys", "MouseButtons"]
 
 
 # Class: rectangle --------------------------------------------------------------------------------
@@ -414,3 +418,17 @@ def prettify_dict(dic: dict, lead: str = "  ") -> str:
         return reps
 
     return "{\n%s\n}" % "\n".join(prettify(dic, 1))
+
+
+# Utils: plist ------------------------------------------------------------------------------------
+def load_plist_file(plist_file: str) -> dict:
+    """Load a local plist file `<dict>`."""
+    with open(plist_file, "rb") as file:
+        return load(file)
+
+
+# Utils: json -------------------------------------------------------------------------------------
+def load_json_file(json_file: str) -> dict:
+    """Load a local json file `<dict>`."""
+    with open(json_file, "r") as file:
+        return loads(file.read())

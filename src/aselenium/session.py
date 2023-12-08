@@ -36,8 +36,9 @@ from aselenium.connection import Connection
 from aselenium.utils import is_file_dir_exists
 from aselenium.utils import Rectangle, CustomDict
 from aselenium.element import Element, ELEMENT_KEY
-from aselenium.settings import Constraint, DefaultNetworkConditions
+from aselenium.manager.version import Version, ChromiumVersion
 from aselenium.service import BaseService, ChromiumBaseService
+from aselenium.settings import Constraint, DefaultNetworkConditions
 from aselenium.options import BaseOptions, ChromiumBaseOptions, Timeouts
 
 __all__ = [
@@ -49,10 +50,6 @@ __all__ = [
     "Viewport",
     "Window",
     "WindowRect",
-    "Session",
-    "SessionContext",
-    "ChromiumBaseSession",
-    "ChromiumBaseSessionContext",
 ]
 
 
@@ -636,6 +633,8 @@ class Session:
         """
         # Options
         self._options: BaseOptions = options
+        self._browser_location: str = self._options.browser_location
+        self._browser_version: str = self._options.browser_version
         # Service
         self._service: BaseService = service
         # Connection
@@ -663,9 +662,29 @@ class Session:
         return self._options
 
     @property
+    def browser_version(self) -> Version:
+        """Access the browser binary version of the session `<Version>`."""
+        return self._browser_version
+
+    @property
+    def browser_location(self) -> str:
+        """Access the browser binary location of the session `<str>`."""
+        return self._browser_location
+
+    @property
     def service(self) -> BaseService:
         """Access the webdriver service `<BaseService>`."""
         return self._service
+
+    @property
+    def driver_version(self) -> Version:
+        """Access the webdriver binary version of the session `<Version>`."""
+        return self._service._driver_version
+
+    @property
+    def driver_location(self) -> str:
+        """Access the webdriver binary location of the session `<str>`."""
+        return self._service._driver_location
 
     @property
     def connection(self) -> Connection:
@@ -679,7 +698,7 @@ class Session:
 
     @property
     def base_url(self) -> str:
-        """Access the base service URL of the session `<str>`."""
+        """Access the base `service` URL of the session `<str>`."""
         return self._base_url
 
     # Execute -----------------------------------------------------------------------------
@@ -769,8 +788,8 @@ class Session:
             if cancelled:
                 raise CancelledError
             if exceptions:
-                raise errors.ServiceStopError(
-                    "<{}>\nFailed to quit Session: {}\n{}".format(
+                raise errors.SessionQuitError(
+                    "<{}>\nSession not quit gracefully: {}\n{}".format(
                         self.__class__.__name__, self._id, "\n".join(exceptions)
                     )
                 )
@@ -1118,7 +1137,7 @@ class Session:
         """
         try:
             res = await self._execute_script(javascript.GET_PAGE_VIEWPORT)
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to request page viewport: "
                 "{}".format(self.__class__.__name__, err)
@@ -1140,7 +1159,7 @@ class Session:
         """
         try:
             return await self._execute_script(javascript.GET_PAGE_WIDTH)
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to request page width: {}".format(
                     self.__class__.__name__, err
@@ -1156,7 +1175,7 @@ class Session:
         """
         try:
             return await self._execute_script(javascript.GET_PAGE_HEIGHT)
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to request page height: {}".format(
                     self.__class__.__name__, err
@@ -1709,7 +1728,7 @@ class Session:
         # Request all windows
         try:
             res = await self.execute_command(Command.W3C_GET_WINDOW_HANDLES)
-        except errors.InvalidSessionIdError:
+        except errors.InvalidSessionError:
             # . all windows are closed
             self._window_by_name.clear()
             self._window_by_handle.clear()
@@ -1822,7 +1841,7 @@ class Session:
             res = await self.execute_command(
                 Command.NEW_WINDOW, body={"type": win_type}
             )
-        except errors.InvalidSessionIdError as err:
+        except errors.InvalidSessionError as err:
             # . All windows are closed: start a new session
             self._window_by_name = {}
             self._window_by_handle = {}
@@ -1957,7 +1976,7 @@ class Session:
         if switch_to is not None:
             try:
                 return await self.switch_window(switch_to)
-            except errors.InvalidSessionIdError:
+            except errors.InvalidSessionError:
                 return None  # exit: all windows are closed
             except errors.WindowNotFountError:
                 pass  # specified window not found -> switch to a random window
@@ -1969,7 +1988,7 @@ class Session:
                 return wins[0]
             else:
                 return None  # exit: all windows are closed
-        except (errors.InvalidSessionIdError, errors.WindowNotFountError):
+        except (errors.InvalidSessionError, errors.WindowNotFountError):
             return None  # exit: all windows are closed
 
     async def _active_window_handle(self) -> str | None:
@@ -1979,7 +1998,7 @@ class Session:
         # Get window handle
         try:
             res = await self.execute_command(Command.W3C_GET_CURRENT_WINDOW_HANDLE)
-        except (errors.InvalidSessionIdError, errors.WindowNotFountError):
+        except (errors.InvalidSessionError, errors.WindowNotFountError):
             return None
         # Return window handle
         try:
@@ -2153,7 +2172,7 @@ class Session:
         """
         try:
             await self._execute_script(javascript.PAGE_SCROLL_BY, width, height)
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to scroll the viewport by width ({}) & height ({}): {}".format(
                     self.__class__.__name__, repr(width), repr(height), err
@@ -2180,7 +2199,7 @@ class Session:
         """
         try:
             await self._execute_script(javascript.PAGE_SCROLL_TO, x, y)
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to scroll the viewport to x ({}) & y ({}): {}".format(
                     self.__class__.__name__, repr(x), repr(y), err
@@ -3032,7 +3051,7 @@ class Session:
                     self.__class__.__name__, repr(value)
                 )
             ) from err
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidXPathSelectorError(
                 "<{}>\nInvalid 'xpath' selector: {}".format(
                     self.__class__.__name__, repr(value)
@@ -3055,7 +3074,7 @@ class Session:
                     self.__class__.__name__, repr(value)
                 )
             ) from err
-        except errors.InvalidScriptError as err:
+        except errors.InvalidJavaScriptError as err:
             raise errors.InvalidXPathSelectorError(
                 "<{}>\nInvalid 'xpath' selector: {}".format(
                     self.__class__.__name__, repr(value)
@@ -3228,7 +3247,7 @@ class Session:
         try:
             js = self._script_by_name.pop(script)
         except KeyError as err:
-            raise errors.ScriptNotFoundError(
+            raise errors.JavaScriptNotFoundError(
                 "<{}>\nCannot rename script {}. JavaScript "
                 "not found.".format(self.__class__.__name__, repr(script))
             ) from err
@@ -3543,43 +3562,6 @@ class Session:
         self.__closed = True
 
 
-class SessionContext:
-    """The base context manager for a session."""
-
-    def __init__(
-        self,
-        options: BaseOptions,
-        service: BaseService,
-    ) -> None:
-        """The context manager for a session.
-
-        :param options: `<BaseOptions>` The browser options.
-        :param service: `<BaseService>` The browser service.
-        """
-        self._session = Session(options, service)
-
-    async def start(self) -> Session:
-        """Start & return the session `<Session>`."""
-        try:
-            await self._session.start()
-            return self._session
-        except BaseException as err:
-            try:
-                await self._session.quit()
-            except BaseException:
-                pass
-            raise err
-
-    async def __aenter__(self) -> Session:
-        return await self.start()
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb) -> None:
-        try:
-            await self._session.quit()
-        finally:
-            self._session = None
-
-
 # Chromium Base Session ---------------------------------------------------------------------------
 class ChromiumBaseSession(Session):
     """Represents a session of the chromium based browser."""
@@ -3600,9 +3582,19 @@ class ChromiumBaseSession(Session):
         return self._options
 
     @property
+    def browser_version(self) -> ChromiumVersion:
+        """Access the browser binary version of the session `<ChromiumVersion>`."""
+        return super().browser_version
+
+    @property
     def service(self) -> ChromiumBaseService:
         """Access the webdriver service `<ChromiumBaseService>`."""
         return self._service
+
+    @property
+    def driver_version(self) -> ChromiumVersion:
+        """Access the webdriver binary version of the session `<ChromiumVersion>`."""
+        return super().driver_version
 
     # Chromium - Permission ---------------------------------------------------------------
     @property
@@ -3647,7 +3639,7 @@ class ChromiumBaseSession(Session):
         # Request permission
         try:
             res = await self._execute_script(javascript.GET_PERMISSION, name)
-        except (errors.InvalidScriptError, errors.UnknownCommandError):
+        except (errors.InvalidJavaScriptError, errors.UnknownCommandError):
             return None
         try:
             return Permission(name, res["state"])
@@ -4146,22 +4138,3 @@ class ChromiumBaseSession(Session):
         super()._collect_garbage()
         # Devtools cmd
         self._cdp_cmd_by_name = None
-
-
-class ChromiumBaseSessionContext(SessionContext):
-    """The base context manager for a Chromium based session."""
-
-    def __init__(
-        self,
-        options: ChromiumBaseOptions,
-        service: ChromiumBaseService,
-    ) -> None:
-        """The context manager for a Chromium based session.
-
-        :param options: `<ChromiumBaseOptions>` The browser options.
-        :param service: `<ChromiumBaseService>` The browser service.
-        """
-        self._session = ChromiumBaseSession(options, service)
-
-    async def __aenter__(self) -> ChromiumBaseSession:
-        return await self.start()

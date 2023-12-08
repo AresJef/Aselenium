@@ -21,11 +21,12 @@ from aselenium import errors
 from aselenium.logs import logger
 from aselenium.element import Element
 from aselenium.command import Command
+from aselenium.session import Session
 from aselenium.safari.options import SafariOptions
 from aselenium.safari.service import SafariService
-from aselenium.session import Session, SessionContext
+from aselenium.manager.version import SafariVersion
 
-__all__ = ["SafariSession", "SafariSessionContext"]
+__all__ = ["SafariSession"]
 
 
 # Safari Session ----------------------------------------------------------------------------------
@@ -42,9 +43,19 @@ class SafariSession(Session):
         return self._options
 
     @property
+    def browser_version(self) -> SafariVersion:
+        """Access the browser binary version of the session `<SafariVersion>`."""
+        return super().browser_version
+
+    @property
     def service(self) -> SafariService:
         """Access the Safari service `<SafariService>`."""
         return self._service
+
+    @property
+    def driver_version(self) -> SafariVersion:
+        """Access the webdriver binary version of the session `<SafariVersion>`."""
+        return super().driver_version
 
     # Execute -----------------------------------------------------------------------------
     async def execute_command(
@@ -185,18 +196,3 @@ class SafariSession(Session):
             body={"permissions": permissions | {name: bool(value)}},
         )
         return await self.permissions
-
-
-class SafariSessionContext(SessionContext):
-    """The context manager for a Safari session."""
-
-    def __init__(self, options: SafariOptions, service: SafariService) -> None:
-        """The context manager for a Safari session.
-
-        :param options: `<SafariOptions>` The browser options.
-        :param service: `<SafariService>` The browser service.
-        """
-        self._session = SafariSession(options, service)
-
-    async def __aenter__(self) -> SafariSession:
-        return await self.start()

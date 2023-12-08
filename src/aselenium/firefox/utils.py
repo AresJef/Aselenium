@@ -17,15 +17,13 @@
 
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
-import os
 from typing import Any
 from orjson import loads
 from xml.dom import minidom
+from os.path import join as join_path
 from zipfile import ZipFile, is_zipfile
 from aselenium import errors
 from aselenium.utils import CustomDict, is_path_file, is_path_dir
-
-__all__ = ["FirefoxAddon", "extract_firefox_addon_details"]
 
 
 # Utils: addon ------------------------------------------------------------------------------------
@@ -130,11 +128,11 @@ def extract_firefox_addon_details(path: str) -> FirefoxAddon:
                     return parse_manifest_json(zip.read("manifest.json"))  # exit
                 install_rdf = zip.read("install.rdf")
         elif is_path_dir(path):
-            manifest_js = os.path.join(path, "manifest.json")
+            manifest_js = join_path(path, "manifest.json")
             if is_path_file(manifest_js):
                 with open(manifest_js, "r", encoding="utf-8") as file:
                     return parse_manifest_json(file.read())  # exit
-            install_rdf = os.path.join(path, "install.rdf")
+            install_rdf = join_path(path, "install.rdf")
             with open(install_rdf, "r", encoding="utf-8") as file:
                 install_rdf = file.read()
         else:

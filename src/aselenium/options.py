@@ -18,15 +18,19 @@
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
 from copy import deepcopy
-import tempfile, os, shutil
 from platform import system
+from tempfile import mkdtemp
 from base64 import b64encode
 from typing import Any, Literal
+from os import chmod
+from os.path import join as join_path
+from shutil import copytree, ignore_patterns, rmtree
 from aselenium import errors
 from aselenium.settings import Constraint, DefaultTimeouts
+from aselenium.manager.version import Version, ChromiumVersion
 from aselenium.utils import is_path_file, is_path_dir, prettify_dict
 
-__all__ = ["BaseOptions", "ChromiumBaseOptions", "Proxy", "Timeouts", "ChromiumProfile"]
+__all__ = ["Proxy", "Timeouts", "ChromiumProfile"]
 
 # Constants ---------------------------------------------------------------------------------------
 PROXY_TYPES: set[str] = {"DEFAULT", "AUTODETECT", "MANUAL", "PAC"}
@@ -617,161 +621,111 @@ class Timeouts:
         return Timeouts(self._implicit, self._pageLoad, self._script, unit="ms")
 
 
-class ChromiumProfile:
-    """Represents the user profile for Chromium based browser.
-    Such as: Edge, Chrome, Chromium, etc.
-    """
+class Profile:
+    """Represents the user profile for a browser."""
 
-    def __init__(self, directory: str, profile: str, temporary: bool = True) -> None:
-        """The user profile for Chromium based browser.
-        Such as: Edge, Chrome, Chromium, etc.
+    def __init__(self, directory: str, profile_folder: str | None) -> None:
+        """The user profile for the browser.
 
-        :param directory: `<str>` The main directory contains the profile folder.
-        :param profile: `<str>` The name of the profile folder.
-        :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `True`.
-            - If `True`, a cloned temporary profile will be created based on the given
-              'directory' and 'profile'. After all related sessions are closed, the
-              temporary profile will be deleted automatically, leaving the original
-              profile untouched.
-            - If `False`, the original profile will be used directly. Any changes made
-              during the session will be saved to the profile.
-            - *Notice*: In some rare cases (such as KeyboardInterrupt exception), the
-              temporary profile might not be deleted properly. In this case, a warning
-              message will be printed to the console, warning user to manually delete
-              the remaining temporary files if necessary (The temporary profile is always
-              located in the 'Standard Location for Temporary Files' in the system, and
-              most systems should delete these temporary files after a system reboot).
+        :param directory [REQUIRED]: `<st>` The directory of the user profile.
+        :param profile_folder [OPTIONAL]: `<str/None>` The name of the profile folder inside of the 'directory'.
 
-        ### Location:
-        >>> # . the default profile directory for Chrome on MacOS:
-            directory="/Users/<username>/Library/Application Support/Google/Chrome"
-            profile="Default"
-
-        >>> # . the default profile directory for Chrome on Windows:
-            directory="C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data"
-            profile="Default"
-
-        >>> # . the default profile directory for Chrome on Linux:
-            directory="/home/<username>/.config/google-chrome"
-            profile="Default"
+        ### Explaination
+        - When creating a `Profile` instance, a cloned temporary profile
+          will be created based on the given profile 'directory'. The
+          automated session will use this temporary profile leaving the
+          original profile untouched. When this profile is no longer
+          used by the program, the temporary profile will be deleted
+          automatically.
         """
         # Profile directory
         self._directory: str = directory
+        self._profile_folder: str | None = profile_folder
+        self._profile_dir: str = None
         self._temp_directory: str = None
-        if not is_path_dir(directory):
-            raise errors.InvalidProfileError(
-                "<{}> Invalid profile directory: {} {}".format(
-                    self.__class__.__name__, repr(directory), type(directory)
-                )
-            )
-        # Profile folder name
-        if not isinstance(profile, str):
-            raise errors.InvalidProfileError(
-                "<{}>\nInvalid name for the profile folder: {} {}".format(
-                    self.__class__.__name__, repr(profile), type(profile)
-                )
-            )
-        full_path = os.path.join(self._directory, profile)
-        if not is_path_dir(full_path):
-            raise errors.InvalidProfileError(
-                "<{}>\nProfile folder not found at: {}".format(
-                    self.__class__.__name__, repr(full_path)
-                )
-            )
-        self._profile = profile
-        # Temporary profile
-        self._temp_directory: str = None
-        if temporary:
-            self._create_temp_profile()
-
-    # Properties --------------------------------------------------------------------------
-    @property
-    def directory(self) -> str:
-        """Access the main directory contains the profile folder `<str>`."""
-        return self._directory
-
-    @property
-    def directory_for_driver(self) -> str:
-        """Access the main directory to be used by the webdriver `<str>`.
-
-        - If temporary mode (`temporary=True`), returns the temporary
-          directory instead of the original profile directory.
-        - If the profile is in normal mode (`temporary=False`), returns
-          the original profile directory (equivalent to the 'directory'
-          attribute).
-        """
-        if self._temp_directory is None:
-            return self._directory
-        else:
-            return self._temp_directory
-
-    @property
-    def profile(self) -> str:
-        """Access the name of the profile folder `<str>`."""
-        return self._profile
-
-    @property
-    def profile_for_driver(self) -> str:
-        """Access the name of the profile folder to be used by the webdriver `<str>`.
-
-        - If temporary mode (`temporary=True`), returns the temporary
-          profile folder name instead of the original profile folder.
-        - If the profile is in normal mode (`temporary=False`), returns
-          the original profile folder name (equivalent to the 'profile'
-          attribute).
-        """
-        return self._profile if self._temp_directory is None else "TEMP_PROFILE"
+        self._temp_profile_folder: str = "TEMP_PROFILE"
+        self._temp_profile_dir: str = None
+        # Create temporary profile
+        self._create_temp_profile()
 
     # Temporary profile -------------------------------------------------------------------
     def _create_temp_profile(self) -> None:
-        """(Internal) Create a temporary profile
-        based on the original profile.
-        """
+        """(Internal) Create the temporary profile."""
         # Temporary profile already created
         if self._temp_directory is not None:
             return None  # exit
 
-        # Create temporary profile
-        self._temp_directory = tempfile.mkdtemp()
-        temp_profile_dir = os.path.join(self._temp_directory, "TEMP_PROFILE")
-        shutil.copytree(
-            os.path.join(self._directory, self._profile),
-            temp_profile_dir,
-            ignore=shutil.ignore_patterns("parent.lock", "lock", ".parentlock"),
-        )
-        os.chmod(temp_profile_dir, 0o755)
+        # Validate directory
+        if not is_path_dir(self._directory):
+            raise errors.InvalidProfileError(
+                "<{}> Invalid profile directory: {} {}.".format(
+                    self.__class__.__name__,
+                    repr(self._directory),
+                    type(self._directory),
+                )
+            )
+        if self._profile_folder is not None:
+            try:
+                self._profile_dir = join_path(self._directory, self._profile_folder)
+            except Exception as err:
+                raise errors.InvalidProfileError(
+                    "<{}> Invalid profile folder: {} {}.".format(
+                        self.__class__.__name__,
+                        repr(self._profile_folder),
+                        type(self._profile_folder),
+                    )
+                ) from err
+            if not is_path_dir(self._profile_dir):
+                raise errors.InvalidProfileError(
+                    "<{}> Invalid profile directory: {} {}.".format(
+                        self.__class__.__name__,
+                        repr(self._profile_dir),
+                        type(self._profile_dir),
+                    )
+                )
+        else:
+            self._profile_dir = self._directory
+
+        # Clone profile to temporary directory
+        try:
+            self._temp_directory = mkdtemp()
+            self._temp_profile_dir = join_path(
+                self._temp_directory, self._temp_profile_folder
+            )
+            copytree(
+                self._profile_dir,
+                self._temp_profile_dir,
+                ignore=ignore_patterns("parent.lock", "lock", ".parentlock"),
+            )
+            chmod(self._temp_profile_dir, 0o755)
+        except Exception as err:
+            self._delete_temp_profile()
+            raise errors.InvalidProfileError(
+                "<{}> Failed to clone profile at: '{}'\nError:{}".format(
+                    self.__class__.__name__, self._profile_dir, err
+                )
+            ) from err
 
     def _delete_temp_profile(self) -> None:
-        """(Internal) Delete the temporary profile
-        without affecting the original profile.
-        """
-        # Temporary profile not created
+        """(Internal) Delete the temporary profile."""
+        # Temporary profile already deleted
         if self._temp_directory is None:
             return None  # exit
 
         # Delete temporary profile
-        warning = False
         while is_path_dir(self._temp_directory):
             try:
-                shutil.rmtree(self._temp_directory)
+                rmtree(self._temp_directory)
             except OSError:
-                warning = True
-        if warning:
-            print(
-                "\n<{}> Encountered unexpected error when deleting temporary profile, "
-                "there might be some files left in the temporary directory: '{}'\n".format(
-                    self.__class__.__name__, self._temp_directory
-                )
-            )
+                continue
         self._temp_directory = None
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
-        return "<%s (directory='%s', profile='%s', temporary=%s)>" % (
+        return "<%s (profile_directory='%s', temp_directory='%s')>" % (
             self.__class__.__name__,
-            self.directory_for_driver,
-            self.profile_for_driver,
-            self._temp_directory is not None,
+            self._profile_dir,
+            self._temp_profile_dir,
         )
 
     def __hash__(self) -> int:
@@ -785,6 +739,70 @@ class ChromiumProfile:
 
     def __del__(self):
         self._delete_temp_profile()
+
+
+class ChromiumProfile(Profile):
+    """Represents the user profile for Chromium based browser.
+    Such as: Edge, Chrome, Chromium, etc.
+    """
+
+    def __init__(self, directory: str, profile_folder: str) -> None:
+        """The user profile for Chromium based browser.
+        Such as: Edge, Chrome, Chromium, etc.
+
+        :param directory: `<st>` The directory of the user profile.
+        :param profile_folder: `<str>` The name of the profile folder inside of the 'directory'.
+
+        ### Explaination
+        - When creating a `Profile` instance, a cloned temporary profile
+          will be created based on the given profile 'directory'. The
+          automated session will use this temporary profile leaving the
+          original profile untouched. When this profile is no longer
+          used by the program, the temporary profile will be deleted
+          automatically.
+
+        ### Example for Default Profile Location:
+        >>> # . Chrome on MacOS:
+            directory="/Users/<username>/Library/Application Support/Google/Chrome"
+            profile="Default"
+
+        >>> # . Chrome on Windows:
+            directory="C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data"
+            profile="Default"
+
+        >>> # . Chrome on Linux:
+            directory="/home/<username>/.config/google-chrome"
+            profile="Default"
+        """
+        # Pre-validation
+        if not isinstance(profile_folder, str):
+            raise errors.InvalidProfileError(
+                "<ChromiumProfile> Invalid profile folder name: {} {}".format(
+                    repr(profile_folder), type(profile_folder)
+                )
+            )
+        super().__init__(directory, profile_folder)
+
+    # Properties --------------------------------------------------------------------------
+    @property
+    def directory(self) -> str:
+        """Access the main directory of the original profile `<str>`."""
+        return self._directory
+
+    @property
+    def directory_temp(self) -> str:
+        """Access the main directory of the temporary profile `<str>`."""
+        return self._temp_directory
+
+    @property
+    def profile_folder(self) -> str:
+        """Access the profile folder name of the original profile `<str>`."""
+        return self._profile_folder
+
+    @property
+    def profile_folder_temp(self) -> str:
+        """Access the profile folder name of the temporary profile `<str>`."""
+        return self._temp_profile_folder
 
 
 # Base Options ------------------------------------------------------------------------------------
@@ -840,6 +858,9 @@ class BaseOptions:
         self._arguments: list[str] = []
         # Proxy
         self._proxy: Proxy | None = None
+        # Options
+        self._experimental_options: dict[str, Any] = {}
+        self._preferences: dict[str, Any] = {}
 
     # Session timeout ---------------------------------------------------------------------
     @property
@@ -908,6 +929,22 @@ class BaseOptions:
             "implemented in subclass.".format(self.__class__.__name__)
         )
 
+    def get_capability(self, name: str) -> Any:
+        """Get a capability of the browser.
+
+        :param name: `<str>` The name of the capability.
+        :raises `OptionsNotSetError`: If the capability is not set.
+        :return `<Any>` The value of the capability.
+        """
+        try:
+            return self._capabilities[name]
+        except KeyError as err:
+            raise errors.OptionsNotSetError(
+                "<{}>\nCapability {} has not been set.".format(
+                    self.__class__.__name__, repr(name)
+                )
+            ) from err
+
     def set_capability(self, name: str, value: Any) -> None:
         """Set a capability of the browser.
 
@@ -928,22 +965,6 @@ class BaseOptions:
         except KeyError:
             pass
 
-    def get_capability(self, name: str) -> Any:
-        """Get a capability of the browser.
-
-        :param name: `<str>` The name of the capability.
-        :raises `OptionsNotSetError`: If the capability is not set.
-        :return `<Any>` The value of the capability.
-        """
-        try:
-            return self._capabilities[name]
-        except KeyError as err:
-            raise errors.OptionsNotSetError(
-                "<{}>\nCapability {} has not been set.".format(
-                    self.__class__.__name__, repr(name)
-                )
-            ) from err
-
     def _caps_changed(self) -> None:
         """Switch the capabilities status to `changed`, which will
         trigger a re-construction of the browser capabilites.
@@ -957,7 +978,7 @@ class BaseOptions:
         try:
             return self._capabilities["browserName"]
         except KeyError as err:
-            raise errors.InvalidCapabilitiesError(
+            raise errors.InvalidOptionsError(
                 "<{}>\nDefault 'browserName' is not defined in "
                 "class attribute `DEFAULT_CAPABILITIES`: {}".format(
                     self.__class__.__name__, self.DEFAULT_CAPABILITIES
@@ -966,23 +987,55 @@ class BaseOptions:
 
     # Caps: browser version ---------------------------------------------------------------
     @property
-    def browser_version(self) -> str | None:
-        """Access the version of the browser `<str>`."""
+    def browser_version(self) -> Version | None:
+        """Access the version of the browser `<Version/None>`."""
         return self._capabilities.get("browserVersion")
 
     @browser_version.setter
-    def browser_version(self, version: str | None) -> None:
+    def browser_version(self, value: Version | None) -> None:
+        self._set_browser_version(value)
+
+    def _set_browser_version(self, value: Version | None) -> None:
+        # Same browser version
+        if value == self.browser_version:
+            return None
+
         # Remove browser version
-        if version is None:
+        if value is None:
             self.rem_capability("browserVersion")
-            return None  # exit
+            return None
 
         # Set browser version
-        if not isinstance(version, str):
-            raise errors.InvalidCapabilitiesError(
-                f"<{self.__class__.__name__}>\n`browser_version` must be type of `<str>`."
+        if not isinstance(value, Version):
+            raise errors.InvalidOptionsError(
+                f"<{self.__class__.__name__}>\n`browser_version` must be type of `<Version>`."
             )
-        self.set_capability("browserVersion", version)
+        self.set_capability("browserVersion", value.patch)
+
+    # Options: binary location ------------------------------------------------------------
+    @property
+    def browser_location(self) -> str | None:
+        """Access the location of the Brwoser binary `<str>`."""
+        return self._experimental_options.get("binary")
+
+    @browser_location.setter
+    def browser_location(self, value: str | None) -> None:
+        # Same binary location
+        if value == self.browser_location:
+            return None  # exit
+
+        # Remove binary location
+        if value is None:
+            self.rem_experimental_option("binary")
+            return None  # exit
+
+        # Set binary location
+        if not is_path_file(value):
+            raise errors.InvalidOptionsError(
+                "<{}>\nBrowser 'browser_location' not exists at: "
+                "{}.".format(self.__class__.__name__, repr(value))
+            )
+        self.add_experimental_options(binary=value)
 
     # Caps: platform name -----------------------------------------------------------------
     @property
@@ -994,18 +1047,18 @@ class BaseOptions:
         return self._capabilities.get("platformName")
 
     @platform_name.setter
-    def platform_name(self, platform: str | None) -> None:
+    def platform_name(self, value: str | None) -> None:
         # Remove platform name
-        if platform is None:
+        if value is None:
             self.rem_capability("platformName")
             return None  # exit
 
         # Set platform name
-        if not isinstance(platform, str):
-            raise errors.InvalidCapabilitiesError(
+        if not isinstance(value, str):
+            raise errors.InvalidOptionsError(
                 f"<{self.__class__.__name__}>\n`platform_name` must be type of `<str>`."
             )
-        self.set_capability("platformName", platform)
+        self.set_capability("platformName", value)
 
     # Caps: accept insecure certs ---------------------------------------------------------
     @property
@@ -1038,23 +1091,23 @@ class BaseOptions:
         return self._capabilities["pageLoadStrategy"]
 
     @page_load_strategy.setter
-    def page_load_strategy(self, strategy: str | None) -> None:
+    def page_load_strategy(self, value: str | None) -> None:
         # Reset to default
-        if strategy is None:
+        if value is None:
             self.set_capability("pageLoadStrategy", "normal")
             return None  # exit
 
         # Set pageLoadStrategy
-        if strategy not in Constraint.PAGE_LOAD_STRATEGIES:
-            raise errors.InvalidCapabilitiesError(
+        if value not in Constraint.PAGE_LOAD_STRATEGIES:
+            raise errors.InvalidOptionsError(
                 "<{}>\n`page_load_stragety` {} is not valid, "
                 "available options: {}".format(
                     self.__class__.__name__,
-                    repr(strategy),
+                    repr(value),
                     sorted(Constraint.PAGE_LOAD_STRATEGIES),
                 )
             )
-        self.set_capability("pageLoadStrategy", strategy)
+        self.set_capability("pageLoadStrategy", value)
 
     # Caps: proxy -------------------------------------------------------------------------
     @property
@@ -1063,21 +1116,21 @@ class BaseOptions:
         return self._proxy
 
     @proxy.setter
-    def proxy(self, proxy: Proxy | None) -> None:
+    def proxy(self, value: Proxy | None) -> None:
         # Remove proxy
-        if proxy is None:
+        if value is None:
             self.rem_capability("proxy")
             self._proxy = None
             return None  # exit
 
         # Set proxy
-        if not isinstance(proxy, Proxy):
+        if not isinstance(value, Proxy):
             raise errors.InvalidProxyError(
                 f"<{self.__class__.__name__}>\n`proxy` "
                 "must be an instance of `<class 'Proxy'>`."
             )
-        self.set_capability("proxy", proxy.to_capabilities())
-        self._proxy = proxy
+        self.set_capability("proxy", value.to_capabilities())
+        self._proxy = value
 
     # # Caps: window rect -------------------------------------------------------------------
     # @property
@@ -1201,17 +1254,69 @@ class BaseOptions:
         return self._capabilities.get("unhandledPromptBehavior", "dismiss and notify")
 
     @unhandled_prompt_behavior.setter
-    def unhandled_prompt_behavior(self, behavior: str) -> None:
-        if behavior not in Constraint.UNHANDLED_PROMPT_BEHAVIORS:
-            raise errors.InvalidCapabilitiesError(
+    def unhandled_prompt_behavior(self, value: str) -> None:
+        if value not in Constraint.UNHANDLED_PROMPT_BEHAVIORS:
+            raise errors.InvalidOptionsError(
                 "<{}>\n`unhandled_prompt_behavior` {} is not valid, "
                 "available options: {}".format(
                     self.__class__.__name__,
-                    repr(behavior),
+                    repr(value),
                     sorted(Constraint.UNHANDLED_PROMPT_BEHAVIORS),
                 )
             )
-        self.set_capability("unhandledPromptBehavior", behavior)
+        self.set_capability("unhandledPromptBehavior", value)
+
+    # Options: experimental options -------------------------------------------------------
+    @property
+    def experimental_options(self) -> dict[str, Any]:
+        """Access the experimental options of the browser `<dict>`."""
+        return deepcopy(self._experimental_options)
+
+    def add_experimental_options(self, **options: Any) -> None:
+        """Add experimental options of the browser.
+
+        :param options [Keywords]: `<Any>` The experimental options to add.
+
+        ### Example:
+        >>> options.add_experimental_options(
+                excludeSwitches=["enable-automation"],
+                useAutomationExtension=False,
+                ...
+            )
+        """
+        # Add options
+        self._experimental_options |= options
+        self._caps_changed()
+
+    def rem_experimental_option(self, name: str) -> None:
+        """Remove an experimental option of the browser.
+
+        :param name: `<str>` The name of the experimental option.
+
+        ### Example:
+        >>> options.rem_experimental_options("excludeSwitches")
+        """
+        try:
+            self._experimental_options.pop(name)
+            self._caps_changed()
+        except KeyError:
+            pass
+
+    def get_experimental_option(self, name: str) -> Any:
+        """Get an experimental option of the browser.
+
+        :param name: `<str>` The name of the experimental option.
+        :raises `OptionsNotSetError`: If the experimental option is not set.
+        :return `<Any>` The value of the experimental option.
+        """
+        try:
+            return self._experimental_options[name]
+        except KeyError as err:
+            raise errors.OptionsNotSetError(
+                "<{}>\nExperimental option {} has not been set.".format(
+                    self.__class__.__name__, repr(name)
+                )
+            ) from err
 
     # Caps: arguments ---------------------------------------------------------------------
     @property
@@ -1235,7 +1340,7 @@ class BaseOptions:
         added = False
         for arg in args:
             if not isinstance(arg, str) or not arg:
-                raise errors.InvalidCapabilitiesError(
+                raise errors.InvalidOptionsError(
                     "<{}>\nSpecifed 'argument' is not valid: {} {}.".format(
                         self.__class__.__name__, type(arg), repr(arg)
                     )
@@ -1253,6 +1358,66 @@ class BaseOptions:
         if self._arguments:
             self._arguments.clear()
             self._caps_changed()
+
+    # Options: preferences ----------------------------------------------------------------
+    @property
+    def preferences(self) -> dict[str, Any]:
+        """Access the preferences of the browser `<dict[str, Any]>`."""
+        return deepcopy(self._preferences)
+
+    def set_preference(self, name: str, value: Any) -> None:
+        """Set a preference of the browser.
+
+        :param name: `<str>` The name of the preference.
+        :param value: `<Any>` The value of the preference.
+
+        ### Example:
+        >>> options.set_preference("media.navigator.permission.disabled", False)
+        """
+        # Set preference
+        if not isinstance(name, str) or not name:
+            raise errors.InvalidOptionsError(
+                "<{}>\nInvalid 'preferences' name: {} {}.".format(
+                    self.__class__.__name__, repr(name), type(name)
+                )
+            )
+        self._preferences[name] = value
+        self._caps_changed()
+
+    def get_preference(self, name: str) -> Any:
+        """Get a preference value of the browser.
+
+        :param name: `<str>` The name of the preference.
+        :raises `OptionsNotSetError`: If the preference is not set.
+        :return `<Any>` The value of the preference.
+
+        ### Example:
+        >>> options.get_preference("media.navigator.permission.disabled")
+            # False
+        """
+        try:
+            return self._preferences[name]
+        except KeyError as err:
+            raise errors.OptionsNotSetError(
+                "<{}>\nPreference {} has not been set.".format(
+                    self.__class__.__name__, repr(name)
+                )
+            ) from err
+
+    def rem_preference(self, name: str) -> None:
+        """Remove a preference of the browser.
+
+        :param name: `<str>` The name of the preference.
+
+        ### Example:
+        >>> options.rem_preference("media.navigator.permission.disabled")
+        """
+        # Remove preference
+        try:
+            self._preferences.pop(name)
+            self._caps_changed()
+        except KeyError:
+            pass
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
@@ -1329,10 +1494,8 @@ class ChromiumBaseOptions(BaseOptions):
                 "own class attribute: `KEY`. For more information, "
                 "please refer to class docs."
             )
-        # Settings
+        # Options
         self._profile: ChromiumProfile | None = None
-        self._experimental_options: dict[str, Any] = {}
-        self._preferences: dict[str, Any] = {}
         self._extensions: list[str] = []
 
     # Caps: basic -------------------------------------------------------------------------
@@ -1354,26 +1517,15 @@ class ChromiumBaseOptions(BaseOptions):
         # Return caps
         return caps
 
-    # Options: binary location ------------------------------------------------------------
+    # Caps: browser version ---------------------------------------------------------------
     @property
-    def binary_location(self) -> str | None:
-        """Access the binary location of the Brwoser executable `<str>`."""
-        return self._experimental_options.get("binary")
+    def browser_version(self) -> ChromiumVersion | None:
+        """Access the version of the browser `<ChromiumVersion/None>`."""
+        return self._capabilities.get("browserVersion")
 
-    @binary_location.setter
-    def binary_location(self, value: str | None) -> None:
-        # Remove binary location
-        if value is None:
-            self.rem_experimental_options("binary")
-            return None  # exit
-
-        # Set binary location
-        if not is_path_file(value):
-            raise errors.InvalidOptionsError(
-                "<{}>\nBrowser 'binary_location' not found at: "
-                "{}".format(self.__class__.__name__, repr(value))
-            )
-        self.add_experimental_options(binary=value)
+    @browser_version.setter
+    def browser_version(self, value: ChromiumVersion | None) -> None:
+        self._set_browser_version(value)
 
     # Options: debugger -------------------------------------------------------------------
     @property
@@ -1386,175 +1538,84 @@ class ChromiumBaseOptions(BaseOptions):
         return self._experimental_options.get("debuggerAddress")
 
     @debugger_address.setter
-    def debugger_address(self, address: str | None) -> None:
+    def debugger_address(self, value: str | None) -> None:
         # Remove debugger address
-        if address is None:
-            self.rem_experimental_options("debuggerAddress")
+        if value is None:
+            self.rem_experimental_option("debuggerAddress")
             return None  # exit
 
         # Set debugger address
-        if not isinstance(address, str):
+        if not isinstance(value, str):
             raise errors.InvalidOptionsError(
                 f"<{self.__class__.__name__}>\n'debugger_address' must be type of `<str>`."
             )
-        self.add_experimental_options(debuggerAddress=address)
-
-    # Options: experimental options -------------------------------------------------------
-    @property
-    def experimental_options(self) -> dict[str, Any]:
-        """Access the experimental options of the browser `<dict>`."""
-        return deepcopy(self._experimental_options)
-
-    def add_experimental_options(self, **options: Any) -> None:
-        """Add experimental options of the browser.
-
-        :param options: `<Any>` The experimental options to add.
-
-        ### Example:
-        >>> options.add_experimental_options(
-                excludeSwitches=["enable-automation"],
-                ...
-            )
-        """
-        # Add options
-        self._experimental_options |= options
-        self._caps_changed()
-
-    def rem_experimental_options(self, name: str) -> None:
-        """Remove an experimental option of the browser.
-
-        :param name: `<str>` The name of the experimental option.
-
-        ### Example:
-        >>> options.rem_experimental_options("excludeSwitches")
-        """
-        try:
-            self._experimental_options.pop(name)
-            self._caps_changed()
-        except KeyError:
-            pass
-
-    def get_experimental_option(self, name: str) -> Any:
-        """Get an experimental option of the browser.
-
-        :param name: `<str>` The name of the experimental option.
-        :raises `OptionsNotSetError`: If the experimental option is not set.
-        :return `<Any>` The value of the experimental option.
-        """
-        try:
-            return self._experimental_options[name]
-        except KeyError as err:
-            raise errors.OptionsNotSetError(
-                "<{}>\nExperimental option {} has not been set.".format(
-                    self.__class__.__name__, repr(name)
-                )
-            ) from err
+        self.add_experimental_options(debuggerAddress=value)
 
     # Options: profile --------------------------------------------------------------------
     @property
     def profile(self) -> ChromiumProfile | None:
         """Access the profile of the browser `<ChromiumProfile>`.
         Returns `None` if profile is not configured.
+
+        ### Notice
+        - Please use `set_profile()` method to configure the profile.
         """
         return self._profile
 
-    @profile.setter
-    def profile(self, value: ChromiumProfile | None) -> None:
-        # Remove profile
-        if value is None:
-            self._remove_profile_arguments()
-            self._profile = None
-            self._caps_changed()
-            return None  # exit
-
-        # Set profile
-        if not isinstance(value, ChromiumProfile):
-            raise errors.InvalidProfileError(
-                "<{}>\nInvalid 'profile' ({} {}), must be an "
-                "instance of `<ChromiumProfile>'.".format(
-                    self.__class__.__name__, repr(value), type(value)
-                )
-            )
-        self._remove_profile_arguments()
-        self.add_arguments(
-            "--user-data-dir=%s" % value.directory_for_driver,
-            "--profile-directory=%s" % value.profile_for_driver,
-        )
-        self._profile = value
-        self._caps_changed()
-
-    def set_profile(
-        self,
-        directory: str,
-        profile: str,
-        temporary: bool = True,
-    ) -> ChromiumProfile:
+    def set_profile(self, directory: str, profile: str) -> ChromiumProfile:
         """Set the user profile for the Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
-        :param directory: `<str>` The main directory contains the profile folder.
-        :param profile: `<str>` The name of the profile folder.
-        :param temporary: `<bool>` Whether to create a temporary profile. Defaults to `True`.
-            - If `True`, a cloned temporary profile will be created based on the given
-              'directory' and 'profile'. After all related sessions are closed, the
-              temporary profile will be deleted automatically, leaving the original
-              profile untouched.
-            - If `False`, the original profile will be used directly. Any changes made
-              during the session will be saved to the profile.
-            - *Notice*: In some rare cases (such as KeyboardInterrupt exception), the
-              temporary profile might not be deleted properly. In this case, a warning
-              message will be printed to the console, warning user to manually delete
-              the remaining temporary files if necessary (The temporary profile is always
-              located in the 'Standard Location for Temporary Files' in the system, and
-              most systems should delete these temporary files after a system reboot).
-
+        :param directory: `<st>` The directory of the user profile.
+        :param profile_folder: `<str>` The name of the profile folder inside of the 'directory'.
         :return `<ChromiumProfile>`: The profile instance.
 
-        ### Explain:
-        >>> # . when 'temporary=False', this method is equivalent to:
-            driver.options.add_arguments(
-                "--user-data-dir=%s" % directory,
-                "--profile-directory=%s" % profile,
-            )
+        ### Explaination
+        - When creating a `Profile` instance, a cloned temporary profile
+          will be created based on the given profile 'directory'. The
+          automated session will use this temporary profile leaving the
+          original profile untouched. When this profile is no longer
+          used by the program, the temporary profile will be deleted
+          automatically.
 
-        >>> # . when 'temporary=True', this method is equivalent to:
-            # 1. copy the profile to a temporary directory
-            driver.options.add_arguments(
-                "--user-data-dir=%s" % temp_directory,
-                "--profile-directory=%s" % temp_profile,
-            )
-
-        ### Location:
-        >>> # . the default profile directory for Chrome on MacOS:
+        ### Example for Default Profile Location:
+        >>> # . Chrome on MacOS:
             directory="/Users/<username>/Library/Application Support/Google/Chrome"
             profile="Default"
 
-        >>> # . the default profile directory for Chrome on Windows:
+        >>> # . Chrome on Windows:
             directory="C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data"
             profile="Default"
 
-        >>> # . the default profile directory for Chrome on Linux:
+        >>> # . Chrome on Linux:
             directory="/home/<username>/.config/google-chrome"
             profile="Default"
-
-        ### Example:
-        >>> # . set profile
-            options.set_profile(directory, profile, True)
         """
-        self.profile = ChromiumProfile(directory, profile, temporary)
-        return self._profile
+        # Create profile
+        value = ChromiumProfile(directory, profile)
+        # Set new profile
+        self._remove_profile_arguments()
+        self.add_arguments(
+            "--user-data-dir=%s" % value.directory_temp,
+            "--profile-directory=%s" % value.profile_folder_temp,
+        )
+        self._profile = value
+        self._caps_changed()
+        return value
 
     def rem_profile(self) -> None:
-        """Remove the previously configured profile for the browser.
+        """Remove the previously configured profile of the browser.
 
         ### Example:
-        >>> # . set profile
-            options.set_profile(directory, profile, True)
+        >>> # . set a new profile
+            options.set_profile(directory, profile)
 
         >>> # . remove the profile
             options.rem_profile()
         """
-        self.profile = None
+        self._remove_profile_arguments()
+        self._profile = None
+        self._caps_changed()
 
     def _remove_profile_arguments(self) -> None:
         """(Internal) Remove previously setted profile arguments."""
@@ -1564,62 +1625,6 @@ class ChromiumBaseOptions(BaseOptions):
             if not arg.startswith("--user-data-dir=")
             and not arg.startswith("--profile-directory=")
         ]
-
-    # Options: preferences ----------------------------------------------------------------
-    @property
-    def preferences(self) -> dict[str, Any]:
-        """Access the preferences of the browser `<dict[str, Any]>`."""
-        return deepcopy(self._preferences)
-
-    def set_preference(self, name: str, value: Any) -> None:
-        """Set a preference of the browser.
-
-        :param name: `<str>` The name of the preference.
-        :param value: `<Any>` The value of the preference.
-
-        ### Example:
-        >>> options.set_preference("directory_upgrade", True)
-        """
-        # Set preference
-        if not isinstance(name, str) or not name:
-            raise errors.InvalidOptionsError(
-                "<{}>\nInvalid 'preferences' name: {} {}.".format(
-                    self.__class__.__name__, repr(name), type(name)
-                )
-            )
-        self._preferences[name] = value
-        self._caps_changed()
-
-    def get_preference(self, name: str) -> Any:
-        """Get a preference value of the browser.
-
-        :param name: `<str>` The name of the preference.
-        :raises `OptionsNotSetError`: If the preference is not set.
-        :return `<Any>` The value of the preference.
-        """
-        try:
-            return self._preferences[name]
-        except KeyError as err:
-            raise errors.OptionsNotSetError(
-                "<{}>\nPreference {} has not been set.".format(
-                    self.__class__.__name__, repr(name)
-                )
-            ) from err
-
-    def rem_preference(self, name: str) -> None:
-        """Remove a preference of the browser.
-
-        :param name: `<str>` The name of the preference.
-
-        ### Example:
-        >>> options.rem_preference("directory_upgrade")
-        """
-        # Remove preference
-        try:
-            self._preferences.pop(name)
-            self._caps_changed()
-        except KeyError:
-            pass
 
     # Options: extensions -----------------------------------------------------------------
     @property

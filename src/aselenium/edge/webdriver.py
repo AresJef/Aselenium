@@ -16,13 +16,25 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any
+from typing import Any, Literal
 from aselenium.edge.options import EdgeOptions
 from aselenium.edge.service import EdgeService
-from aselenium.edge.session import EdgeSessionContext
-from aselenium.webdriver import ChromiumBaseWebDriver
+from aselenium.edge.session import EdgeSession
+from aselenium.manager.version import ChromiumVersion
+from aselenium.manager.driver import EdgeDriverManager
+from aselenium.webdriver import ChromiumBaseWebDriver, SessionContext
 
 __all__ = ["Edge"]
+
+
+# Edge Session Context ----------------------------------------------------------------------------
+class EdgeSessionContext(SessionContext):
+    """The context manager for the Edge session."""
+
+    _SESSION_CLS: type[EdgeSession] = EdgeSession
+
+    async def __aenter__(self) -> EdgeSession:
+        return await self.start()
 
 
 # Edge Webdriver ----------------------------------------------------------------------------------
@@ -31,46 +43,83 @@ class Edge(ChromiumBaseWebDriver):
 
     def __init__(
         self,
-        executable: str,
+        directory: str | None = None,
+        max_cache_size: int | None = None,
+        request_timeout: int | float = 10,
+        download_timeout: int | float = 120,
+        proxy: str | None = None,
         service_timeout: int = 10,
         *service_args: Any,
-        **service_kwargs: Any
+        **service_kwargs: Any,
     ) -> None:
-        """The webdriver for Edge.
-
-        :param executable: `<str>` The absolute path to the webdriver executable file.
-        :param service_timeout: `<int/float>` Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
-        :param service_args: `<Any>` Additional arguments for the webdriver service.
-        :param service_kwargs: `<Any>` Additional keyword arguments for the webdriver service.
-        """
         super().__init__(
-            executable,
-            EdgeOptions,
+            EdgeDriverManager,
             EdgeService,
+            EdgeOptions,
+            EdgeSessionContext,
+            directory,
+            max_cache_size,
+            request_timeout,
+            download_timeout,
+            proxy,
             service_timeout,
             *service_args,
             **service_kwargs,
         )
+
+    # Properties ------------------------------------------------------------------
+    @property
+    def manager(self) -> EdgeDriverManager:
+        """Access the driver manager `<EdgeDriverManager>`."""
+        return self._manager
 
     @property
     def options(self) -> EdgeOptions:
         """Access the webdriver options for the browser `<EdgeOptions>`."""
         return self._options
 
-    def acquire(self) -> EdgeSessionContext:
-        """Acquire a new browser session `<EdgeSession>`.
+    # Acquire ---------------------------------------------------------------------
+    def acquire(
+        self,
+        version: ChromiumVersion | Literal["major", "build", "patch"] = "build",
+        channel: Literal["stable", "beta", "dev"] = "stable",
+        binary: str | None = None,
+    ) -> EdgeSessionContext:
+        """Acquire a new Edge session `<EdgeSession>`.
+
+        :param version: `<str>` Defaults to `'build'`. Accepts the following values:
+            - `'major'`: Install webdriver that has the same major version as the browser.
+            - `'build'`: Install webdriver that has the same major & build version as the browser.
+            - `'patch'`: Install webdriver that has the same major, build & patch version as the browser.
+            - `'118.0.5982.0'`: Install the excat webdriver version regardless of the browser version.
+
+        :param channel: `<str>` Defaults to `'stable'`. Accepts the following values:
+            - `'stable'`: Locate the `STABLE` (normal) browser binary in the system
+                          and use it to determine the webdriver version.
+            - `'beta'`:   Locate the `BETA` browser binary in the system and use it to
+                          determine the webdriver version.
+            - `'dev'`:    Locate the `DEV` browser binary in the system and use it to
+                          determine the webdriver version.
+
+        :param binary: `<str>` The path to a specific browser binary. Defaults to `None`.
+            If specified, will use this given browser binary to determine
+            the webdriver version and start the session.
 
         ### Example:
-        >>> async with driver.acquire() as session:
+        >>> from aselenium import Edge
+            driver = Edge(
+                # optional: the directory to store the webdriver
+                directory="/path/to/driver/cache/directory"
+                # optional: the maximum number of webdriver to cache
+                max_cache_size=10
+            )
+        >>> # . acquire an edge session
+            async with driver.acquire("build", "beta") as session:
+                # explain: install webdriver that has the same major & build
+                # version as the Edge [beta] browser installed in the system,
+                # and start a new session with the beta browser.
                 await session.load("https://www.google.com")
-                # . some automated tasks
+                # . do some automated tasks
+                ...
         """
-        return EdgeSessionContext(
-            self._options,
-            self._service_cls(
-                self._executable,
-                self._service_timeout,
-                *self._service_args,
-                **self._service_kwargs,
-            ),
-        )
+        return super().acquire(version=version, channel=channel, binary=binary)

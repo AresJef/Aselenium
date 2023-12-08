@@ -17,19 +17,18 @@
 
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
-import shutil, os, tarfile
+from shutil import rmtree
 from typing import Literal
 from subprocess import call
 from datetime import datetime
 from zipfile import ZipFile, ZipInfo
+from os import makedirs, chmod, getcwd
 from os.path import join as join_path, expanduser
+from tarfile import open as tar_open, ReadError
 from pandas import DataFrame, read_feather
 from aselenium import errors
 from aselenium.utils import is_path_dir, is_path_file
 from aselenium.manager.version import ChromiumVersion, GeckoVersion
-
-
-__all__ = ["EdgeFileManager", "ChromeFileManager", "FirefoxFileManager"]
 
 
 # File manager -------------------------------------------------------------------------------------
@@ -64,8 +63,8 @@ class FileManager:
         elif is_path_dir(base_dir):
             return base_dir
         else:
-            raise errors.InvalidDriverCacheDirectoryError(
-                "<{}>\nInvalid webdriver base caching directory: "
+            raise errors.DriverManagerError(
+                "<{}>\nInvalid driver manager cache directory: "
                 "{} {}".format(cls.__name__, repr(base_dir), type(base_dir))
             )
 
@@ -106,8 +105,8 @@ class FileManager:
         self._base_dir = self._validate_base_dir(base_dir)
         self._directory: str = join_path(self._base_dir, ".aselenium")
         if not is_path_dir(self._directory):
-            os.makedirs(self._directory)
-            os.chmod(self._directory, 0o755)
+            makedirs(self._directory)
+            chmod(self._directory, 0o755)
         # Unique instance key
         self._inst_key = self._gen_instance_key(self._base_dir)
         # Driver Metadata
@@ -331,7 +330,7 @@ class FileManager:
             folder: str = row["folder"]
             while is_path_dir(folder):
                 try:
-                    shutil.rmtree(folder)
+                    rmtree(folder)
                 except OSError:
                     continue
 
@@ -360,7 +359,7 @@ class FileManager:
             folder: str = row["folder"]
             while is_path_dir(folder):
                 try:
-                    shutil.rmtree(folder)
+                    rmtree(folder)
                 except OSError:
                     continue
 
@@ -373,7 +372,7 @@ class FileManager:
             try:
                 return meta.to_feather(path)
             except OSError:
-                os.makedirs(self._directory, exist_ok=True)
+                makedirs(self._directory, exist_ok=True)
 
     # Exceptions --------------------------------------------------------------------------
     def _raise_attribute_implementation_error(self, attr_name: str) -> None:
@@ -730,11 +729,11 @@ class LinuxZipFileWithPermissions(ZipFile):
             member = self.getinfo(member)
 
         if path is None:
-            path = os.getcwd()
+            path = getcwd()
 
         ret_val = self._extract_member(member, path, pwd)  # noqa
         attr = member.external_attr >> 16
-        os.chmod(ret_val, attr)
+        chmod(ret_val, attr)
         return ret_val
 
 
@@ -797,36 +796,28 @@ class File:
         # Save content into local file
         download_file = self._save_file(directory)
 
-        try:
-            # Extract files
-            folder = join_path(directory, "extracted")
-            if self._filetype == "zip":
-                files = self._extract_zip_file(download_file, folder)
-            elif self._filetype == "tar.gz":
-                files = self._extract_tar_file(download_file, folder)
-            else:
-                raise errors.InvalidDownloadFileError(
-                    "<{}>\nInvalid file: '{}'.".format(
-                        self.__class__.__name__, download_file
-                    )
+        # Extract files
+        folder = join_path(directory, "extracted")
+        if self._filetype == "zip":
+            files = self._extract_zip_file(download_file, folder)
+        elif self._filetype == "tar.gz":
+            files = self._extract_tar_file(download_file, folder)
+        else:
+            raise errors.InvalidDownloadFileError(
+                "<{}>\nInvalid file: '{}'.".format(
+                    self.__class__.__name__, download_file
                 )
+            )
 
-            # Find executable
-            executable = self._find_target_executable(folder, files)
-            if executable is None:
-                raise errors.InvalidDownloadFileError(
-                    "<{}>\nFailed to find executable from unpacked"
-                    "files: {}.".format(self.__class__.__name__, files)
-                )
-            # Return
-            return executable
-
-        finally:
-            # Remove local file
-            try:
-                os.remove(download_file)
-            except OSError:
-                pass
+        # Find executable
+        executable = self._find_target_executable(folder, files)
+        if executable is None:
+            raise errors.InvalidDownloadFileError(
+                "<{}>\nFailed to find executable from unpacked"
+                "files: {}.".format(self.__class__.__name__, files)
+            )
+        # Return
+        return executable
 
     def _save_file(self, directory: str) -> str:
         """(Internal) Save the downloaded content into a file.
@@ -836,7 +827,7 @@ class File:
         """
         try:
             # Create directory
-            os.makedirs(directory, exist_ok=True)
+            makedirs(directory, exist_ok=True)
             # Save file
             file_path = join_path(directory, self._name + "." + self.filetype)
             while True:
@@ -845,7 +836,7 @@ class File:
                         file.write(self._content)
                     return file_path
                 except OSError:
-                    os.makedirs(directory, exist_ok=True)
+                    makedirs(directory, exist_ok=True)
         finally:
             # Release memory
             self._content = None
@@ -875,11 +866,11 @@ class File:
         """
         try:
             try:
-                with tarfile.open(file_path, mode="r:gz") as archive:
+                with tar_open(file_path, mode="r:gz") as archive:
                     archive.extractall(unzip_dir)
                     return [x.name for x in archive.getmembers()]
-            except tarfile.ReadError:
-                with tarfile.open(file_path, mode="r:bz2") as archive:
+            except ReadError:
+                with tar_open(file_path, mode="r:bz2") as archive:
                     archive.extractall(unzip_dir)
                     return [x.name for x in archive.getmembers()]
         except Exception as err:

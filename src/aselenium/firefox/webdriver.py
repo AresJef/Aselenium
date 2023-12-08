@@ -16,13 +16,25 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any
+from typing import Any, Literal
 from aselenium.firefox.options import FirefoxOptions
 from aselenium.firefox.service import FirefoxService
-from aselenium.firefox.session import FirefoxSessionContext
-from aselenium.webdriver import WebDriver
+from aselenium.firefox.session import FirefoxSession
+from aselenium.manager.version import GeckoVersion
+from aselenium.manager.driver import FirefoxDriverManager
+from aselenium.webdriver import WebDriver, SessionContext
 
 __all__ = ["Firefox"]
+
+
+# Firefox Session Context --------------------------------------------------------------------------
+class FirefoxSessionContext(SessionContext):
+    """The context manager for a Firefox session."""
+
+    _SESSION_CLS: type[FirefoxSession] = FirefoxSession
+
+    async def __aenter__(self) -> FirefoxSession:
+        return await self.start()
 
 
 # Firefox Webdriver --------------------------------------------------------------------------------
@@ -31,46 +43,81 @@ class Firefox(WebDriver):
 
     def __init__(
         self,
-        executable: str,
+        directory: str | None = None,
+        max_cache_size: int | None = None,
+        request_timeout: int | float = 10,
+        download_timeout: int | float = 120,
+        proxy: str | None = None,
         service_timeout: int = 10,
         *service_args: Any,
-        **service_kwargs: Any
+        **service_kwargs: Any,
     ) -> None:
-        """The webdriver for Safari.
-
-        :param executable: `<str>` The absolute path to the webdriver executable file.
-        :param service_timeout: `<int/float>` Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
-        :param service_args: `<Any>` Additional arguments for the webdriver service.
-        :param service_kwargs: `<Any>` Additional keyword arguments for the webdriver service.
-        """
         super().__init__(
-            executable,
-            FirefoxOptions,
+            FirefoxDriverManager,
             FirefoxService,
+            FirefoxOptions,
+            FirefoxSessionContext,
+            directory,
+            max_cache_size,
+            request_timeout,
+            download_timeout,
+            proxy,
             service_timeout,
             *service_args,
             **service_kwargs,
         )
+
+    # Properties ------------------------------------------------------------------
+    @property
+    def manager(self) -> FirefoxDriverManager:
+        """Access the driver manager `<FirefoxDriverManager>`."""
+        return self._manager
 
     @property
     def options(self) -> FirefoxOptions:
         """Access the webdriver options for the browser `<FirefoxOptions>`."""
         return self._options
 
-    def acquire(self) -> FirefoxSessionContext:
-        """Acquire a new browser session `<FirefoxSession>`.
+    # Acquire ---------------------------------------------------------------------
+    def acquire(
+        self,
+        version: GeckoVersion | Literal["latest", "auto"] = "latest",
+        binary: str | None = None,
+    ) -> FirefoxSessionContext:
+        """Acquire a new Firefox session `<FirefoxSession>`.
+
+        :param version: `<str>` Defaults to `'latest'`. Accepts the following values:
+            - `'latest'`: Always install the latest available geckodriver that is
+                          compatible with the Firefox browser from the [Mozilla Github]
+                          repository.
+            - `'auto'`:   Install the latest cached geckodriver that is compatible
+                          with the Firefox browser. If compatible geckodriver does
+                          not exist in cache, will install the latest compatible
+                          geckodriver from the [Mozilla Github] repository.
+            - `'0.32.1'`: Install the excat geckodriver version regardless of the
+                          Firefox browser version.
+
+        :param binary: `<str/None>` The path to a specific Firefox binary. Defaults to `None`.
+            - If `None`, will try to locate the Firefox binary installed in the
+              system and use it to determine the compatible webdriver version.
+            - If specified, will use this given Firefox binary to determine the
+              compatible webdriver version and start the session.
 
         ### Example:
-        >>> async with driver.acquire() as session:
+        >>> from aselenium import Firefox
+            driver = Firefox(
+                # optional: the directory to store the webdriver
+                directory="/path/to/driver/cache/directory"
+                # optional: the maximum number of webdriver to cache
+                max_cache_size=10
+            )
+        >>> # . acquire a firefox session
+            async with driver.acquire("latest") as session:
+                # explain: install the latest geckodriver available at
+                # [Mozilla Github] repository that is compatible with
+                # the installed Firefox browser, and start a new session.
                 await session.load("https://www.google.com")
-                # . some automated tasks
+                # . do some automated tasks
+                ...
         """
-        return FirefoxSessionContext(
-            self._options,
-            self._service_cls(
-                self._executable,
-                self._service_timeout,
-                *self._service_args,
-                **self._service_kwargs,
-            ),
-        )
+        return super().acquire(version=version, binary=binary)

@@ -16,11 +16,11 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+from aselenium.session import ChromiumBaseSession
 from aselenium.chrome.options import ChromeOptions
 from aselenium.chrome.service import ChromeService
-from aselenium.session import ChromiumBaseSession, ChromiumBaseSessionContext
 
-__all__ = ["ChromeSession", "ChromeSessionContext"]
+__all__ = ["ChromeSession"]
 
 
 # Chrome Session ----------------------------------------------------------------------------------
@@ -37,18 +37,3 @@ class ChromeSession(ChromiumBaseSession):
     def service(self) -> ChromeService:
         """Access the Chrome service `<ChromeService>`."""
         return self._service
-
-
-class ChromeSessionContext(ChromiumBaseSessionContext):
-    """The context manager for a Chrome session."""
-
-    def __init__(self, options: ChromeOptions, service: ChromeService) -> None:
-        """The context manager for a Chrome session.
-
-        :param options: `<ChromeOptions>` The browser options.
-        :param service: `<ChromeService>` The browser service.
-        """
-        self._session = ChromeSession(options, service)
-
-    async def __aenter__(self) -> ChromeSession:
-        return await self.start()
