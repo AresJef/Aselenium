@@ -2090,7 +2090,7 @@ class Session:
         rect.y = y
 
         # Set new window rect
-        res = await self._change_windows_state(Command.SET_WINDOW_RECT, rect.dict, 10)
+        res = await self._change_windows_state(Command.SET_WINDOW_RECT, rect.dict, 20)
         return self._create_window_rect(res)
 
     async def maximize_window(self) -> WindowRect:
@@ -2102,7 +2102,7 @@ class Session:
         >>> rect = await session.maximize_window()
             # <WindowRect (width=1512, height=944, x=0, y=38)>
         """
-        res = await self._change_windows_state(Command.W3C_MAXIMIZE_WINDOW, None, 10)
+        res = await self._change_windows_state(Command.W3C_MAXIMIZE_WINDOW, None, 20)
         return self._create_window_rect(res)
 
     async def minimize_window(self) -> None:
@@ -2111,7 +2111,7 @@ class Session:
         ### Example:
         >>> await session.minimize_window()
         """
-        await self._change_windows_state(Command.MINIMIZE_WINDOW, None, 10)
+        await self._change_windows_state(Command.MINIMIZE_WINDOW, None, 20)
 
     async def fullscreen_window(self) -> None:
         """Set the active window to fullscreen.
@@ -2119,7 +2119,7 @@ class Session:
         ### Example:
         >>> await session.fullscreen_window()
         """
-        await self._change_windows_state(Command.FULLSCREEN_WINDOW, None, 10)
+        await self._change_windows_state(Command.FULLSCREEN_WINDOW, None, 20)
 
     async def _change_windows_state(
         self,
@@ -2136,7 +2136,7 @@ class Session:
                 if window_state_retry >= retry:
                     raise
                 window_state_retry += 1
-                await sleep(0.5)
+                await sleep(0.2)
 
     def _create_window_rect(self, res: dict) -> WindowRect:
         """(Internal) Parse & create window rect from response.
