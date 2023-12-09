@@ -448,6 +448,7 @@ class DriverManager:
         """(Internal) Parse the target browser binary for the installation."""
         if binary is None:
             self._target_binary = None
+            return None  # exit
         try:
             self._target_binary = validate_file(binary)
         except Exception:
@@ -2140,6 +2141,7 @@ class SafariDriverManager(DriverManager):
         """(Internal) Prase the target webdriver executable for the installation."""
         if driver is None:
             self._target_driver = None
+            return None  # exit
         try:
             driver: str = validate_file(driver)
         except Exception:
