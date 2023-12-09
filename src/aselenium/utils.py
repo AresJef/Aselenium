@@ -19,6 +19,7 @@
 from __future__ import annotations
 from orjson import loads
 from plistlib import load
+from platform import system
 from math import ceil, floor
 from os.path import isfile, isdir, dirname, expanduser
 from typing import Any, Iterator, KeysView, ValuesView, ItemsView
@@ -341,7 +342,7 @@ class KeyboardKeys:
 
     # Special keys
     META: str = "\ue03d"
-    COMMAND: str = "\ue03d"
+    COMMAND: str = "\ue03d" if system() == "Darwin" else CONTROL
     ZENKAKU_HANKAKU: str = "\ue040"
 
 
