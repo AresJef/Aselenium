@@ -20,7 +20,7 @@ from __future__ import annotations
 from orjson import loads
 from plistlib import load
 from math import ceil, floor
-from os.path import isfile, isdir, dirname
+from os.path import isfile, isdir, dirname, expanduser
 from typing import Any, Iterator, KeysView, ValuesView, ItemsView
 from aselenium import errors
 
@@ -392,6 +392,51 @@ def is_file_dir_exists(file: str | Any) -> bool:
         return isdir(dirname(file))
     except Exception:
         return False
+
+
+def validate_dir(path: str | Any) -> str:
+    """Validate a directory and return the absolute path `<str>`."""
+    try:
+        path = expanduser(path)
+    except Exception as err:
+        raise errors.AseleniumInvalidPathError(
+            "Directory {} {} is not valid.".format(repr(path), type(path))
+        ) from err
+    if not is_path_dir(path):
+        raise errors.AseleniumDirectoryNotFoundError(
+            "Directory '{}' not exists.".format(path)
+        )
+    return path
+
+
+def validate_file(path: str | Any) -> str:
+    """Validate a file and return the absolute path `<str>`."""
+    try:
+        path = expanduser(path)
+    except Exception as err:
+        raise errors.AseleniumInvalidPathError(
+            "File path {} {} is not valid.".format(repr(path), type(path))
+        ) from err
+    if not is_path_file(path):
+        raise errors.AseleniumFileNotFoundError("File '{}' not exists.".format(path))
+    return path
+
+
+def validate_save_file_path(path: str | Any, file_ext: str) -> str:
+    """Validates a file path and ensures that the directory exists."""
+    try:
+        path = expanduser(path)
+    except Exception as err:
+        raise errors.AseleniumInvalidPathError(
+            "File path {} {} is not valid.".format(repr(path), type(path))
+        ) from err
+    if not is_file_dir_exists(path):
+        raise errors.AseleniumDirectoryNotFoundError(
+            "File directory '{}' does not exist.".format(path)
+        )
+    if not path.endswith(file_ext):
+        path += file_ext
+    return path
 
 
 # Utils: dict -------------------------------------------------------------------------------------

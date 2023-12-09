@@ -16,19 +16,18 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from io import BytesIO
 from typing import Literal
-from os import walk as walk_path
-from os.path import join as join_path
-from zipfile import ZipFile, ZIP_DEFLATED, is_zipfile
+from zipfile import is_zipfile
 from aselenium import errors
 from aselenium.logs import logger
 from aselenium.command import Command
 from aselenium.session import Session
 from aselenium.manager.version import GeckoVersion, FirefoxVersion
-from aselenium.utils import is_path_file, is_path_dir, is_file_dir_exists
+from aselenium.utils import validate_save_file_path
+from aselenium.utils import validate_file, is_path_file, is_path_dir
 from aselenium.firefox.options import FirefoxOptions
 from aselenium.firefox.service import FirefoxService
+from aselenium.firefox.utils import encode_dir_to_firefox_wire_protocol
 from aselenium.firefox.utils import FirefoxAddon, extract_firefox_addon_details
 
 __all__ = ["FirefoxSession"]
@@ -101,15 +100,14 @@ class FirefoxSession(Session):
             # True / False
         """
         # Validate screenshot path
-        if not is_file_dir_exists(path):
+        try:
+            path = validate_save_file_path(path, ".png")
+        except Exception as err:
             raise errors.InvalidArgumentError(
-                "<{}>\nInvalid `save_full_screenshot()` path: {}. "
-                "File directory might not exist.".format(
-                    self.__class__.__name__, repr(path)
+                "<{}>\nSave full screenshot 'path' error: {}".format(
+                    self.__class__.__name__, err
                 )
-            )
-        if not path.endswith(".png"):
-            path += ".png"
+            ) from err
 
         # Take & save screenshot
         data = None
@@ -239,14 +237,7 @@ class FirefoxSession(Session):
         def encode_addon(path: str) -> str:
             # . unpacked add-on folder
             if is_path_dir(path):
-                fp = BytesIO()
-                path_root = len(path) + 1  # account for trailing slash
-                with ZipFile(fp, "w", ZIP_DEFLATED) as zip:
-                    for base, _, files in walk_path(path):
-                        for fyle in files:
-                            filename = join_path(base, fyle)
-                            zip.write(filename, filename[path_root:])
-                return self._encode_base64(fp.getvalue(), "utf-8")
+                return encode_dir_to_firefox_wire_protocol(path)
             # . packed add-on file
             elif is_path_file(path) and is_zipfile(path):
                 with open(path, "rb") as file:
@@ -260,6 +251,15 @@ class FirefoxSession(Session):
 
         addons = []
         for path in paths:
+            # . Validate add-on path
+            try:
+                path = validate_file(path)
+            except Exception as err:
+                raise errors.InvalidExtensionError(
+                    "<{}>\nExtension 'path' error: {}".format(
+                        self.__class__.__name__, err
+                    )
+                ) from err
             # . extract add-on details
             try:
                 details = extract_firefox_addon_details(path)

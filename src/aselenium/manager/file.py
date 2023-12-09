@@ -24,10 +24,10 @@ from datetime import datetime
 from zipfile import ZipFile, ZipInfo
 from os import makedirs, chmod, getcwd
 from os.path import join as join_path, expanduser
-from tarfile import open as tar_open, ReadError
+from tarfile import open as tarfile_open, ReadError
 from pandas import DataFrame, read_feather
 from aselenium import errors
-from aselenium.utils import is_path_dir, is_path_file
+from aselenium.utils import validate_dir, is_path_dir, is_path_file
 from aselenium.manager.version import ChromiumVersion, GeckoVersion
 
 
@@ -60,13 +60,13 @@ class FileManager:
         """(Class method) Validate the base directory."""
         if base_dir is None:
             return expanduser("~")
-        elif is_path_dir(base_dir):
-            return base_dir
-        else:
+        try:
+            return validate_dir(base_dir)
+        except Exception as err:
             raise errors.DriverManagerError(
                 "<{}>\nInvalid driver manager cache directory: "
-                "{} {}".format(cls.__name__, repr(base_dir), type(base_dir))
-            )
+                "{} {}.".format(cls.__name__, repr(base_dir), type(base_dir))
+            ) from err
 
     @classmethod
     def _gen_instance_key(cls, base_dir: str) -> str:
@@ -866,11 +866,11 @@ class File:
         """
         try:
             try:
-                with tar_open(file_path, mode="r:gz") as archive:
+                with tarfile_open(file_path, mode="r:gz") as archive:
                     archive.extractall(unzip_dir)
                     return [x.name for x in archive.getmembers()]
             except ReadError:
-                with tar_open(file_path, mode="r:bz2") as archive:
+                with tarfile_open(file_path, mode="r:bz2") as archive:
                     archive.extractall(unzip_dir)
                     return [x.name for x in archive.getmembers()]
         except Exception as err:

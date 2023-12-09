@@ -170,13 +170,13 @@ async def test_driver_profile(browser: T) -> None:
     def get_profile_dir(browser: T) -> str | None:
         if SYSTEM == "Darwin":
             if browser == "chrome":
-                return "/Users/jef/Library/Application Support/Google/Chrome"
+                return "~/Library/Application Support/Google/Chrome"
             elif browser == "chromium":
-                return "/Users/jef/Library/Application Support/Chromium"
+                return "~/Library/Application Support/Chromium"
             elif browser == "edge":
-                return "/Users/jef/Library/Application Support/Microsoft Edge"
+                return "~/Library/Application Support/Microsoft Edge"
             elif browser == "firefox":
-                return "/Users/jef/Library/Application Support/Firefox/Profiles/684o1n0x.default-release-1700386926530"
+                return "~/Library/Application Support/Firefox/Profiles/684o1n0x.default-release-1700386926530"
         elif SYSTEM == "Windows":
             if browser == "chrome":
                 return r"C:\Users\jef\AppData\Local\Google\Chrome\User Data"
@@ -188,13 +188,13 @@ async def test_driver_profile(browser: T) -> None:
                 return r"C:\Users\jef\AppData\Roaming\Mozilla\Firefox\Profiles\bestyaik.default-release"
         elif SYSTEM == "Linux":
             if browser == "chrome":
-                return "/home/jef/.config/google-chrome"
+                return "~/.config/google-chrome"
             elif browser == "chromium":
                 return None
             elif browser == "edge":
-                return "/home/jef/.config/microsoft-edge"
+                return "~/.config/microsoft-edge"
             elif browser == "firefox":
-                return "/home/jef/.mozilla/firefox/a9epssnc.default-release"
+                return "~/.mozilla/firefox/a9epssnc.default-release"
         return None
 
     profile_dir = get_profile_dir(browser)

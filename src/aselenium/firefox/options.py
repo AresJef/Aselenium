@@ -17,16 +17,14 @@
 
 # -*- coding: UTF-8 -*-
 from typing import Any
-from io import BytesIO
 from copy import deepcopy
-from base64 import b64encode
+from os import listdir
 from os.path import join as join_path
-from os import walk as walk_path, listdir
-from zipfile import ZipFile, ZIP_DEFLATED
 from aselenium import errors
 from aselenium.utils import is_path_dir
 from aselenium.options import BaseOptions, Profile
 from aselenium.manager.version import FirefoxVersion
+from aselenium.firefox.utils import encode_dir_to_firefox_wire_protocol
 from aselenium.firefox.utils import FirefoxAddon, extract_firefox_addon_details
 
 
@@ -50,15 +48,10 @@ class FirefoxProfile(Profile):
           used by the program, the temporary profile will be deleted
           automatically.
 
-        ### Example for Default Profile Location:
-        >>> # . Firefox on MacOS:
-            directory="/Users/<username>/Library/Application Support/Firefox/Profiles/<profile_folder>"
-
-        >>> # . Firefox on Windows:
-            directory="C:\\Users\\<username>\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\<profile_folder>"
-
-        >>> # . Firefox on Linux:
-            directory="/home/<username>/.mozilla/firefox/<profile_folder>"
+        ### Default Profile Location:
+        - MacOS: '~/Library/Application Support/Firefox/Profiles/<profile_folder>'
+        - Windows: 'C:\\Users\\<username>\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\<profile_folder>'
+        - Linux: '~/.mozilla/firefox/<profile_folder>'
         """
         super().__init__(directory, None)
         # Extensions
@@ -90,14 +83,14 @@ class FirefoxProfile(Profile):
             return self._encode
 
         # Encode profile
-        fp = BytesIO()
-        with ZipFile(fp, "w", ZIP_DEFLATED) as zip:
-            path_root = len(self._temp_profile_dir) + 1
-            for base, _, files in walk_path(self._temp_profile_dir):
-                for fyle in files:
-                    filename = join_path(base, fyle)
-                    zip.write(filename, filename[path_root:])
-        self._encode = b64encode(fp.getvalue()).decode("utf-8")
+        try:
+            self._encode = encode_dir_to_firefox_wire_protocol(self._temp_profile_dir)
+        except Exception as err:
+            raise errors.InvalidProfileError(
+                "<{}>\nFailed to encode the Firefox profile: {}".format(
+                    self.__class__.__name__, err
+                )
+            ) from err
         return self._encode
 
     # Extensions --------------------------------------------------------------------------
@@ -202,15 +195,10 @@ class FirefoxOptions(BaseOptions):
           used by the program, the temporary profile will be deleted
           automatically.
 
-        ### Example for Default Profile Location:
-        >>> # . Firefox on MacOS:
-            directory="/Users/<username>/Library/Application Support/Firefox/Profiles/<profile_folder>"
-
-        >>> # . Firefox on Windows:
-            directory="C:\\Users\\<username>\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\<profile_folder>"
-
-        >>> # . Firefox on Linux:
-            directory="/home/<username>/.mozilla/firefox/<profile_folder>"
+        ### Default Profile Location:
+        - MacOS: '~/Library/Application Support/Firefox/Profiles/<profile_folder>'
+        - Windows: 'C:\\Users\\<username>\\AppData\\Roaming\\Mozilla\\Firefox\\Profiles\\<profile_folder>'
+        - Linux: '~/.mozilla/firefox/<profile_folder>'
         """
         # Create profile
         value = FirefoxProfile(directory)

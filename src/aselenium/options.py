@@ -28,7 +28,7 @@ from shutil import copytree, ignore_patterns, rmtree
 from aselenium import errors
 from aselenium.settings import Constraint, DefaultTimeouts
 from aselenium.manager.version import Version, ChromiumVersion
-from aselenium.utils import is_path_file, is_path_dir, prettify_dict
+from aselenium.utils import validate_file, validate_dir, is_path_dir, prettify_dict
 
 __all__ = ["Proxy", "Timeouts", "ChromiumProfile"]
 
@@ -639,12 +639,19 @@ class Profile:
           automatically.
         """
         # Profile directory
-        self._directory: str = directory
         self._profile_folder: str | None = profile_folder
         self._profile_dir: str = None
         self._temp_directory: str = None
         self._temp_profile_folder: str = "TEMP_PROFILE"
         self._temp_profile_dir: str = None
+        try:
+            self._directory = validate_dir(directory)
+        except Exception as err:
+            raise errors.InvalidProfileError(
+                "<{}>\nProfile 'directory' error: {}".format(
+                    self.__class__.__name__, err
+                )
+            ) from err
         # Create temporary profile
         self._create_temp_profile()
 
@@ -655,15 +662,7 @@ class Profile:
         if self._temp_directory is not None:
             return None  # exit
 
-        # Validate directory
-        if not is_path_dir(self._directory):
-            raise errors.InvalidProfileError(
-                "<{}> Invalid profile directory: {} {}.".format(
-                    self.__class__.__name__,
-                    repr(self._directory),
-                    type(self._directory),
-                )
-            )
+        # Determine profile directory
         if self._profile_folder is not None:
             try:
                 self._profile_dir = join_path(self._directory, self._profile_folder)
@@ -761,18 +760,20 @@ class ChromiumProfile(Profile):
           used by the program, the temporary profile will be deleted
           automatically.
 
-        ### Example for Default Profile Location:
-        >>> # . Chrome on MacOS:
-            directory="/Users/<username>/Library/Application Support/Google/Chrome"
-            profile="Default"
+        ### MacOS Default Profile Location:
+        - Chrome: '~/Library/Application Support/Google/Chrome' & 'Default'
+        - Chromium: '~/Library/Application Support/Chromium' & 'Default'
+        - Edge: '~/Library/Application Support/Microsoft Edge' & 'Default'
 
-        >>> # . Chrome on Windows:
-            directory="C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data"
-            profile="Default"
+        ### Windows Default Profile Location:
+        - Chrome: 'C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data' & 'Default'
+        - Chromium: 'C:\\Users\\<username>\\AppData\\Local\\Chromium\\User Data' & 'Default'
+        - Edge: 'C:\\Users\\<username>\\AppData\\Local\\Microsoft\\Edge\\User Data' & 'Default'
 
-        >>> # . Chrome on Linux:
-            directory="/home/<username>/.config/google-chrome"
-            profile="Default"
+        ### Linux Default Profile Location:
+        - Chrome: '~/.config/google-chrome' & 'Default'
+        - Chromium: '~/.config/chromium' & 'Default'
+        - Edge: '~/.config/microsoft-edge' & 'Default'
         """
         # Pre-validation
         if not isinstance(profile_folder, str):
@@ -1030,11 +1031,14 @@ class BaseOptions:
             return None  # exit
 
         # Set binary location
-        if not is_path_file(value):
+        try:
+            value = validate_file(value)
+        except Exception as err:
             raise errors.InvalidOptionsError(
-                "<{}>\nBrowser 'browser_location' not exists at: "
-                "{}.".format(self.__class__.__name__, repr(value))
-            )
+                "<{}>\nOptions 'browser_location' error: {}".format(
+                    self.__class__.__name__, err
+                )
+            ) from err
         self.add_experimental_options(binary=value)
 
     # Caps: platform name -----------------------------------------------------------------
@@ -1578,18 +1582,20 @@ class ChromiumBaseOptions(BaseOptions):
           used by the program, the temporary profile will be deleted
           automatically.
 
-        ### Example for Default Profile Location:
-        >>> # . Chrome on MacOS:
-            directory="/Users/<username>/Library/Application Support/Google/Chrome"
-            profile="Default"
+        ### MacOS Default Profile Location:
+        - Chrome: '~/Library/Application Support/Google/Chrome' & 'Default'
+        - Chromium: '~/Library/Application Support/Chromium' & 'Default'
+        - Edge: '~/Library/Application Support/Microsoft Edge' & 'Default'
 
-        >>> # . Chrome on Windows:
-            directory="C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data"
-            profile="Default"
+        ### Windows Default Profile Location:
+        - Chrome: 'C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data' & 'Default'
+        - Chromium: 'C:\\Users\\<username>\\AppData\\Local\\Chromium\\User Data' & 'Default'
+        - Edge: 'C:\\Users\\<username>\\AppData\\Local\\Microsoft\\Edge\\User Data' & 'Default'
 
-        >>> # . Chrome on Linux:
-            directory="/home/<username>/.config/google-chrome"
-            profile="Default"
+        ### Linux Default Profile Location:
+        - Chrome: '~/.config/google-chrome' & 'Default'
+        - Chromium: '~/.config/chromium' & 'Default'
+        - Edge: '~/.config/microsoft-edge' & 'Default'
         """
         # Create profile
         value = ChromiumProfile(directory, profile)
@@ -1652,11 +1658,14 @@ class ChromiumBaseOptions(BaseOptions):
         added = False
         for path in paths:
             # . validate ext path
-            if not is_path_file(path):
+            try:
+                path = validate_file(path)
+            except Exception as err:
                 raise errors.InvalidExtensionError(
-                    "<{}>\nExtension file not found at: "
-                    "{}".format(self.__class__.__name__, repr(path))
-                )
+                    "<{}>\nExtension 'path' error: {}".format(
+                        self.__class__.__name__, err
+                    )
+                ) from err
             # . load ext data
             try:
                 with open(path, "rb") as f:

@@ -31,7 +31,7 @@ from aselenium.manager.file import EdgeFileManager, EdgeDriverFile
 from aselenium.manager.file import FirefoxFileManager, GeckoDriverFile
 from aselenium.manager.file import FileManager, ChromiumBaseFileManager, File
 from aselenium.manager.file import ChromeFileManager, ChromeDriverFile, ChromeBinaryFile
-from aselenium.utils import is_path_file, load_json_file, load_plist_file
+from aselenium.utils import validate_file, is_path_file, load_json_file, load_plist_file
 
 __all__ = [
     "EdgeDriverManager",
@@ -448,9 +448,9 @@ class DriverManager:
         """(Internal) Parse the target browser binary for the installation."""
         if binary is None:
             self._target_binary = None
-        elif is_path_file(binary):
-            self._target_binary = binary
-        else:
+        try:
+            self._target_binary = validate_file(binary)
+        except Exception:
             self._raise_invalid_browser_location_error(binary)
 
     # Driver ------------------------------------------------------------------------------
@@ -2032,6 +2032,8 @@ class SafariDriverManager(DriverManager):
         ChannelType.DEV: ["/Applications/Safari Technology Preview.app/Contents/MacOS/Safari Technology Preview"],
     }
     """The partial paths to the browser binary on MacOS."""
+    _MAC_DRIVER_DEFAULT_PATH: str = "/usr/bin/safaridriver"
+    """The default path to the webdriver executable on MacOS."""
     _DRIVER_EXECUTABLE_NAME: str = "safaridriver"
     """The name of the webdriver executable."""
     # fmt: on
@@ -2138,10 +2140,13 @@ class SafariDriverManager(DriverManager):
         """(Internal) Prase the target webdriver executable for the installation."""
         if driver is None:
             self._target_driver = None
-        elif is_path_file(driver) and driver.endswith(self._DRIVER_EXECUTABLE_NAME):
-            self._target_driver = driver
-        else:
+        try:
+            driver: str = validate_file(driver)
+        except Exception:
             self._raise_invalid_driver_location_error(driver)
+        if not driver.endswith(self._DRIVER_EXECUTABLE_NAME):
+            self._raise_invalid_driver_location_error(driver)
+        self._target_driver = driver
 
     # Driver ------------------------------------------------------------------------------
     @property
@@ -2155,9 +2160,8 @@ class SafariDriverManager(DriverManager):
         """(Internal) Detect the driver location `<str>`."""
         # Stable channel - default location
         if self._channel == ChannelType.STABLE and self._target_binary is None:
-            location = "/usr/bin/safaridriver"
-            if is_path_file(location):
-                return location
+            if is_path_file(self._MAC_DRIVER_DEFAULT_PATH):
+                return self._MAC_DRIVER_DEFAULT_PATH
 
         # Application contents - default location
         base_folder = dirname(self._browser_location)
@@ -2174,9 +2178,9 @@ class SafariDriverManager(DriverManager):
         # Raise driver not found error
         if self._target_binary is None:
             self._raise_invalid_driver_location_error(None)
+
         # Return default driver location
-        else:
-            return "/usr/bin/safaridriver"
+        return self._MAC_DRIVER_DEFAULT_PATH
 
     # Browser -----------------------------------------------------------------------------
     @property

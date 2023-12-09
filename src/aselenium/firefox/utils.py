@@ -17,11 +17,14 @@
 
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
+from io import BytesIO
 from typing import Any
 from orjson import loads
 from xml.dom import minidom
+from base64 import b64encode
+from os import walk as walk_path
 from os.path import join as join_path
-from zipfile import ZipFile, is_zipfile
+from zipfile import ZipFile, ZIP_DEFLATED, is_zipfile
 from aselenium import errors
 from aselenium.utils import CustomDict, is_path_file, is_path_dir
 
@@ -187,3 +190,19 @@ def extract_firefox_addon_details(path: str) -> FirefoxAddon:
 
     # Return details
     return FirefoxAddon(**details)
+
+
+def encode_dir_to_firefox_wire_protocol(directory: str) -> str:
+    """Encodes a directory to the Firefox wire protocol format.
+
+    :param directory: `<str>` The directory to be encoded.
+    :return `<str>`: The encoded directory in the Firefox wire protocol format.
+    """
+    fp = BytesIO()
+    path_root = len(directory) + 1  # account for trailing slash
+    with ZipFile(fp, "w", ZIP_DEFLATED) as zip:
+        for base, _, files in walk_path(directory):
+            for fyle in files:
+                filename = join_path(base, fyle)
+                zip.write(filename, filename[path_root:])
+    return b64encode(fp.getvalue()).decode("utf-8")

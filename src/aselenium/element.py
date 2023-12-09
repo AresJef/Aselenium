@@ -26,7 +26,7 @@ from aselenium.service import BaseService
 from aselenium.connection import Connection
 from aselenium.shadow import Shadow, SHADOWROOT_KEY
 from aselenium.utils import Rectangle, KeyboardKeys
-from aselenium.utils import is_path_file, is_file_dir_exists, process_keys
+from aselenium.utils import process_keys, validate_file, validate_save_file_path
 
 if TYPE_CHECKING:
     from aselenium.session import Session
@@ -293,14 +293,12 @@ class Element:
         >>> await element.upload("~/path/to/image.png")
         """
         # Validate
-        for file in files:
-            if not is_path_file(file):
-                raise errors.AseleniumFileNotFoundError(
-                    "<{}>\nInvalid file to upload: {}".format(
-                        self.__class__.__name__, repr(file)
-                    )
-                )
-        files = list(files)
+        try:
+            files = [validate_file(file) for file in files]
+        except Exception as err:
+            raise errors.InvalidArgumentError(
+                "<{}>\nUpload 'file' error: {}".format(self.__class__.__name__, err)
+            )
         # Upload
         await self.execute_command(
             Command.SEND_KEYS_TO_ELEMENT,
@@ -867,15 +865,14 @@ class Element:
         >>> await element.save_screenshot("~/path/to/screenshot.png")  # True / False
         """
         # Validate save path
-        if not is_file_dir_exists(path):
+        try:
+            path = validate_save_file_path(path, ".png")
+        except Exception as err:
             raise errors.InvalidArgumentError(
-                "<{}>\nInvalid `save_screenshot()` path: {}. "
-                "File directory does not exist.".format(
-                    self.__class__.__name__, repr(path)
+                "<{}>\nSave screenshot 'path' error: {}".format(
+                    self.__class__.__name__, err
                 )
-            )
-        if not path.endswith(".png"):
-            path += ".png"
+            ) from err
 
         data = None
         try:

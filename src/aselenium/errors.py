@@ -32,8 +32,16 @@ class AseleniumTimeout(AseleniumError, TimeoutError):
     """Exception raised for timeout."""
 
 
-class AseleniumFileNotFoundError(AseleniumError, FileNotFoundError):
+class AseleniumInvalidPathError(AseleniumError, ValueError):
+    """Exception raised for invalid path."""
+
+
+class AseleniumFileNotFoundError(AseleniumInvalidPathError, FileNotFoundError):
     """The file could not be found at the given path."""
+
+
+class AseleniumDirectoryNotFoundError(AseleniumInvalidPathError, FileNotFoundError):
+    """The directory could not be found at the given path."""
 
 
 class AseleniumInvalidValueError(AseleniumError, ValueError):

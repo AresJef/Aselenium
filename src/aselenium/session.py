@@ -33,13 +33,12 @@ from aselenium.errors import ErrorCode
 from aselenium import errors, javascript
 from aselenium.valuewrap import warp_tuple
 from aselenium.connection import Connection
-from aselenium.utils import is_file_dir_exists
-from aselenium.utils import Rectangle, CustomDict
 from aselenium.element import Element, ELEMENT_KEY
 from aselenium.manager.version import Version, ChromiumVersion
 from aselenium.service import BaseService, ChromiumBaseService
 from aselenium.settings import Constraint, DefaultNetworkConditions
 from aselenium.options import BaseOptions, ChromiumBaseOptions, Timeouts
+from aselenium.utils import validate_save_file_path, Rectangle, CustomDict
 
 __all__ = [
     "Cookie",
@@ -1232,15 +1231,14 @@ class Session:
         >>> await session.save_screenshot("~/path/to/screenshot.png")  # True / False
         """
         # Validate screenshot path
-        if not is_file_dir_exists(path):
+        try:
+            path = validate_save_file_path(path, ".png")
+        except Exception as err:
             raise errors.InvalidArgumentError(
-                "<{}>\nInvalid `save_screenshot()` path: {}. "
-                "File directory might not exist.".format(
-                    self.__class__.__name__, repr(path)
+                "<{}>\nSave screenshot 'path' error: {}".format(
+                    self.__class__.__name__, err
                 )
-            )
-        if not path.endswith(".png"):
-            path += ".png"
+            ) from err
 
         # Take & save screenshot
         data = None
@@ -1434,15 +1432,14 @@ class Session:
         >>> await session.save_page("~/path/to/screenshot.pdf")  # True / False
         """
         # Validate pdf path
-        if not is_file_dir_exists(path):
+        try:
+            path = validate_save_file_path(path, ".pdf")
+        except Exception as err:
             raise errors.InvalidArgumentError(
-                "<{}>\nInvalid `save_pdf()` path: {}. "
-                "File directory might not exist.".format(
-                    self.__class__.__name__, repr(path)
+                "<{}>\nSave page 'path' error: {}".format(
+                    self.__class__.__name__, err
                 )
-            )
-        if not path.endswith(".pdf"):
-            path += ".pdf"
+            ) from err
 
         # Print & save pdf
         data = None

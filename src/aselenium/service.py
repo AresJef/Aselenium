@@ -28,7 +28,7 @@ from socket import socket, AF_INET, SOCK_STREAM, create_connection
 from psutil import Process as psutil_Process
 from aiohttp import ClientSession, ClientConnectorError
 from aselenium import errors
-from aselenium.utils import is_path_file
+from aselenium.utils import validate_file
 from aselenium.manager.version import Version, ChromiumVersion
 
 
@@ -61,13 +61,14 @@ class BaseService:
         :param kwargs: `<Any>` Additional keyword arguments for `subprocess.Popen` constructor.
         """
         # Driver
-        if not is_path_file(driver_location):
+        try:
+            self._driver_location = validate_file(driver_location)
+        except Exception as err:
             raise errors.ServiceExecutableNotFoundError(
                 "`<{}>`\nService webdriver executable not found at: {}".format(
                     self.__class__.__name__, repr(driver_location)
                 )
-            )
-        self._driver_location = driver_location
+            ) from err
         self._driver_version = driver_version
         # Timeout
         self.timeout = timeout
