@@ -24,7 +24,7 @@ from aiohttp import ClientSession, ClientError, ClientTimeout
 from aselenium import errors
 from aselenium.logs import logger
 from aselenium.command import COMMANDS
-from aselenium.errors import ErrorCode, error_handler
+from aselenium.errors import ErrorCode, webdriver_error_handler
 
 __all__ = ["Connection"]
 
@@ -87,7 +87,7 @@ class Connection:
 
         # Execute command
         res = await self._request(method, base_url + cmd, body, timeout)
-        error_handler(res)
+        webdriver_error_handler(res)
 
         # Return response
         return res

@@ -719,8 +719,21 @@ WEBDRIVER_ERROR_MAP: dict[int | str, Exception] = {
     "unknown method exception": UnknownMethodError,
 }
 
+INCOMPATIBLE_DRIVER_PATTERN: Pattern = compile(
+    "session not created: this version .+ only supports .+ version .+", IGNORECASE
+)
+"""
+Edge error message:
+This version of Microsoft Edge WebDriver only supports Microsoft Edge version 110
+Current browser version is 119.0.2151.97 with binary path ~
 
-def error_handler(res: dict[str, Any]) -> None:
+Chromium error message:
+aselenium.errors.IncompatibleWebdriverError: session not created: This version of ChromeDriver only supports Chrome version 116
+Current browser version is 119.0.6045.199 with binary path ~
+"""
+
+
+def webdriver_error_handler(res: dict[str, Any]) -> None:
     """Check response from the WebDriver for error.
 
     :params res: The response from the WebDriver server as a dictionary object.
@@ -732,7 +745,7 @@ def error_handler(res: dict[str, Any]) -> None:
     if status == ErrorCode.SUCCESS or not status:
         return None  # exit
 
-    # Construct - value & message
+    # Error - message
     value = res.get("value")
     if isinstance(value, str) and isinstance(status, int):
         try:
@@ -755,22 +768,25 @@ def error_handler(res: dict[str, Any]) -> None:
     else:
         message = res.get("message", value.get("message", "Unknown error"))
 
-    # Map error
+    # Map webdriver error
     error = WEBDRIVER_ERROR_MAP.get(status, WebDriverError)
     if error is UnknownError:
         if ErrorCode.INTERNET_DISCONNECTED in message:
             error = InternetDisconnectedError
         elif ErrorCode.FAILED_TO_CHANGE_WINDOW_STATE in message:
             error = ChangeWindowStateError
+    elif error is InvalidSessionError:
+        if INCOMPATIBLE_DRIVER_PATTERN.search(message) is not None:
+            error = IncompatibleWebdriverError
 
-    # Raise error
+    # Raise direct error
     if isinstance(value, str):
         raise error(value)
 
-    # Construct - screen
+    # Error - screen
     screen = value.get("screen")
 
-    # Construct - stacktrace
+    # Error - stacktrace
     stacktrace = None
     # strace = value.get("stackTrace") or value.get("stacktrace")
     # if strace:
@@ -795,7 +811,7 @@ def error_handler(res: dict[str, Any]) -> None:
     # else:
     #     stacktrace = None
 
-    # Raise error
+    # Raise unexpected alert error
     if error is UnexpectedAlertFoundError:
         if "data" in value:
             alert_text = value["data"].get("text")
@@ -804,41 +820,6 @@ def error_handler(res: dict[str, Any]) -> None:
         else:
             alert_text = None
         raise error(message, screen, stacktrace, alert_text)
-    elif error is InvalidSessionError:
-        raise_invalid_session_error(error, message, screen, stacktrace)
-    else:
-        raise error(message, screen, stacktrace)
 
-
-# Incompatible webdriver error
-INCOMPATIBLE_DRIVER_PATTERN: Pattern = compile(
-    "session not created: this version .+ only supports .+ version .+", IGNORECASE
-)
-"""
-Edge error message:
-This version of Microsoft Edge WebDriver only supports Microsoft Edge version 110
-Current browser version is 119.0.2151.97 with binary path ~
-
-Chrome error message:
-aselenium.errors.IncompatibleWebdriverError: session not created: This version of ChromeDriver only supports Chrome version 116
-Current browser version is 119.0.6045.199 with binary path ~
-"""
-
-
-def raise_invalid_session_error(
-    error: type[Exception],
-    message: str,
-    screen: str | None,
-    stacktrace: list[str] | None,
-) -> None:
-    """Raise the InvalidSessionError.
-
-    If the error is for incompatible webdriver, raise `IncompatibleWebdriverError`,
-    which is a subclass of `InvalidSessionError`. Otherwise, raise the original error.
-    """
-    # Match imcompatible webdriver error
-    matches = INCOMPATIBLE_DRIVER_PATTERN.search(message)
-    if matches is not None:
-        raise IncompatibleWebdriverError(message, screen, stacktrace)
-    else:
-        raise error(message, screen, stacktrace)
+    # Raise webdriver error
+    raise error(message, screen, stacktrace)
