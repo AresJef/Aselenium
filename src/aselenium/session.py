@@ -1436,9 +1436,7 @@ class Session:
             path = validate_save_file_path(path, ".pdf")
         except Exception as err:
             raise errors.InvalidArgumentError(
-                "<{}>\nSave page 'path' error: {}".format(
-                    self.__class__.__name__, err
-                )
+                "<{}>\nSave page 'path' error: {}".format(self.__class__.__name__, err)
             ) from err
 
         # Print & save pdf
@@ -1476,7 +1474,7 @@ class Session:
     # Timeouts ----------------------------------------------------------------------------
     @property
     async def timeouts(self) -> Timeouts:
-        """Access the timeout settings of the current session `<Timeouts>`.
+        """Access the timeouts of the current session `<Timeouts>`.
 
         ### Timeouts explain:
 
@@ -1503,7 +1501,7 @@ class Session:
         pageLoad: int | float | None = None,
         script: int | float | None = None,
     ) -> Timeouts:
-        """Set the timeout settings of the current session.
+        """Sets the timeouts of the current session.
 
         ### Notice
         All of the timeout values should be in `SECONDS` instead of milliseconds
@@ -1546,10 +1544,8 @@ class Session:
         return self._timeouts.copy()
 
     async def reset_timeouts(self) -> Timeouts:
-        """Reset the timeout settings of the current session to the
-        default values, and returns the reset `<Timeouts>`. Here the
-        default values are the timeouts specified in the options. You
-        can access this timeout through `session.options.timeouts`.
+        """Resets the timeouts of the current session to the orginal
+        options values, and returns the reset `<Timeouts>`.
 
         ### Example:
         >>> timeouts = await session.reset_timeouts()
@@ -2076,8 +2072,8 @@ class Session:
         :param y: `<int/None>` The new y coordinate of the window. If `None (default)`, keep the current y coordinate.
 
         ### Example:
-        >>> rect = await session.set_window_rect(900, 1200, 22, 60)
-            # <WindowRect (width=1200, height=900, x=22, y=60)>
+        >>> rect = await session.set_window_rect(800, 500, 22, 60)
+            # <WindowRect (width=800, height=500, x=22, y=60)>
         """
         # Update from current rect
         rect = await self.window_rect

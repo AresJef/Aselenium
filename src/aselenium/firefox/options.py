@@ -188,12 +188,11 @@ class FirefoxOptions(BaseOptions):
         :param directory: `<str>` The directory of the Firefox profile.
 
         ### Explaination
-        - When creating a `Profile` instance, a cloned temporary profile
-          will be created based on the given profile 'directory'. The
-          automated session will use this temporary profile leaving the
-          original profile untouched. When this profile is no longer
-          used by the program, the temporary profile will be deleted
-          automatically.
+        - When setting the profile through this method, a cloned temporary
+          profile will be created based on the given profile 'directory'.
+          The automated session will use the temporary profile leaving the
+          original profile untouched. When the driver is no longer used by
+          the program, the temporary profile will be deleted automatically.
 
         ### Default Profile Location:
         - MacOS: '~/Library/Application Support/Firefox/Profiles/<profile_folder>'

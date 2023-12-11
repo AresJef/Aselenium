@@ -17,6 +17,7 @@
 
 # -*- coding: UTF-8 -*-
 from __future__ import annotations
+from asyncio import sleep
 from typing import Any, Literal, TypedDict, TYPE_CHECKING
 from aselenium import errors
 from aselenium.command import Command
@@ -110,8 +111,8 @@ class ActionsChain(TypedDict):
 # Actions -----------------------------------------------------------------------------------------
 class Actions:
     """Represent an actions chain that peforms (automate) low
-    level interactions such as mouse movements, key press, and
-    wheel scroll.
+    level interactions such as mouse movements, key presses,
+    and wheel scrolls.
     """
 
     def __init__(
@@ -459,7 +460,12 @@ class Actions:
         *keys: str | KeyboardKeys,
         pause: int | float | None = None,
     ) -> Actions:
-        """Send keyboard KEYs.
+        """Simulate the action of typing keyboad keys.
+
+        ### Notice:
+        Different from the `send_key_combo()`, the `send_keys()` method simulates
+        the actions of typing a series of keyboard keys, such as `Hello world!`.
+        Each key is first pressed down and then released in the specified order.
 
         :param keys: `<str/KeyboardKeys>` The keys to send.
         :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
@@ -480,6 +486,42 @@ class Actions:
         for key in process_keys(*keys):
             self._key_down(key)
             self._key_up(key)
+        return self.pause(pause)
+
+    def send_key_combo(
+        self,
+        *keys: str | KeyboardKeys,
+        pause: int | float | None = None,
+    ) -> Actions:
+        """Simulates the action of pressing a combination of keys.
+
+        ### Notice:
+        Different from the `send_keys()`, the `send_key_combo()` method simulates
+        the action of pressing a combination of keys, such as `ctrl + a` (select all),
+        `ctrl + c` (copy), `ctrl + v` (paste), etc. Each key is first pressed down in
+        the specified order, and then released in the reverse order.
+
+        :param keys: `<str/KeyboardKeys>` The keys combinations to send.
+        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
+        :return `<Actions>`: The actions chain.
+
+        ### Example:
+        >>> From aselenium import KeyboardKeys
+            inputbox = await session.find_element("#inputbox")
+            (
+                await session.actions()
+                .move_to(inputbox)
+                .click()
+                .send_keys("Hello world!")
+                .send_key_combo(KeyboardKeys.CONTROL, "a")
+                .send_key_combo(KeyboardKeys.CONTROL, "x")
+                .send_key_combo(KeyboardKeys.CONTROL, "v")
+                .perform()
+            )
+        """
+        keys = process_keys(*keys)
+        [self._key_down(key) for key in keys]
+        [self._key_up(key) for key in reversed(keys)]
         return self.pause(pause)
 
     def _key_down(self, key: str, **kwargs) -> None:
@@ -630,8 +672,18 @@ class Actions:
         return self
 
     # Perform -----------------------------------------------------------------------------
-    async def perform(self) -> None:
-        """Perform (execute) the actions chain."""
+    async def perform(self, explicit_wait: int | float | None = None) -> None:
+        """Perform (execute) the actions chain.
+
+        :param explicit_wait: `<int/float/None>` Total seconds to wait after sending the actions command. Defaults to `None`.
+        - For Chromium based browsers, this argument is usually not needed. The webdriver
+          itself will wait until all the actions are performed before returning a response.
+        - For Firefox, specifing an explicit wait is required in most cases, since the
+          webdriver will return a response immediately after receiving the actions command.
+          Without an explicit long enough block, the next line of code will be executed
+          while the browser is still performing the actions.
+        """
+        # Perform the actions
         try:
             await self._session.execute_command(
                 Command.W3C_ACTIONS,
@@ -653,9 +705,21 @@ class Actions:
                 "-> This might be caused by trying to perform an action to move "
                 "the pointer (mouse) or scoll the viewport out of the document."
             )
-
         finally:
             self._collect_garbage()
+
+        # Explicit wait
+        if explicit_wait is None:
+            return None
+        try:
+            await sleep(explicit_wait)
+        except Exception as err:
+            raise errors.InvalidArgumentError(
+                "<{}>\nArgument 'explicit_wait' must "
+                "be a positive `<int/float>`, instead of: {} {}.".format(
+                    self.__class__.__name__, repr(explicit_wait), type(explicit_wait)
+                )
+            ) from err
 
     async def reset(self) -> Actions:
         """Reset the action chain."""

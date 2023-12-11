@@ -112,9 +112,9 @@ class Chrome(ChromiumBaseWebDriver):
         ### Example:
         >>> from aselenium import Chrome
             driver = Chrome(
-                # optional: the directory to store the webdriver
+                # optional: the directory to store the webdrivers.
                 directory="/path/to/driver/cache/directory"
-                # optional: the maximum number of webdriver to cache
+                # optional: the maximum amount of webdrivers (and CTF browsers) to maintain.
                 max_cache_size=10
             )
         >>> # . acquire a chrome session

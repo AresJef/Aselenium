@@ -108,9 +108,9 @@ class Edge(ChromiumBaseWebDriver):
         ### Example:
         >>> from aselenium import Edge
             driver = Edge(
-                # optional: the directory to store the webdriver
+                # optional: the directory to store the webdrivers.
                 directory="/path/to/driver/cache/directory"
-                # optional: the maximum number of webdriver to cache
+                optional: the maximum amount of webdrivers to maintain.
                 max_cache_size=10
             )
         >>> # . acquire an edge session

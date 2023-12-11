@@ -376,7 +376,7 @@ async def test_driver_automation(browser: T) -> None:
         screenshot = await s.take_screenshot()
         print("screenshot:", bool(screenshot), screenshot[:30], sep="\t")
         path = os.path.join(TEST_FOLDER, "screenshot")
-        print("save_sshot:", await s.save_screenshot(path), sep="\t")
+        print("save_screenshot:", await s.save_screenshot(path), sep="\t")
 
         pdf = await s.print_page()
         if pdf is not None:
@@ -1421,17 +1421,12 @@ async def test_driver_automation(browser: T) -> None:
                 .move_to(element=sch_btn)
                 .click(pause=1)
                 .send_keys("hellow world!", pause=1)
-                .key_down(CONTROL_KEY)
-                .key_down("a")
-                .key_up("a")
-                .key_up(CONTROL_KEY, pause=1)
+                .send_key_combo(CONTROL_KEY, "a", pause=1)
                 .send_keys(KeyboardKeys.DELETE, pause=1)
                 .send_keys("Hello World!", pause=1)
                 .send_keys(KeyboardKeys.ENTER, pause=1)
-                .perform()
+                .perform("10" if isinstance(s, FirefoxSession) else None)
             )
-            if isinstance(s, FirefoxSession):
-                await asyncio.sleep(10)
             title = await s.title
             print("[AC] keyboards:\t\t", title.startswith("Hello World!"), sep="\t")
             print()

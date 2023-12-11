@@ -1369,23 +1369,23 @@ class BaseOptions:
         """Access the preferences of the browser `<dict[str, Any]>`."""
         return deepcopy(self._preferences)
 
-    def set_preference(self, name: str, value: Any) -> None:
-        """Set a preference of the browser.
+    def set_preferences(self, **prefs: Any) -> None:
+        """Set preferences of the browser.
 
-        :param name: `<str>` The name of the preference.
-        :param value: `<Any>` The value of the preference.
+        :param prefs [Keywords]: `<Any>` The preferences to set.
 
         ### Example:
-        >>> options.set_preference("media.navigator.permission.disabled", False)
+        >>> options.set_preferences(
+                **{
+                "download.default_directory": "/path/to/download/directory",
+                "download.prompt_for_download": False,
+                "download.directory_upgrade": True,
+                "safebrowsing.enabled": True
+            }
+        )
         """
-        # Set preference
-        if not isinstance(name, str) or not name:
-            raise errors.InvalidOptionsError(
-                "<{}>\nInvalid 'preferences' name: {} {}.".format(
-                    self.__class__.__name__, repr(name), type(name)
-                )
-            )
-        self._preferences[name] = value
+        # Set preferences
+        self._preferences |= prefs
         self._caps_changed()
 
     def get_preference(self, name: str) -> Any:
@@ -1575,12 +1575,11 @@ class ChromiumBaseOptions(BaseOptions):
         :return `<ChromiumProfile>`: The profile instance.
 
         ### Explaination
-        - When creating a `Profile` instance, a cloned temporary profile
-          will be created based on the given profile 'directory'. The
-          automated session will use this temporary profile leaving the
-          original profile untouched. When this profile is no longer
-          used by the program, the temporary profile will be deleted
-          automatically.
+        - When setting the profile through this method, a cloned temporary 
+          profile will be created based on the given profile 'directory'. 
+          The automated session will use the temporary profile leaving the
+          original profile untouched. When the driver is no longer used by
+          the program, the temporary profile will be deleted automatically.
 
         ### MacOS Default Profile Location:
         - Chrome: '~/Library/Application Support/Google/Chrome' & 'Default'
