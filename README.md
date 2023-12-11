@@ -1,4 +1,4 @@
-# Asyncronous implementation of web browser automation for Python.
+## Asyncronous implementation of web browser automation for Python.
 
 Created to be used in a project, this package is published to github for ease of management and installation across different modules.
 
