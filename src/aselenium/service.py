@@ -280,7 +280,7 @@ class BaseService:
         """(Internal) Stop the process of the service."""
 
         # . Kill unclosed child processes
-        def kill_unclosed_child_processes() -> None:
+        def kill_child_processes() -> None:
             try:
                 driver_process = psutil_Process(self._process.pid)
             except Exception:
@@ -292,10 +292,11 @@ class BaseService:
                     pass
 
         # . Kill (SIGKILL) the process
-        async def kill() -> None:
+        async def kill_main_process() -> None:
             # Force kill (SIGKILL)
             try:
                 self._process.kill()
+                await wait_for(self._process.wait(), self._timeout)
             # Process stopped
             except ProcessLookupError:
                 return None  # exit
@@ -304,20 +305,13 @@ class BaseService:
                 raise errors.ServiceProcessError(
                     f"\nFailed to kill service process '{self._process.pid}': {err}"
                 ) from err
-            # Verify killed
-            try:
-                await wait_for(self._process.wait(), self._timeout)
-            except TimeoutError as err:
-                raise errors.ServiceProcessError(
-                    f"\nFailed to stop service process '{self._process.pid}'"
-                ) from err
 
         # Already stopped
         if self._process is None:
             return None  # exit
 
         # Kill unclosed child processes
-        kill_unclosed_child_processes()
+        kill_child_processes()
 
         # Terminate (SIGTERM)
         try:
@@ -331,19 +325,14 @@ class BaseService:
                 except AttributeError:
                     pass
             self._process.terminate()
+            await wait_for(self._process.wait(), self._timeout)
         # Process stopped
         except ProcessLookupError:
             return None  # exit
         # Force kill (SIGKILL)
         except Exception:
-            await kill()
-        # Verify closed
-        else:
-            try:
-                await wait_for(self._process.wait(), self._timeout)
-            except TimeoutError:
-                await kill()
-
+            await kill_main_process()
+        # Reset process
         finally:
             self._process = None
 
