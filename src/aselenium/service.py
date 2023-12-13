@@ -21,11 +21,10 @@ from os import environ
 from platform import system
 from errno import ENOENT, EACCES
 from time import time as unix_time
-from asyncio.subprocess import Process, PIPE, DEVNULL
-from asyncio.subprocess import create_subprocess_exec
-from asyncio import wait_for, sleep, TimeoutError, CancelledError
+from subprocess import Popen, PIPE, DEVNULL
+from asyncio import sleep, TimeoutError, CancelledError
 from socket import socket, AF_INET, SOCK_STREAM, create_connection
-from psutil import Process as psutil_Process
+from psutil import Process
 from aiohttp import ClientSession, ClientConnectorError
 from aselenium import errors
 from aselenium.utils import validate_file
@@ -79,7 +78,6 @@ class BaseService:
         self._close_fds: bool = self._kwargs.pop("close_fds", system() != "Windows")
         self._port: int = -1
         self._port_str: str = None
-        self._env: Any = environ
         self._process: Process | None = None
         # Session
         self._session: ClientSession | None = None
@@ -219,35 +217,24 @@ class BaseService:
     def process_running(self) -> bool:
         """Access whether the service process is running `<bool>`."""
         try:
-            return self._process.returncode is None
+            return self._process.is_running()
         except Exception:
             return False
 
-    async def _start_process(self) -> None:
+    def _start_process(self) -> None:
         """(Internal) Start the process of the service."""
         try:
-            process = await wait_for(
-                create_subprocess_exec(
-                    self._driver_location,
-                    *self.port_args,
-                    *self._args,
-                    env=self._env,
-                    close_fds=self._close_fds,
-                    stdout=DEVNULL,
-                    stderr=DEVNULL,
-                    stdin=PIPE,
-                    creationflags=self._creation_flags,
-                    **self._kwargs,
-                ),
-                self._timeout,
+            process = Popen(
+                [self._driver_location, *self.port_args, *self._args],
+                stdin=PIPE,
+                stdout=DEVNULL,
+                stderr=DEVNULL,
+                close_fds=self._close_fds,
+                env=environ,
+                creationflags=self._creation_flags,
+                **self._kwargs,
             )
-            self._process = process
-        except TimeoutError:
-            raise errors.ServiceTimeoutError(
-                "<{}>\nFailed to start process in time: {}s.".format(
-                    self.__class__.__name__, self._timeout
-                )
-            )
+            self._process = Process(process.pid)
         except OSError as err:
             if err.errno == ENOENT:
                 raise errors.ServiceProcessError(
@@ -276,27 +263,31 @@ class BaseService:
                 )
             ) from err
 
-    async def _stop_process(self) -> None:
+    def _stop_process(self) -> None:
         """(Internal) Stop the process of the service."""
+        # Already stopped
+        if self._process is None:
+            return None  # exit
 
-        # . Kill unclosed child processes
-        def kill_child_processes() -> None:
-            try:
-                driver_process = psutil_Process(self._process.pid)
-            except Exception:
-                return None
-            for child in driver_process.children(recursive=False):
+        # Terminate (SIGTERM)
+        try:
+            # Kill unclosed child processes
+            for child in self._process.children(recursive=False):
                 try:
                     child.kill()
                 except Exception:
                     pass
-
-        # . Kill (SIGKILL) the process
-        async def kill_main_process() -> None:
+            self._process.terminate()
+            self._process.wait(self._timeout)
+        # Process stopped
+        except ProcessLookupError:
+            return None  # exit
+        # Force kill (SIGKILL)
+        except Exception:
             # Force kill (SIGKILL)
             try:
                 self._process.kill()
-                await wait_for(self._process.wait(), self._timeout)
+                self._process.wait(self._timeout)
             # Process stopped
             except ProcessLookupError:
                 return None  # exit
@@ -305,33 +296,6 @@ class BaseService:
                 raise errors.ServiceProcessError(
                     f"\nFailed to kill service process '{self._process.pid}': {err}"
                 ) from err
-
-        # Already stopped
-        if self._process is None:
-            return None  # exit
-
-        # Kill unclosed child processes
-        kill_child_processes()
-
-        # Terminate (SIGTERM)
-        try:
-            for stream in (
-                self._process.stdin,
-                self._process.stdout,
-                self._process.stderr,
-            ):
-                try:
-                    stream.close()
-                except AttributeError:
-                    pass
-            self._process.terminate()
-            await wait_for(self._process.wait(), self._timeout)
-        # Process stopped
-        except ProcessLookupError:
-            return None  # exit
-        # Force kill (SIGKILL)
-        except Exception:
-            await kill_main_process()
         # Reset process
         finally:
             self._process = None
@@ -413,7 +377,7 @@ class BaseService:
         """Start the Service."""
         try:
             # Start Process & Session
-            await self._start_process()
+            self._start_process()
             await self._start_session()
 
             # Verify Connection
@@ -421,10 +385,7 @@ class BaseService:
             while (unix_time() - start_time) < self._timeout:
                 if not self.process_running:
                     raise errors.ServiceProcessError(
-                        "<{}> Service exited unexpectedly: {}".format(
-                            self.__class__.__name__,
-                            self._process.returncode if self._process else 0,
-                        )
+                        f"<{self.__class__.__name__}> Service exited unexpectedly."
                     )
                 if self.port_connectable and self.session_connectable:
                     return None
@@ -458,7 +419,7 @@ class BaseService:
 
             # Stop process
             try:
-                await self._stop_process()
+                self._stop_process()
             except Exception as err:
                 exceptions.append(str(err))
 
