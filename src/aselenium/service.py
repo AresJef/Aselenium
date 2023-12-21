@@ -24,7 +24,7 @@ from time import time as unix_time
 from subprocess import Popen, PIPE, DEVNULL
 from asyncio import sleep, TimeoutError, CancelledError
 from socket import socket, AF_INET, SOCK_STREAM, create_connection
-from psutil import Process
+from psutil import Process, NoSuchProcess
 from aiohttp import ClientSession, ClientConnectorError
 from aselenium import errors
 from aselenium.utils import validate_file
@@ -164,21 +164,16 @@ class BaseService:
 
     def _free_port(self) -> int:
         """(Internal) Acquire a free socket port `<int>`."""
-        sock = None
         try:
-            sock = socket(AF_INET, SOCK_STREAM)
-            sock.bind(("127.0.0.1", 0))
-            sock.listen(5)
-            return sock.getsockname()[1]
+            with socket(AF_INET, SOCK_STREAM) as sock:
+                sock.bind(("127.0.0.1", 0))
+                sock.listen(5)
+                return sock.getsockname()[1]
         except Exception as err:
             raise errors.ServiceSocketError(
                 "<{}>\nFailed to acquire a free socket port for "
                 "the service: {}".format(self.__class__.__name__, err)
             ) from err
-        finally:
-            if sock is not None:
-                sock.close()
-            del sock
 
     def _ping_port(self, port: int) -> bool:
         """(Internal) Check if the socket port is in use `<bool>`."""
@@ -223,6 +218,11 @@ class BaseService:
 
     def _start_process(self) -> None:
         """(Internal) Start the process of the service."""
+        # Already started
+        if self._process is not None:
+            return None
+
+        # Start process
         try:
             process = Popen(
                 [self._driver_location, *self.port_args, *self._args],
@@ -280,7 +280,7 @@ class BaseService:
             self._process.terminate()
             self._process.wait(self._timeout)
         # Process stopped
-        except ProcessLookupError:
+        except (NoSuchProcess, ProcessLookupError):
             return None  # exit
         # Force kill (SIGKILL)
         except Exception:
@@ -289,7 +289,7 @@ class BaseService:
                 self._process.kill()
                 self._process.wait(self._timeout)
             # Process stopped
-            except ProcessLookupError:
+            except (NoSuchProcess, ProcessLookupError):
                 return None  # exit
             # Failed to kill
             except Exception as err:
@@ -314,8 +314,13 @@ class BaseService:
         except Exception:
             return False
 
-    async def _start_session(self) -> None:
+    def _start_session(self) -> None:
         """(Internal) Start the session of the service."""
+        # Already started
+        if self._session is not None:
+            return None
+
+        # Start session
         self._session = ClientSession(base_url=self.url)
 
     async def _stop_session(self) -> None:
@@ -378,7 +383,7 @@ class BaseService:
         try:
             # Start Process & Session
             self._start_process()
-            await self._start_session()
+            self._start_session()
 
             # Verify Connection
             start_time = unix_time()

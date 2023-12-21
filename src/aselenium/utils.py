@@ -469,12 +469,12 @@ def prettify_dict(dic: dict, lead: str = "  ") -> str:
 # Utils: plist ------------------------------------------------------------------------------------
 def load_plist_file(plist_file: str) -> dict:
     """Load a local plist file `<dict>`."""
-    with open(plist_file, "rb") as file:
+    with open(plist_file, "rb", encoding="utf-8") as file:
         return load(file)
 
 
 # Utils: json -------------------------------------------------------------------------------------
 def load_json_file(json_file: str) -> dict:
     """Load a local json file `<dict>`."""
-    with open(json_file, "r") as file:
+    with open(json_file, "r", encoding="utf-8") as file:
         return loads(file.read())
