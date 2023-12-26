@@ -39,7 +39,7 @@ class FileManager:
     __instances: dict[str, FileManager] = {}
     """A dictionary of all instanciated file managers."""
     __instanciated: bool = False
-    """Whether the instance has been instanciated."""
+    """Whether the file manager has been instanciated."""
     # Driver Metadata
     _DIRVER_METADATA_FILE: str = None
     """The name of the driver metadata file `<str>`. e.g. `'chrome_driver_metadata'`."""
@@ -74,18 +74,11 @@ class FileManager:
         return cls.__name__ + "|" + base_dir
 
     def __new__(cls, base_dir: str | None = None) -> FileManager:
-        # Validate base directory
         base_dir = cls._validate_base_dir(base_dir)
-
-        # Create new instance
         key = cls._gen_instance_key(base_dir)
         if key not in cls.__instances:
-            inst = super(FileManager, cls).__new__(cls)
-            cls.__instances[key] = inst
-            return inst
-        # Access existing instance
-        else:
-            return cls.__instances[key]
+            cls.__instances[key] = super(FileManager, cls).__new__(cls)
+        return cls.__instances[key]
 
     def __init__(self, base_dir: str | None = None) -> None:
         """Manager for the webdriver executables & browser binaries.
