@@ -687,7 +687,7 @@ class Profile:
 
         # Clone profile to temporary directory
         try:
-            self._temp_directory = mkdtemp(prefix="asel_")
+            self._temp_directory = mkdtemp(prefix="aselenium-")
             self._temp_profile_dir = join_path(
                 self._temp_directory, self._temp_profile_folder
             )
