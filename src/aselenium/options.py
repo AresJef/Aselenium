@@ -627,7 +627,7 @@ class Profile:
     def __init__(self, directory: str, profile_folder: str | None) -> None:
         """The user profile for the browser.
 
-        :param directory [REQUIRED]: `<st>` The directory of the user profile.
+        :param directory [REQUIRED]: `<str>` The directory of the user profile.
         :param profile_folder [OPTIONAL]: `<str/None>` The name of the profile folder inside of the 'directory'.
 
         ### Explaination
@@ -687,7 +687,7 @@ class Profile:
 
         # Clone profile to temporary directory
         try:
-            self._temp_directory = mkdtemp()
+            self._temp_directory = mkdtemp(prefix="asel_")
             self._temp_profile_dir = join_path(
                 self._temp_directory, self._temp_profile_folder
             )
@@ -749,7 +749,7 @@ class ChromiumProfile(Profile):
         """The user profile for Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
-        :param directory: `<st>` The directory of the user profile.
+        :param directory: `<str>` The directory of the user profile.
         :param profile_folder: `<str>` The name of the profile folder inside of the 'directory'.
 
         ### Explaination
@@ -1570,13 +1570,13 @@ class ChromiumBaseOptions(BaseOptions):
         """Set the user profile for the Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
-        :param directory: `<st>` The directory of the user profile.
+        :param directory: `<str>` The directory of the user profile.
         :param profile_folder: `<str>` The name of the profile folder inside of the 'directory'.
         :return `<ChromiumProfile>`: The profile instance.
 
         ### Explaination
-        - When setting the profile through this method, a cloned temporary 
-          profile will be created based on the given profile 'directory'. 
+        - When setting the profile through this method, a cloned temporary
+          profile will be created based on the given profile 'directory'.
           The automated session will use the temporary profile leaving the
           original profile untouched. When the driver is no longer used by
           the program, the temporary profile will be deleted automatically.
