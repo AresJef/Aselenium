@@ -208,6 +208,10 @@ class InternetDisconnectedError(WebDriverError):
     """Exception raised when internet disconnected."""
 
 
+class ConnectionClosedError(WebDriverError):
+    """Exception raised when connection closed."""
+
+
 # . Inavlid value error
 class InvalidValueError(WebDriverError, AseleniumInvalidValueError):
     """Base exception class for all invalid value errors."""
@@ -647,6 +651,8 @@ class ErrorCode:
     INVALID_PERMISSION_NAME = "Invalid PermissionDescriptor name"
     # "ERR_INTERNET_DISCONNECTED"
     INTERNET_DISCONNECTED = "ERR_INTERNET_DISCONNECTED"
+    # "ERR_CONNECTION_CLOSED"
+    CONNECTION_CLOSED = "ERR_CONNECTION_CLOSED"
     # "Sink not found"
     SINK_NOT_FOUND = "Sink not found"
 
@@ -771,10 +777,12 @@ def webdriver_error_handler(res: dict[str, Any]) -> None:
     # Map webdriver error
     error = WEBDRIVER_ERROR_MAP.get(status, WebDriverError)
     if error is UnknownError:
-        if ErrorCode.INTERNET_DISCONNECTED in message:
-            error = InternetDisconnectedError
-        elif ErrorCode.FAILED_TO_CHANGE_WINDOW_STATE in message:
+        if ErrorCode.FAILED_TO_CHANGE_WINDOW_STATE in message:
             error = ChangeWindowStateError
+        elif ErrorCode.INTERNET_DISCONNECTED in message:
+            error = InternetDisconnectedError
+        elif ErrorCode.CONNECTION_CLOSED in message:
+            error = ConnectionClosedError
     elif error is InvalidSessionError:
         if INCOMPATIBLE_DRIVER_PATTERN.search(message) is not None:
             error = IncompatibleWebdriverError
