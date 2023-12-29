@@ -111,6 +111,7 @@ from aselenium.errors import (
     WebDriverError,
     WebDriverTimeoutError,
     WebdriverNotFoundError,
+    ConnectionClosedError,
     InternetDisconnectedError,
     InvalidValueError,
     InvalidArgumentError,
@@ -209,7 +210,7 @@ __all__ = [
     "ServiceError", "ServiceExecutableNotFoundError", "ServiceStartError", "ServiceStopError",
     "ServiceSocketError", "ServiceProcessError", "ServiceTimeoutError",
     # . webdriver
-    "WebDriverError", "WebDriverTimeoutError", "WebdriverNotFoundError", "InternetDisconnectedError",
+    "WebDriverError", "WebDriverTimeoutError", "WebdriverNotFoundError", "ConnectionClosedError", "InternetDisconnectedError",
     "InvalidValueError", "InvalidArgumentError", "InvalidMethodError", "InvalidRectValueError",
     "InvalidResponseError", "InvalidExtensionError", "UnknownMethodError", "SessionError",
     "SessionClientError", "InvalidSessionError", "IncompatibleWebdriverError", "SessionDataError",

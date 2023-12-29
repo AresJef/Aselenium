@@ -204,12 +204,12 @@ class WebdriverNotFoundError(WebDriverError):
     """Exception raised when target not found."""
 
 
-class InternetDisconnectedError(WebDriverError):
-    """Exception raised when internet disconnected."""
-
-
 class ConnectionClosedError(WebDriverError):
     """Exception raised when connection closed."""
+
+
+class InternetDisconnectedError(WebDriverError):
+    """Exception raised when internet disconnected."""
 
 
 # . Inavlid value error
@@ -779,10 +779,10 @@ def webdriver_error_handler(res: dict[str, Any]) -> None:
     if error is UnknownError:
         if ErrorCode.FAILED_TO_CHANGE_WINDOW_STATE in message:
             error = ChangeWindowStateError
-        elif ErrorCode.INTERNET_DISCONNECTED in message:
-            error = InternetDisconnectedError
         elif ErrorCode.CONNECTION_CLOSED in message:
             error = ConnectionClosedError
+        elif ErrorCode.INTERNET_DISCONNECTED in message:
+            error = InternetDisconnectedError
     elif error is InvalidSessionError:
         if INCOMPATIBLE_DRIVER_PATTERN.search(message) is not None:
             error = IncompatibleWebdriverError
