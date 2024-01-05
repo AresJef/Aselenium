@@ -2416,26 +2416,24 @@ class Session:
         """
         # Element already specified
         if self._is_element(value):
-            return await value.scroll_into_view(timeout)
+            return await value.scroll_into_view()
 
-        # Find element & scroll
+        # Find element & scroll into view
         strat = self._validate_selector_strategy(by)
         element = await self._find_element_no_wait(value, strat)
         if element is not None:
-            return await element.scroll_into_view(timeout)
+            return await element.scroll_into_view()
         elif timeout is None:
             return False
 
-        # Wait for element & scroll
+        # Wait for element & scroll into view
         timeout = self._validate_timeout(timeout)
         start_time = unix_time()
         while unix_time() - start_time < timeout:
-            await sleep(0.2)
             element = await self._find_element_no_wait(value, strat)
             if element is not None:
-                return await element.scroll_into_view(
-                    timeout - (unix_time() - start_time)
-                )
+                return await element.scroll_into_view()
+            await sleep(0.2)
         return False
 
     def _validate_scroll_strategy(self, by: Any) -> str:

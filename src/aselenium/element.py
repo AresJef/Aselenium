@@ -353,11 +353,10 @@ class Element:
         except errors.InvalidMethodError:
             return False
 
-    async def scroll_into_view(self, timeout: int | float | None = 5) -> bool:
+    async def scroll_into_view(self) -> bool:
         """Scroll the viewport to the element location.
 
-        :param timeout: `<int/float/None>` Total seconds to wait for the element to scroll into view. Defaults to `5`.
-        :return `<bool>`: True if the element has been scrolled into view, False if element was not found.
+        :return `<bool>`: True if the element is scrolled into view, False if the element is not viewable.
 
         ### Example:
         >>> viewable = await element.scroll_into_view()  # True / False
@@ -375,19 +374,7 @@ class Element:
             ) from err
 
         # Check viewable
-        if await self.viewable:
-            return True
-        elif timeout is None:
-            return False
-
-        # Wait for scroll
-        timeout = self._validate_timeout(timeout)
-        start_time = unix_time()
-        while unix_time() - start_time < timeout:
-            await sleep(0.2)
-            if await self.viewable:
-                return True
-        return False
+        return await self.viewable
 
     async def wait_until(
         self,
