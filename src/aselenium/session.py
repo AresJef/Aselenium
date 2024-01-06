@@ -866,7 +866,7 @@ class Session:
         self,
         url: str,
         timeout: int | float | None = None,
-        retry: bool = False,
+        retry: int | None = None,
     ) -> None:
         """Load a web page in the actice window.
 
@@ -880,35 +880,42 @@ class Session:
             the webdriver fails to response in time, a `SessionTimeoutError`
             will be raised.
 
-        :param retry: `<bool>` Whether to retry if failed to load the webpage. Defaults to `False`.
+        :param retry: `<int>` How many time to retry if failed to load the webpage. Defaults to `None`.
             Retries are attempted only when the `WebDriverTimeoutError` is
             raised due to native `pageLoad` timeout. The function does not
-            retry on `SessionTimeoutError` (as mentioned above). The maximum
-            retry limit is 10, and exceeding this limit without successful
-            loading will eventually raise the `WebDriverTimeoutError`.
+            retry on `SessionTimeoutError` (as mentioned above).
 
         ### Example:
         >>> await session.load("https://www.google.com")
         """
-        if not retry:
+        # No retry
+        if retry is None:
             await self.execute_command(Command.GET, body={"url": url}, timeout=timeout)
-            return None  # exit
+            return None  # exit: success
 
-        exc = None
-        for _ in range(10):
+        # Validate retry
+        if not isinstance(retry, int) or not retry > 0:
+            raise errors.InvalidArgumentError(
+                "<{}>\nArgument 'retry' must an integer > 0, instead got: "
+                "{} {}.".format(self.__class__.__name__, repr(retry), type(retry))
+            )
+
+        # Retry
+        exception = None
+        for _ in range(retry):
             try:
                 await self.execute_command(
                     Command.GET, body={"url": url}, timeout=timeout
                 )
-                return None  # exit
+                return None  # exit: success
             except errors.WebDriverTimeoutError as err:
-                exc = err
-        raise exc
+                exception = err
+        raise exception
 
     async def refresh(
         self,
         timeout: int | float | None = None,
-        retry: bool = False,
+        retry: int | None = None,
     ) -> None:
         """Refresh the active page window.
 
@@ -920,28 +927,35 @@ class Session:
             the webdriver fails to response in time, a `SessionTimeoutError`
             will be raised.
 
-        :param retry: `<bool>` Whether to retry if failed to load the webpage. Defaults to `False`.
+        :param retry: `<int>` How many time to retry if failed to load the webpage. Defaults to `None`.
             Retries are attempted only when the `WebDriverTimeoutError` is
             raised due to native `pageLoad` timeout. The function does not
-            retry on `SessionTimeoutError` (as mentioned above). The maximum
-            retry limit is 10, and exceeding this limit without successful
-            loading will eventually raise the `WebDriverTimeoutError`.
+            retry on `SessionTimeoutError` (as mentioned above).
 
         ### Example:
         >>> await session.refresh()
         """
-        if not retry:
+        # No retry
+        if retry is None:
             await self.execute_command(Command.REFRESH, timeout=timeout)
-            return None  # exit
+            return None  # exit: success
 
-        exc = None
+        # Validate retry
+        if not isinstance(retry, int) or not retry > 0:
+            raise errors.InvalidArgumentError(
+                "<{}>\nArgument 'retry' must an integer > 0, instead got: "
+                "{} {}.".format(self.__class__.__name__, repr(retry), type(retry))
+            )
+
+        # Retry
+        exception = None
         for _ in range(10):
             try:
                 await self.execute_command(Command.REFRESH, timeout=timeout)
                 return None  # exit
             except errors.WebDriverTimeoutError as err:
-                exc = err
-        raise exc
+                exception = err
+        raise exception
 
     async def forward(self, timeout: int | float | None = None) -> None:
         """Navigate forwards in the browser history (if possible).

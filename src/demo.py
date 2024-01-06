@@ -130,7 +130,7 @@ async def test_driver_options(browser: T) -> None:
         # Test driver
         async with driver.acquire(**kwargs) as session:
             await session.load("https://www.baidu.com")
-            await session.load("https://whatismyipaddress.com/", retry=True)
+            await session.load("https://whatismyipaddress.com/", retry=10)
 
         # Finished
         print("- " * 40)
@@ -223,7 +223,7 @@ async def test_driver_profile(browser: T) -> None:
     async with driver.acquire() as session:
         print(driver.options.profile)
         await session.load("https://www.baidu.com")
-        await session.load("https://whatismyipaddress.com/", retry=True)
+        await session.load("https://whatismyipaddress.com/", retry=10)
         await asyncio.sleep(5)
     print("- " * 40)
     print("Profile Test Success")
@@ -241,7 +241,7 @@ async def test_driver_cancellation(browser: T) -> None:
             async with driver.acquire(**kwargs) as session:
                 cancell_switch = True
                 while True:
-                    await session.load("https://whatismyipaddress.com/", retry=True)
+                    await session.load("https://whatismyipaddress.com/", retry=10)
 
         print("-" * 80)
         driver = driver_cls()
@@ -303,7 +303,7 @@ async def test_driver_automation(browser: T) -> None:
         print("Session url", s.base_url, sep="\t")
         print("Timeouts", await s.timeouts, sep="\t")
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         print("-" * 80)
         print()
@@ -311,10 +311,10 @@ async def test_driver_automation(browser: T) -> None:
     async def navigate(s: Session) -> None:
         print(" Navigate Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         print("Load 'www.taobao.com'")
-        await s.load("https://www.taobao.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.taobao.com", timeout=FORCE_TIMEOUT, retry=10)
         print("Verify url", (await s.url) == "https://www.taobao.com/", sep="\t")
 
         print("Backward")
@@ -330,7 +330,7 @@ async def test_driver_automation(browser: T) -> None:
         print("Verify url", (await s.url) == "https://www.baidu.com/", sep="\t")
 
         print("Refresh")
-        await s.refresh(timeout=FORCE_TIMEOUT, retry=True)
+        await s.refresh(timeout=FORCE_TIMEOUT, retry=10)
         print("Verify url", (await s.url) == "https://www.baidu.com/", sep="\t")
 
         print("-" * 80)
@@ -339,7 +339,7 @@ async def test_driver_automation(browser: T) -> None:
     async def information(s: Session) -> None:
         print(" Information Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         url = await s.url
         print("url:\t\t\t", url == "https://www.baidu.com/", url, sep="\t")
@@ -402,7 +402,7 @@ async def test_driver_automation(browser: T) -> None:
     async def timeouts(s: Session) -> None:
         print(" Timeout Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         # fmt: off
         init_timeouts = await s.timeouts
@@ -433,7 +433,7 @@ async def test_driver_automation(browser: T) -> None:
     async def cookies(s: Session) -> None:
         print(" Cookies Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
         # fmt: off
 
         cookies = await s.cookies
@@ -466,7 +466,7 @@ async def test_driver_automation(browser: T) -> None:
     async def window(s: Session) -> None:
         print(" Window Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         window = await s.new_window("new")
         print("new_window:", window.name == "new", window, sep="\t")
@@ -525,7 +525,7 @@ async def test_driver_automation(browser: T) -> None:
     async def scroll(s: Session) -> None:
         print(" Scroll Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         rect = await s.window_rect
         await s.set_window_rect(800, 900, 0, 0)
@@ -563,7 +563,7 @@ async def test_driver_automation(browser: T) -> None:
         print(" Alert Commands ".center(80, "-"))
         print("Load 'demo.guru99.com/")
         url = "https://demo.guru99.com/test/delete_customer.php"
-        await s.load(url, timeout=FORCE_TIMEOUT, retry=True)
+        await s.load(url, timeout=FORCE_TIMEOUT, retry=10)
         PAUSE = 3
 
         print("nill alert:", await s.get_alert(1) is None, sep="\t")
@@ -603,7 +603,7 @@ async def test_driver_automation(browser: T) -> None:
 
         print(" Frame Commands ".center(80, "-"))
         print("Load 'web.dev/'")
-        await s.load("https://web.dev/shadowdom-v1/", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://web.dev/shadowdom-v1/", timeout=FORCE_TIMEOUT, retry=10)
 
         # Verify default frame
         els = await s.find_elements("button")
@@ -658,7 +658,7 @@ async def test_driver_automation(browser: T) -> None:
     async def element(s: Session) -> None:
         print(" Element Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
         await s.maximize_window()
 
         # fmt: off
@@ -995,7 +995,7 @@ async def test_driver_automation(browser: T) -> None:
         # Skip safari
         if not isinstance(s, SafariSession):
             print("Load 'image.baidu.com/'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
             el = await s.find_element("a[href='http://image.baidu.com/']")
             tag = await el.tag
@@ -1056,7 +1056,7 @@ async def test_driver_automation(browser: T) -> None:
 
         # Control
         print("Load 'image.baidu.com/'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
         el = await s.find_element("#kw", by="css")
         visible = await el.visible
         print("[el] visible:\t\t", visible is True, visible, sep="\t")
@@ -1092,7 +1092,7 @@ async def test_driver_automation(browser: T) -> None:
 
         # Upload
         print("Load 'www.baidu.com/'")
-        await s.load("https://www.baidu.com/", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com/", timeout=FORCE_TIMEOUT, retry=10)
         el = await s.find_element("span.soutu-btn")
         await el.click(pause=0.5)
         el = await s.find_element("input.upload-pic")
@@ -1113,7 +1113,7 @@ async def test_driver_automation(browser: T) -> None:
         print(" Shadow Commands ".center(80, "-"))
         print("Load 'www.htmlelements.com'")
         url = "https://www.htmlelements.com/demos/menu/shadow-dom/index.htm"
-        await s.load(url, timeout=FORCE_TIMEOUT, retry=True)
+        await s.load(url, timeout=FORCE_TIMEOUT, retry=10)
         shadow_css = "smart-ui-menu.smart-ui-component"
         await s.wait_until_element("exist", shadow_css, timeout=100)
         sd = await s.get_shadow(shadow_css)
@@ -1206,7 +1206,7 @@ async def test_driver_automation(browser: T) -> None:
     async def javascript(s: Session) -> None:
         print(" Javascript Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
         js1 = "return document.title;"
         js2 = "return arguments[0];"
         args1 = "Hello world!"
@@ -1282,7 +1282,7 @@ async def test_driver_automation(browser: T) -> None:
         if 1:
             # Move to (x, y) center-coordiantes
             print("Load 'www.baidu.com'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
             img_btn = await s.find_element(img_btn_css)
             print("image button:\t", img_btn is not None, img_btn, sep="\t")
             rect1 = await img_btn.rect
@@ -1301,7 +1301,7 @@ async def test_driver_automation(browser: T) -> None:
 
             # Move to (x, y) offset-coordiantes hit
             print("Load 'www.baidu.com'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
             img_btn = await s.find_element(img_btn_css)
             print("image button:\t", img_btn is not None, img_btn, sep="\t")
             rect1 = await img_btn.rect
@@ -1320,7 +1320,7 @@ async def test_driver_automation(browser: T) -> None:
 
             # Move to (x, y) offset-coordiantes miss
             print("Load 'www.baidu.com'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
             img_btn = await s.find_element(img_btn_css)
             print("image button:\t", img_btn is not None, img_btn, sep="\t")
             rect1 = await img_btn.rect
@@ -1333,7 +1333,7 @@ async def test_driver_automation(browser: T) -> None:
         if 1:
             # Move to (element) center-coordiantes
             print("Load 'www.baidu.com'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
             img_btn = await s.find_element(img_btn_css)
             print("image button:\t", img_btn is not None, img_btn, sep="\t")
             await s.actions().move_to(element=img_btn, pause=0.5).click().perform()
@@ -1348,7 +1348,7 @@ async def test_driver_automation(browser: T) -> None:
 
             # Move to (element) offset hit
             print("Load 'www.baidu.com'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
             x, y = 1, 1
             img_btn = await s.find_element(img_btn_css)
             print("image button:\t", img_btn is not None, img_btn, sep="\t")
@@ -1364,7 +1364,7 @@ async def test_driver_automation(browser: T) -> None:
 
             # Move to (element) offset miss
             print("Load 'www.baidu.com'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
             x, y = 30, 30
             img_btn = await s.find_element(img_btn_css)
             print("image button:\t", img_btn is not None, img_btn, sep="\t")
@@ -1376,7 +1376,7 @@ async def test_driver_automation(browser: T) -> None:
         if 1:
             # Move by (x, y)
             print("Load 'www.baidu.com'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
             img_btn = await s.find_element(img_btn_css)
             print("image button:\t", img_btn is not None, img_btn, sep="\t")
             rect1 = await img_btn.rect
@@ -1398,7 +1398,7 @@ async def test_driver_automation(browser: T) -> None:
             # Drag & Drop (element)
             print("Load 'https://www.w3schools.com'")
             url = "https://www.w3schools.com/html/html5_draganddrop.asp"
-            await s.load(url, timeout=FORCE_TIMEOUT, retry=True)
+            await s.load(url, timeout=FORCE_TIMEOUT, retry=10)
             print("left element:", l_el := await s.find_element("#div1"))
             print("right element:", r_el := await s.find_element("#div2"))
             await s.actions().drag_and_drop(drag=l_el, drop=r_el, pause=1).perform()
@@ -1414,7 +1414,7 @@ async def test_driver_automation(browser: T) -> None:
         if 1:
             # Keyboards
             print("Load 'www.baidu.com'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
             sch_btn = await s.find_element(sch_btn_css)
             (
                 await s.actions()
@@ -1434,7 +1434,7 @@ async def test_driver_automation(browser: T) -> None:
         if 1:
             # Wheel
             print("Load 'www.baidu.com'")
-            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+            await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
             sch_btn = await s.find_element(sch_btn_css)
             (
                 await s.actions()
@@ -1474,7 +1474,7 @@ async def test_driver_automation(browser: T) -> None:
 
         print(" Permission Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         if isinstance(s, SafariSession):
             permissions = await s.permissions
@@ -1509,7 +1509,7 @@ async def test_driver_automation(browser: T) -> None:
 
         print(" Network Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         network = await s.network
         print("network:", network is not None, network, sep="\t")
@@ -1531,7 +1531,7 @@ async def test_driver_automation(browser: T) -> None:
 
         print(" Chromium Casting Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         print("cast_sinks:", await s.cast_sinks)
         print("cast_issue:", await s.cast_issue)
@@ -1549,7 +1549,7 @@ async def test_driver_automation(browser: T) -> None:
 
         print(" Chromium DevTools Protocol Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com/", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com/", timeout=FORCE_TIMEOUT, retry=10)
 
         cmd1 = "Browser.getVersion"
         cmd2 = "Runtime.evaluate"
@@ -1617,7 +1617,7 @@ async def test_driver_automation(browser: T) -> None:
         if browser not in ("chrome", "edge", "chromium"):
             return None
         print(" Logs Commands ".center(80, "-"))
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
         print("logs:", await s.log_types)
         print("get_logs:", await s.get_logs("browser"))
         print("get_logs:", await s.get_logs("driver"))
@@ -1632,7 +1632,7 @@ async def test_driver_automation(browser: T) -> None:
 
         print(" Firefox Context Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         res = await s.context
         print("context\t", res == "content", res, sep="\t")
@@ -1651,7 +1651,7 @@ async def test_driver_automation(browser: T) -> None:
 
         print(" Firefox Addon Commands ".center(80, "-"))
         print("Load 'www.baidu.com'")
-        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=True)
+        await s.load("https://www.baidu.com", timeout=FORCE_TIMEOUT, retry=10)
 
         addons = [
             os.path.join(TEST_FOLDER, file)
