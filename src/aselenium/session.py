@@ -884,7 +884,7 @@ class Session:
             Retries are attempted only when the `WebDriverTimeoutError` is
             raised due to native `pageLoad` timeout. The function does not
             retry on `SessionTimeoutError` (as mentioned above). Notice that
-            the `retry` argument must be and integer greater than 0 (except `None`). 
+            the `retry` argument must be and integer greater than 0 (except `None`).
             For example, if `retry=1`, the function will try to load the page
             one more time if the initial attempt #0 fails.
 
@@ -904,16 +904,16 @@ class Session:
             )
 
         # Retry
-        exception = None
-        for _ in range(retry + 1):
+        for i in range(retry + 1):
             try:
                 await self.execute_command(
                     Command.GET, body={"url": url}, timeout=timeout
                 )
                 return None  # exit: success
-            except errors.WebDriverTimeoutError as err:
-                exception = err
-        raise exception
+            except errors.WebDriverTimeoutError:
+                if i == retry:
+                    raise
+                await sleep(0.1)
 
     async def refresh(
         self,
@@ -934,7 +934,7 @@ class Session:
             Retries are attempted only when the `WebDriverTimeoutError` is
             raised due to native `pageLoad` timeout. The function does not
             retry on `SessionTimeoutError` (as mentioned above). Notice that
-            the `retry` argument must be and integer greater than 0 (except `None`). 
+            the `retry` argument must be and integer greater than 0 (except `None`).
             For example, if `retry=1`, the function will try to refresh the page
             one more time if the initial attempt #0 fails.
 
@@ -954,14 +954,14 @@ class Session:
             )
 
         # Retry
-        exception = None
-        for _ in range(retry + 1):
+        for i in range(retry + 1):
             try:
                 await self.execute_command(Command.REFRESH, timeout=timeout)
                 return None  # exit
-            except errors.WebDriverTimeoutError as err:
-                exception = err
-        raise exception
+            except errors.WebDriverTimeoutError:
+                if retry == i:
+                    raise
+                await sleep(0.1)
 
     async def forward(self, timeout: int | float | None = None) -> None:
         """Navigate forwards in the browser history (if possible).
