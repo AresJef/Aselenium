@@ -891,27 +891,14 @@ class Session:
         ### Example:
         >>> await session.load("https://www.google.com")
         """
-        # No retry
-        if retry is None:
-            await self.execute_command(Command.GET, body={"url": url}, timeout=timeout)
-            return None  # exit: success
-
-        # Validate retry
-        if not isinstance(retry, int) or not retry > 0:
-            raise errors.InvalidArgumentError(
-                "<{}>\nArgument 'retry' must an integer > 0, instead got: "
-                "{} {}.".format(self.__class__.__name__, repr(retry), type(retry))
-            )
-
-        # Retry
-        for i in range(retry + 1):
+        for i in range(1 if retry is None else retry + 1):
             try:
                 await self.execute_command(
                     Command.GET, body={"url": url}, timeout=timeout
                 )
                 return None  # exit: success
             except errors.WebDriverTimeoutError:
-                if i == retry:
+                if retry is None or i == retry:
                     raise
                 await sleep(0.1)
 
@@ -941,25 +928,12 @@ class Session:
         ### Example:
         >>> await session.refresh()
         """
-        # No retry
-        if retry is None:
-            await self.execute_command(Command.REFRESH, timeout=timeout)
-            return None  # exit: success
-
-        # Validate retry
-        if not isinstance(retry, int) or not retry > 0:
-            raise errors.InvalidArgumentError(
-                "<{}>\nArgument 'retry' must an integer > 0, instead got: "
-                "{} {}.".format(self.__class__.__name__, repr(retry), type(retry))
-            )
-
-        # Retry
-        for i in range(retry + 1):
+        for i in range(1 if retry is None else retry + 1):
             try:
                 await self.execute_command(Command.REFRESH, timeout=timeout)
                 return None  # exit
             except errors.WebDriverTimeoutError:
-                if retry == i:
+                if retry is None or retry == i:
                     raise
                 await sleep(0.1)
 
