@@ -883,7 +883,10 @@ class Session:
         :param retry: `<int>` How many time to retry if failed to load the webpage. Defaults to `None`.
             Retries are attempted only when the `WebDriverTimeoutError` is
             raised due to native `pageLoad` timeout. The function does not
-            retry on `SessionTimeoutError` (as mentioned above).
+            retry on `SessionTimeoutError` (as mentioned above). Notice that
+            the `retry` argument must be and integer greater than 0 (except `None`). 
+            For example, if `retry=1`, the function will try to load the page
+            one more time if the initial attempt #0 fails.
 
         ### Example:
         >>> await session.load("https://www.google.com")
@@ -902,7 +905,7 @@ class Session:
 
         # Retry
         exception = None
-        for _ in range(retry):
+        for _ in range(retry + 1):
             try:
                 await self.execute_command(
                     Command.GET, body={"url": url}, timeout=timeout
@@ -930,7 +933,10 @@ class Session:
         :param retry: `<int>` How many time to retry if failed to load the webpage. Defaults to `None`.
             Retries are attempted only when the `WebDriverTimeoutError` is
             raised due to native `pageLoad` timeout. The function does not
-            retry on `SessionTimeoutError` (as mentioned above).
+            retry on `SessionTimeoutError` (as mentioned above). Notice that
+            the `retry` argument must be and integer greater than 0 (except `None`). 
+            For example, if `retry=1`, the function will try to refresh the page
+            one more time if the initial attempt #0 fails.
 
         ### Example:
         >>> await session.refresh()
@@ -949,7 +955,7 @@ class Session:
 
         # Retry
         exception = None
-        for _ in range(10):
+        for _ in range(retry + 1):
             try:
                 await self.execute_command(Command.REFRESH, timeout=timeout)
                 return None  # exit
