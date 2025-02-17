@@ -44,7 +44,7 @@ class Connection:
     def __init__(self, session: ClientSession, session_timeout: int | float) -> None:
         """The connection to a remote server (Browser driver).
 
-        :param session: `<ClientSession>` The async session of the connection.
+        :param session `<'ClientSession'>`: The async session of the connection.
         """
         self._session: ClientSession = session
         self._session_timeout: int | float = session_timeout
@@ -60,17 +60,17 @@ class Connection:
     ) -> dict[str, Any]:
         """Execute a command.
 
-        :param base_url: `<str>` The base url of the command.
-        :param command: `<str>` The command to execute.
-        :param body: `<dict/None>` The body of the command. Defaults to `None`.
-        :param keys: `<dict/None>` The keys to substitute in the command. Defaults to `None`.
-        :param timeout: `<int/float/None>` Session timeout for command execution. Defaults to `None`.
+        :param base_url `<'str'>`: The base url of the command.
+        :param command `<'str'>`: The command to execute.
+        :param body `<'dict/None'>`: The body of the command. Defaults to `None`.
+        :param keys `<'dict/None'>`: The keys to substitute in the command. Defaults to `None`.
+        :param timeout `<'int/float/None'>`: Session timeout for command execution. Defaults to `None`.
             This arguments overwrites the default `options.session_timeout`,
             which is designed to cope with a frozen session due to unknown
             errors. For more information about session timeout, please refer
             to the documentation of `options.session_timeout` attribute.
 
-        :return: `<dict>` The response from the command.
+        :returns `<'dict'>`: The response from the command.
         """
         # Map command
         method, cmd = self.map_command(command)
@@ -183,8 +183,8 @@ class Connection:
     def map_command(self, command: str) -> tuple[str, str]:
         """Map a command to its method and commond value.
 
-        :param command: `<str>` The command to map.
-        :return: `<tuple>` The method and commond value of the command.
+        :param command `<'str'>`: The command to map.
+        :returns `<'tuple'>`: The method and commond value of the command.
         """
         try:
             return COMMANDS[command]

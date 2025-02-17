@@ -35,10 +35,10 @@ class Rectangle:
     def __init__(self, width: int, height: int, x: int, y: int) -> None:
         """The size and relative position of an retangle object.
 
-        :param width: `<int>` The width of the rectangle object.
-        :param height: `<int>` The height of the rectangle object.
-        :param x: `<int>` The x-coordinate of the rectangle object.
-        :param y: `<int>` The y-coordinate of the rectangle object.
+        :param width `<'int'>`: The width of the rectangle object.
+        :param height `<'int'>`: The height of the rectangle object.
+        :param x `<'int'>`: The x-coordinate of the rectangle object.
+        :param y `<'int'>`: The y-coordinate of the rectangle object.
         """
         try:
             self._width: int = ceil(width)
@@ -56,7 +56,7 @@ class Rectangle:
     # Properties ---------------------------------------------------------------
     @property
     def dict(self) -> dict[str, int]:
-        """Access as dictionary `dict[str, int]>`.
+        """Access as dictionary `<'dict[str, int]'>`.
 
         e.g. `{'width': 100, 'height': 100, 'x': 0, 'y': 0}`
         """
@@ -69,7 +69,7 @@ class Rectangle:
 
     @property
     def width(self) -> int:
-        """Access the width `<int>`."""
+        """Access the width `<'int'>`."""
         return self._width
 
     @width.setter
@@ -89,7 +89,7 @@ class Rectangle:
 
     @property
     def height(self) -> int:
-        """Access the height `<int>`."""
+        """Access the height `<'int'>`."""
         return self._height
 
     @height.setter
@@ -109,7 +109,7 @@ class Rectangle:
 
     @property
     def x(self) -> int:
-        """Access the x-coordinate `<int>`."""
+        """Access the x-coordinate `<'int'>`."""
         return self._x
 
     @x.setter
@@ -129,7 +129,7 @@ class Rectangle:
 
     @property
     def y(self) -> int:
-        """Access the y-coordinate `<int>`."""
+        """Access the y-coordinate `<'int'>`."""
         return self._y
 
     @y.setter
@@ -149,40 +149,40 @@ class Rectangle:
 
     @property
     def top(self) -> int:
-        """Access the coordinate of top `<int>`.
+        """Access the coordinate of top `<'int'>`.
         Equivalent to property `y`.
         """
         return self._y
 
     @property
     def bottom(self) -> int:
-        """Access the coordinate of bottom `<int>`.
+        """Access the coordinate of bottom `<'int'>`.
         Equivalent to property `y + height`.
         """
         return self._y + self._height
 
     @property
     def left(self) -> int:
-        """Access the coordinate of left `<int>`.
+        """Access the coordinate of left `<'int'>`.
         Equivalent to property `x`.
         """
         return self._x
 
     @property
     def right(self) -> int:
-        """Access the coordinate of right `<int>`.
+        """Access the coordinate of right `<'int'>`.
         Equivalent to property `x + width`.
         """
         return self._x + self._width
 
     @property
     def center_x(self) -> int:
-        """Access the x-coordinate of the center `<int>`."""
+        """Access the x-coordinate of the center `<'int'>`."""
         return self._x + self._width // 2
 
     @property
     def center_y(self) -> int:
-        """Access the y-coordinate of the center `<int>`."""
+        """Access the y-coordinate of the center `<'int'>`."""
         return self._y + self._height // 2
 
     # Special methods ----------------------------------------------------------
@@ -216,14 +216,14 @@ class CustomDict:
     def __init__(self, **kwargs: Any) -> None:
         """A custom dictionary.
 
-        :param kwargs: `<dict>` The dictionary to be initialized.
+        :param kwargs `<'dict'>`: The dictionary to be initialized.
         """
         self._dict: dict[str, Any] = kwargs
 
     # Properties ---------------------------------------------------------------
     @property
     def dict(self) -> dict[str, Any]:
-        """Access the dictionary `dict[str, Any]>`."""
+        """Access the dictionary `<'dict[str, Any]'>`."""
         return self._dict.copy()
 
     # Access -------------------------------------------------------------------
@@ -357,7 +357,7 @@ class MouseButtons:
 
 
 def process_keys(*keys: str | KeyboardKeys | Any) -> list[str]:
-    """Process the input keys to comply with the W3C spec `<list[str]>`."""
+    """Process the input keys to comply with the W3C spec `<'list[str]'>`."""
     lst = []
     for key in keys:
         if isinstance(key, KeyboardKeys):
@@ -372,7 +372,7 @@ def process_keys(*keys: str | KeyboardKeys | Any) -> list[str]:
 
 # Utils: file -------------------------------------------------------------------------------------
 def is_path_dir(path: str | Any) -> bool:
-    """Check if a path exists and is a directory `<bool>`."""
+    """Check if a path exists and is a directory `<'bool'>`."""
     try:
         return isdir(path)
     except Exception:
@@ -380,7 +380,7 @@ def is_path_dir(path: str | Any) -> bool:
 
 
 def is_path_file(path: str | Any) -> bool:
-    """Check if a path exists and is a file `<bool>`."""
+    """Check if a path exists and is a file `<'bool'>`."""
     try:
         return isfile(path)
     except Exception:
@@ -388,7 +388,7 @@ def is_path_file(path: str | Any) -> bool:
 
 
 def is_file_dir_exists(file: str | Any) -> bool:
-    """Check if the file's directory exists `<bool>`."""
+    """Check if the file's directory exists `<'bool'>`."""
     try:
         return isdir(dirname(file))
     except Exception:
@@ -396,7 +396,7 @@ def is_file_dir_exists(file: str | Any) -> bool:
 
 
 def validate_dir(path: str | Any) -> str:
-    """Validate a directory and return the absolute path `<str>`."""
+    """Validate a directory and return the absolute path `<'str'>`."""
     try:
         path = expanduser(path)
     except Exception as err:
@@ -411,7 +411,7 @@ def validate_dir(path: str | Any) -> str:
 
 
 def validate_file(path: str | Any) -> str:
-    """Validate a file and return the absolute path `<str>`."""
+    """Validate a file and return the absolute path `<'str'>`."""
     try:
         path = expanduser(path)
     except Exception as err:
@@ -444,9 +444,9 @@ def validate_save_file_path(path: str | Any, file_ext: str) -> str:
 def prettify_dict(dic: dict, lead: str = "  ") -> str:
     """Stringify a dictionary in a pretty format.
 
-    :param dic: `<dict>` The dictionary to be stringified.
-    :param lead: `<str>` The leading spaces for each line. Defaults to `'  '` (double space).
-    :returns `<str>`: The prettified dictionary as a string.
+    :param dic `<'dict'>`: The dictionary to be stringified.
+    :param lead `<'str'>`: The leading spaces for each line. Defaults to `'  '` (double space).
+    :returns `<'str'>`: The prettified dictionary as a string.
     """
 
     def prettify(dic: dict, indent: int) -> list:
@@ -468,13 +468,13 @@ def prettify_dict(dic: dict, lead: str = "  ") -> str:
 
 # Utils: plist ------------------------------------------------------------------------------------
 def load_plist_file(plist_file: str) -> dict:
-    """Load a local plist file `<dict>`."""
+    """Load a local plist file `<'dict'>`."""
     with open(plist_file, "rb", encoding="utf-8") as file:
         return load(file)
 
 
 # Utils: json -------------------------------------------------------------------------------------
 def load_json_file(json_file: str) -> dict:
-    """Load a local json file `<dict>`."""
+    """Load a local json file `<'dict'>`."""
     with open(json_file, "r", encoding="utf-8") as file:
         return loads(file.read())

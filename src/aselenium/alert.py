@@ -35,14 +35,14 @@ class Alert:
     def __init__(self, session: Session) -> None:
         """The JavaScript alert.
 
-        :param session: `<Session>` The session the alert raises.
+        :param session `<'Session'>`: The session the alert raises.
         """
         self._session: Session = session
 
     # Properties --------------------------------------------------------------------------
     @property
     async def text(self) -> str | None:
-        """Access the text of the alert `<str>`."""
+        """Access the text of the alert `<'str'>`."""
         try:
             res = await self._session.execute_command(Command.W3C_GET_ALERT_TEXT)
         except errors.InvalidMethodError:
@@ -59,7 +59,7 @@ class Alert:
     async def dismiss(self, pause: int | float | None = None) -> None:
         """Dismiss the alert.
 
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
         """
@@ -69,7 +69,7 @@ class Alert:
     async def accept(self, pause: int | float | None = None) -> None:
         """Accept the alert.
 
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
         """
@@ -84,9 +84,9 @@ class Alert:
     ) -> None:
         """Simulate typing or keyboard keys pressing into the alert.
 
-        :param values: `<str>` strings to be typed or keyboard keys to be pressed.
-        :param sep: `<str>` The separator between each values. Defaults to `' '`.
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param values `<'str'>`: The strings to be typed or keyboard keys to be pressed.
+        :param sep `<'str'>`: The separator between each values. Defaults to `' '`.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
 
@@ -117,7 +117,7 @@ class Alert:
     async def pause(self, duration: int | float | None) -> None:
         """Pause the for a given duration.
 
-        :param duration: `<int/float/None>` The duration to pause in seconds.
+        :param duration `<'int/float/None'>`: The duration to pause in seconds.
         """
         if duration is None:
             return None  # exit

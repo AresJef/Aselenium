@@ -61,41 +61,30 @@ class Proxy:
         proxy settings.
 
         ### Proxy Type: `'AUTODETECT'`
-        :param auto_detect: `<bool>` If `True`, the proxy type will be set
-        to `'AUTODETECT'`. This is often used when the system has its own
-        proxy settings that should be used. Defaults to `False`.
+
+        :param auto_detect `<'bool'>`: If `True`, the proxy type will be 
+          set to `'AUTODETECT'`. This is often used when the system has its 
+          own proxy settings that should be used. Defaults to `False`.
 
         ### Proxy Type: `'PAC'`
-        :param pac_url: `<str/None>` The URL to the PAC (Proxy Auto-Configuration)
-        file. If `pac_url` is provided, the proxy type will be set to `'PAC'`.
-        This is often used when the network environment has a configuration
-        script to handle traffic routing. Defaults to `None`.
+
+        :param pac_url `<'str/None'>`: The URL to the PAC (Proxy Auto-Configuration)
+          file. If `pac_url` is provided, the proxy type will be set to `'PAC'`.
+          This is often used when the network environment has a configuration
+          script to handle traffic routing. Defaults to `None`.
 
         ### Proxy Type: `'MANUAL'`
         If any of the following proxy properties is specified, the proxy type
         will be set to `'MANUAL'`.
 
-        :param ftp_proxy: `<str/None>` The proxy address to route the FTP (File
-        Transfer Protocol) traffics. Defaults to `None`.
-
-        :param http_proxy: `<str/None>` The proxy address to route the HTTP
-        traffics. Defaults to `None`.
-
-        :param https_proxy: `<str/None>` The proxy address to route the encrypted
-        HTTPS traffics. Defaults to `None`.
-
-        :param socks_proxy: `<str/None>` The proxy address to route the SOCKS
-        traffics. Defaults to `None`.
-
-        :param socks_username: `<str/None>` The username to use for SOCKS
-        authentication. Defaults to `None`.
-
-        :param socks_password: `<str/None>` The password to use for SOCKS
-        authentication. Defaults to `None`.
-
-        :param no_proxy: `<str/list/None>` The addresses that bypass the proxy
-        configuration. Each address is either a domain name, a hostname, or an
-        IP address. Defaults to `None`.
+        :param ftp_proxy `<'str/None'>`: The proxy address to route the FTP (File Transfer Protocol) traffics. Defaults to `None`.
+        :param http_proxy `<'str/None'>`: The proxy address to route the HTTP traffics. Defaults to `None`.
+        :param https_proxy `<'str/None'>`: The proxy address to route the encrypted HTTPS traffics. Defaults to `None`.
+        :param socks_proxy `<'str/None'>`: The proxy address to route the SOCKS traffics. Defaults to `None`.
+        :param socks_username `<'str/None'>`: The username to use for SOCKS authentication. Defaults to `None`.
+        :param socks_password `<'str/None'>`: The password to use for SOCKS authentication. Defaults to `None`.
+        :param no_proxy `<'str/list/None'>`: The addresses that bypass the proxy configuration. Each address is 
+          either a domain name, a hostname, or an IP address. Defaults to `None`.
         """
         # Set proxy type
         self._proxy_type: str = "DEFAULT"
@@ -117,7 +106,7 @@ class Proxy:
     # Proxy: type ----------------------------------------------------------------------
     @property
     def proxy_type(self) -> str:
-        """Access the type of the proxy `<str>`.
+        """Access the type of the proxy `<'str'>`.
 
         - `'DEFAULT'`: If the platform is windows, means direct connection
             `{"ff_value": 0, "string": "DIRECT"}`. On other platforms, this
@@ -147,7 +136,7 @@ class Proxy:
     def auto_detect(self) -> bool:
         """Whether the proxy settings should be automatically
         detected. This is often used when the system has its
-        own proxy settings or configurations `<bool>`.
+        own proxy settings or configurations `<'bool'>`.
         """
         return self._proxy_type == "AUTODETECT"
 
@@ -156,7 +145,7 @@ class Proxy:
         if not isinstance(value, bool):
             raise errors.InvalidProxyError(
                 "<{}>\nInvalid `auto_detect`, must be type of "
-                "`<bool>`.".format(self.__class__.__name__)
+                "`<'bool'>`.".format(self.__class__.__name__)
             )
         if value:
             self._proxy_type = "AUTODETECT"
@@ -169,7 +158,7 @@ class Proxy:
     def pac_url(self) -> str:
         """The URL to the PAC (Proxy Auto-Configuration) file.
         This is often used when the network environment has a
-        configuration script to handle traffic routing `<str>`.
+        configuration script to handle traffic routing `<'str'>`.
         """
         return self._pac_url
 
@@ -180,7 +169,7 @@ class Proxy:
         elif value is not None:
             raise errors.InvalidProxyError(
                 "<{}>\nInvalid `pac_url`, must be type of "
-                "`<str>` or `None`.".format(self.__class__.__name__)
+                "`<'str'>` or `None`.".format(self.__class__.__name__)
             )
         self._pac_url = value
         self.__status = 1
@@ -188,9 +177,7 @@ class Proxy:
     # Config: ftp ----------------------------------------------------------------------
     @property
     def ftp_proxy(self) -> str:
-        """The proxy address to route the FTP (File Transfer Protocol)
-        traffics `<str>`.
-        """
+        """The proxy address to route the FTP (File Transfer Protocol) traffics `<'str'>`."""
         return self._ftp_proxy
 
     @ftp_proxy.setter
@@ -206,7 +193,7 @@ class Proxy:
         elif value is not None:
             raise errors.InvalidProxyError(
                 "<{}>\nInvalid `ftp_proxy`, must be type of "
-                "`<str>` or `None`.".format(self.__class__.__name__)
+                "`<'str'>` or `None`.".format(self.__class__.__name__)
             )
         self._ftp_proxy = value
         self.__status = 1
@@ -214,7 +201,7 @@ class Proxy:
     # Config: http ---------------------------------------------------------------------
     @property
     def http_proxy(self) -> str:
-        """The proxy address to route the HTTP traffics `<str>`."""
+        """The proxy address to route the HTTP traffics `<'str'>`."""
         return self._http_proxy
 
     @http_proxy.setter
@@ -230,7 +217,7 @@ class Proxy:
         elif value is not None:
             raise errors.InvalidProxyError(
                 "<{}>\nInvalid `http_proxy`, must be type of "
-                "`<str>` or `None`.".format(self.__class__.__name__)
+                "`<'str'>` or `None`.".format(self.__class__.__name__)
             )
         self._http_proxy = value
         self.__status = 1
@@ -238,7 +225,7 @@ class Proxy:
     # Config: ssl ----------------------------------------------------------------------
     @property
     def https_proxy(self) -> str:
-        """The proxy address to route the encrypted HTTPS traffics `<str>`."""
+        """The proxy address to route the encrypted HTTPS traffics `<'str'>`."""
         return self._https_proxy
 
     @https_proxy.setter
@@ -254,7 +241,7 @@ class Proxy:
         elif value is not None:
             raise errors.InvalidProxyError(
                 "<{}>\nInvalid `https_proxy`, must be type of "
-                "`<str>` or `None`.".format(self.__class__.__name__)
+                "`<'str'>` or `None`.".format(self.__class__.__name__)
             )
         self._https_proxy = value
         self.__status = 1
@@ -262,7 +249,7 @@ class Proxy:
     # Config: socks --------------------------------------------------------------------
     @property
     def socks_proxy(self) -> str:
-        """The proxy address to route the SOCKS traffics `<str>`."""
+        """The proxy address to route the SOCKS traffics `<'str'>`."""
         return self._socks_proxy
 
     @socks_proxy.setter
@@ -286,14 +273,14 @@ class Proxy:
         else:
             raise errors.InvalidProxyError(
                 "<{}>\nInvalid `socks_proxy`, must be type of "
-                "`<str>` or `None`.".format(self.__class__.__name__)
+                "`<'str'>` or `None`.".format(self.__class__.__name__)
             )
         self._socks_proxy = value
         self.__status = 1
 
     @property
     def socks_username(self) -> str:
-        """The username to use for SOCKS authentication `<str>`."""
+        """The username to use for SOCKS authentication `<'str'>`."""
         return self._socks_username
 
     @socks_username.setter
@@ -303,14 +290,14 @@ class Proxy:
         elif value is not None:
             raise errors.InvalidProxyError(
                 "<{}>\nInvalid `socks_username`, must be type of "
-                "`<str>` or `None`.".format(self.__class__.__name__)
+                "`<'str'>` or `None`.".format(self.__class__.__name__)
             )
         self._socks_username = value
         self.__status = 1
 
     @property
     def socks_password(self) -> str:
-        """The password to use for SOCKS authentication `<str>`."""
+        """The password to use for SOCKS authentication `<'str'>`."""
         return self._socks_password
 
     @socks_password.setter
@@ -320,7 +307,7 @@ class Proxy:
         elif value is not None:
             raise errors.InvalidProxyError(
                 "<{}>\nInvalid `socks_password`, must be type of "
-                "`<str>` or `None`.".format(self.__class__.__name__)
+                "`<'str'>` or `None`.".format(self.__class__.__name__)
             )
         self._socks_password = value
         self.__status = 1
@@ -330,7 +317,7 @@ class Proxy:
     def no_proxy(self) -> str:
         """The addresses that bypass the proxy configuration.
         Each address is either a domain name, a hostname, or
-        an IP address, and separated by a comma `<str>`."""
+        an IP address, and separated by a comma `<'str'>`."""
         return self._no_proxy
 
     @no_proxy.setter
@@ -343,12 +330,12 @@ class Proxy:
             except Exception as err:
                 raise errors.InvalidProxyError(
                     "<{}>\nInvalid `no_proxy`, list of addresses items must "
-                    "all be type of `<str>`.".format(self.__class__.__name__)
+                    "all be type of `<'str'>`.".format(self.__class__.__name__)
                 ) from err
             self._proxy_type = "MANUAL"
         elif value is not None:
             raise errors.InvalidProxyError(
-                "<{}>\nInvalid `no_proxy`, must be type of `<str>`, "
+                "<{}>\nInvalid `no_proxy`, must be type of `<'str'>`, "
                 "`<list[str>]>` or `None`.".format(self.__class__.__name__)
             )
         self._no_proxy = value
@@ -357,7 +344,7 @@ class Proxy:
     # Capabilities ---------------------------------------------------------------------
     def to_capabilities(self) -> dict[str, Any]:
         """Create the capabilities representation of the
-        proxy configuration `<dict[str, Any]>`.
+        proxy configuration `<'dict[str, Any]'>`.
         """
         # Already converted
         if self.__caps and self.__status == 0:
@@ -418,18 +405,18 @@ class Timeouts:
     ) -> None:
         """The timeouts parameters for the browser.
 
-        :param implicit: `<int/float>` The time to wait when searching for
-        an element if not immediately present. If `None`, set to default
-        timeout value.
+        :param implicit `<'int/float'>`: The time to wait when searching for
+          an element if not immediately present. If `None`, set to default
+          timeout value.
 
-        :param pageLoad: `<int/float>` The time to wait for a page load to
-        complete. If `None`, set to default timeout value.
+        :param pageLoad `<'int/float'>`: The time to wait for a page load to
+          complete. If `None`, set to default timeout value.
 
-        :param script: `<int/float>` The time to wait for an asynchronous
-        script execution. If `None`, set to default timeout value.
+        :param script `<'int/float'>`: The time to wait for an asynchronous
+          script execution. If `None`, set to default timeout value.
 
-        :param unit: `<'str'>` The unit of the timeouts, accepts `s` or `ms`.
-        Defaults to `'ms'`.
+        :param unit `<'str'>`: The unit of the timeouts, accepts `s` or `ms`. 
+          Defaults to `'ms'`.
         """
         self._implicit: int = None
         self._pageLoad: int = None
@@ -447,7 +434,7 @@ class Timeouts:
     @property
     def dict(self) -> dict[str, int]:
         """Access the timeouts in miliseconds as
-        a dictionary `<dict[str, int]>`.
+        a dictionary `<'dict[str, int]'>`.
 
         Excepted format:
         >>> {"implicit": 0, "pageLoad": 300_000, "script": 30_000}
@@ -461,7 +448,7 @@ class Timeouts:
     # Implicit timeout --------------------------------------------------------------------
     @property
     def implicit(self) -> float:
-        """Access implicit timeout in seconds `<float>`.
+        """Access implicit timeout in seconds `<'float'>`.
 
         Total seconds to wait when searching for an element
         if not immediately present.
@@ -481,7 +468,7 @@ class Timeouts:
 
     @property
     def implicit_ms(self) -> int:
-        """Access implicit timeout in milliseconds `<int>`.
+        """Access implicit timeout in milliseconds `<'int'>`.
 
         Total milliseconds to wait when searching for an
         element if not immediately present.
@@ -501,7 +488,7 @@ class Timeouts:
     # PageLoad timeout --------------------------------------------------------------------
     @property
     def pageLoad(self) -> float:
-        """Access pageLoad timeout in seconds `<float>`.
+        """Access pageLoad timeout in seconds `<'float'>`.
 
         Total seconds to wait for a page load to complete.
         """
@@ -520,7 +507,7 @@ class Timeouts:
 
     @property
     def pageLoad_ms(self) -> int:
-        """Access pageLoad timeout in milliseconds `<int>`.
+        """Access pageLoad timeout in milliseconds `<'int'>`.
 
         Total milliseconds to wait for a page load to complete.
         """
@@ -539,7 +526,7 @@ class Timeouts:
     # Script timeout ----------------------------------------------------------------------
     @property
     def script(self) -> float:
-        """Access script timeout in seconds `<float>`.
+        """Access script timeout in seconds `<'float'>`.
 
         Total seconds to wait for an asynchronous script execution.
         """
@@ -558,7 +545,7 @@ class Timeouts:
 
     @property
     def script_ms(self) -> int:
-        """Access script timeout in milliseconds `<int>`.
+        """Access script timeout in milliseconds `<'int'>`.
 
         Total milliseconds to wait for an asynchronous script execution.
         """
@@ -576,7 +563,7 @@ class Timeouts:
 
     # Utils -------------------------------------------------------------------------------
     def _validate_timeout(self, value: Any) -> int | float:
-        """(internal) Validate the timeout value `<int/float>`"""
+        """(internal) Validate the timeout value `<'int/float'>`"""
         if not isinstance(value, (int, float)):
             raise errors.InvalidOptionsError(
                 "<{}>\nInvalid timeout ({}), must be an integer or float.".format(
@@ -624,11 +611,11 @@ class Timeouts:
 class Profile:
     """Represents the user profile for a browser."""
 
-    def __init__(self, directory: str, profile_folder: str | None) -> None:
+    def __init__(self, directory: str, profile_folder: str | None = None) -> None:
         """The user profile for the browser.
 
-        :param directory [REQUIRED]: `<str>` The directory of the user profile.
-        :param profile_folder [OPTIONAL]: `<str/None>` The name of the profile folder inside of the 'directory'.
+        :param directory [REQUIRED] `<'str'>`: The directory of the user profile.
+        :param profile_folder [OPTIONAL] `<'str/None'>`: The name of the profile folder inside of the 'directory'.
 
         ### Explaination
         - When creating a `Profile` instance, a cloned temporary profile
@@ -749,8 +736,8 @@ class ChromiumProfile(Profile):
         """The user profile for Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
-        :param directory: `<str>` The directory of the user profile.
-        :param profile_folder: `<str>` The name of the profile folder inside of the 'directory'.
+        :param directory `<'str'>`: The directory of the user profile.
+        :param profile_folder `<'str'>`: The name of the profile folder inside of the 'directory'.
 
         ### Explaination
         - When creating a `Profile` instance, a cloned temporary profile
@@ -787,22 +774,22 @@ class ChromiumProfile(Profile):
     # Properties --------------------------------------------------------------------------
     @property
     def directory(self) -> str:
-        """Access the main directory of the original profile `<str>`."""
+        """Access the main directory of the original profile `<'str'>`."""
         return self._directory
 
     @property
     def directory_temp(self) -> str:
-        """Access the main directory of the temporary profile `<str>`."""
+        """Access the main directory of the temporary profile `<'str'>`."""
         return self._temp_directory
 
     @property
     def profile_folder(self) -> str:
-        """Access the profile folder name of the original profile `<str>`."""
+        """Access the profile folder name of the original profile `<'str'>`."""
         return self._profile_folder
 
     @property
     def profile_folder_temp(self) -> str:
-        """Access the profile folder name of the temporary profile `<str>`."""
+        """Access the profile folder name of the temporary profile `<'str'>`."""
         return self._temp_profile_folder
 
 
@@ -819,7 +806,7 @@ class BaseOptions:
     """
 
     DEFAULT_CAPABILITIES: dict[str, Any] = None
-    "the default capabilities of the target browser `dict[str, Any]`"
+    "the default capabilities of the target browser `<'dict[str, Any]'>`"
     VENDOR_PREFIX: str = None
     "the vendor prefix of the target browser `str`"
 
@@ -827,7 +814,7 @@ class BaseOptions:
         """The options for the browser.
 
         Each subclass of `Options` must implement the following:
-        - `DEFAULT_CAPABILITIES`: `dict[str, Any]` Class attribute that
+        - `DEFAULT_CAPABILITIES`: <'dict[str, Any]'> Class attribute that
            contains the default capabilities of the target browser.
 
         - `construct()`: class instance method, which complete the final
@@ -866,7 +853,7 @@ class BaseOptions:
     # Session timeout ---------------------------------------------------------------------
     @property
     def session_timeout(self) -> int | float:
-        """Access the hard session timeout (seconds) for the browser `<int/float>`.
+        """Access the hard session timeout (seconds) for the browser `<'int/float'>`.
 
         This timeout is not a native timeout settings provided by
         the webdriver, but a hard timeout over the connection to
@@ -915,7 +902,7 @@ class BaseOptions:
     # Caps: basic -------------------------------------------------------------------------
     @property
     def capabilities(self) -> dict[str, Any]:
-        """Access the final browser capabilities `<dict[str, Any]>`."""
+        """Access the final browser capabilities `<'dict[str, Any]'>`."""
         if not self.__caps or self.__caps_status == 1:
             self.__caps = deepcopy(self.construct())
             self.__caps_status = 0
@@ -933,9 +920,9 @@ class BaseOptions:
     def get_capability(self, name: str) -> Any:
         """Get a capability of the browser.
 
-        :param name: `<str>` The name of the capability.
-        :raises `OptionsNotSetError`: If the capability is not set.
-        :return `<Any>` The value of the capability.
+        :param name `<'str'>`: The name of the capability.
+        :raises `<'OptionsNotSetError'>`: If the capability is not set.
+        :returns `<'Any'>`: The value of the capability.
         """
         try:
             return self._capabilities[name]
@@ -949,8 +936,8 @@ class BaseOptions:
     def set_capability(self, name: str, value: Any) -> None:
         """Set a capability of the browser.
 
-        :param name: `<str>` The name of the capability.
-        :param value: `<Any>` The value of the capability.
+        :param name `<'str'>`: The name of the capability.
+        :param value `<'Any'>`: The value of the capability.
         """
         self._capabilities[name] = value
         self._caps_changed()
@@ -958,7 +945,7 @@ class BaseOptions:
     def rem_capability(self, name: str) -> None:
         """Remove a capability of the browser.
 
-        :param name: `<str>` The name of the capability.
+        :param name `<'str'>`: The name of the capability.
         """
         try:
             self._capabilities.pop(name)
@@ -975,7 +962,7 @@ class BaseOptions:
     # Caps: browser name ------------------------------------------------------------------
     @property
     def browser_name(self) -> str:
-        """Access the name of the browser agent `<str>`."""
+        """Access the name of the browser agent `<'str'>`."""
         try:
             return self._capabilities["browserName"]
         except KeyError as err:
@@ -989,7 +976,7 @@ class BaseOptions:
     # Caps: browser version ---------------------------------------------------------------
     @property
     def browser_version(self) -> Version | None:
-        """Access the version of the browser `<Version/None>`."""
+        """Access the version of the browser `<'Version/None'>`."""
         return self._capabilities.get("browserVersion")
 
     @browser_version.setter
@@ -1009,14 +996,14 @@ class BaseOptions:
         # Set browser version
         if not isinstance(value, Version):
             raise errors.InvalidOptionsError(
-                f"<{self.__class__.__name__}>\n`browser_version` must be type of `<Version>`."
+                f"<{self.__class__.__name__}>\n`browser_version` must be type of `<'Version'>`."
             )
         self.set_capability("browserVersion", value.patch)
 
     # Options: binary location ------------------------------------------------------------
     @property
     def browser_location(self) -> str | None:
-        """Access the location of the Brwoser binary `<str>`."""
+        """Access the location of the Brwoser binary `<'str'>`."""
         return self._experimental_options.get("binary")
 
     @browser_location.setter
@@ -1044,7 +1031,7 @@ class BaseOptions:
     # Caps: platform name -----------------------------------------------------------------
     @property
     def platform_name(self) -> str | None:
-        """Access the name of the platform `<str>`.
+        """Access the name of the platform `<'str'>`.
 
         e.g. "windows", "mac", "linux".
         """
@@ -1060,7 +1047,7 @@ class BaseOptions:
         # Set platform name
         if not isinstance(value, str):
             raise errors.InvalidOptionsError(
-                f"<{self.__class__.__name__}>\n`platform_name` must be type of `<str>`."
+                f"<{self.__class__.__name__}>\n`platform_name` must be type of `<'str'>`."
             )
         self.set_capability("platformName", value)
 
@@ -1085,7 +1072,7 @@ class BaseOptions:
     @property
     def page_load_strategy(self) -> str:
         """The strategy to use when waiting for the page load
-        event to fire. Defaults to `'normal' <str>`.
+        event to fire. Defaults to `'normal' `<'str'>`.
 
         Available options:
         - `'normal'`: Waits for all resources to be downloaded.
@@ -1116,7 +1103,7 @@ class BaseOptions:
     # Caps: proxy -------------------------------------------------------------------------
     @property
     def proxy(self) -> Proxy | None:
-        """Access browser proxy configurations `<Proxy>`."""
+        """Access browser proxy configurations `<'Proxy'>`."""
         return self._proxy
 
     @proxy.setter
@@ -1188,19 +1175,19 @@ class BaseOptions:
         (as the webdriver protocol requires). The values will be converted to
         milliseconds automatically.
 
-        :param implicit: `<int/float/None>` Total `seconds` the current session
-        should wait when searching for an element if not immediately present.
-        If `None (default)`, keep the current implicit timeout.
+        :param implicit `<'int/float/None'>`: Total `seconds` the current session
+          should wait when searching for an element if not immediately present.
+          If `None (default)`, keep the current implicit timeout.
 
-        :param pageLoad: `<int/float/None>` Total `seconds` the current session
-        should wait for a page load to complete before returning an error. if
-        `None (default)`, keep the current pageLoad timeout.
+        :param pageLoad `<'int/float/None'>`: Total `seconds` the current session
+          should wait for a page load to complete before returning an error. if
+          `None (default)`, keep the current pageLoad timeout.
 
-        :param script: `<int/float/None>` Total `seconds` the current session
-        should wait for an asynchronous script to finish execution before
-        returning an error. if `None (default)`, keep the current script timeout.
+        :param script `<'int/float/None'>`: Total `seconds` the current session
+          should wait for an asynchronous script to finish execution before
+          returning an error. if `None (default)`, keep the current script timeout.
 
-        :return `<Timeouts>`: The timeouts after update.
+        :returns `<'Timeouts'>`: The timeouts after update.
 
         ### Example:
         >>> timeouts = options.set_timeouts(implicit=0.1, pageLoad=30, script=3)
@@ -1222,7 +1209,7 @@ class BaseOptions:
     @property
     def strict_file_interactability(self) -> bool:
         """Access whether browser is strict about file
-        interactability. Defaults to `False <bool>`.
+        interactability. Defaults to False `<'bool'>`.
         """
         return self._capabilities.get("strictFileInteractability", False)
 
@@ -1239,7 +1226,7 @@ class BaseOptions:
     @property
     def unhandled_prompt_behavior(self) -> str:
         """Access what action the browser must take when a user prompt
-        is encountered. Defaults to `'dismiss and notify' <str>`.
+        is encountered. Defaults to `'dismiss and notify' <'str'>`.
 
         Available options:
         - `'dismiss'`: All simple dialogs encountered should be dismissed.
@@ -1279,7 +1266,7 @@ class BaseOptions:
     def add_experimental_options(self, **options: Any) -> None:
         """Add experimental options of the browser.
 
-        :param options [Keywords]: `<Any>` The experimental options to add.
+        :param options [Keywords] `<'Any'>`: The experimental options to add.
 
         ### Example:
         >>> options.add_experimental_options(
@@ -1295,7 +1282,7 @@ class BaseOptions:
     def rem_experimental_option(self, name: str) -> None:
         """Remove an experimental option of the browser.
 
-        :param name: `<str>` The name of the experimental option.
+        :param name `<'str'>`: The name of the experimental option.
 
         ### Example:
         >>> options.rem_experimental_options("excludeSwitches")
@@ -1309,9 +1296,9 @@ class BaseOptions:
     def get_experimental_option(self, name: str) -> Any:
         """Get an experimental option of the browser.
 
-        :param name: `<str>` The name of the experimental option.
-        :raises `OptionsNotSetError`: If the experimental option is not set.
-        :return `<Any>` The value of the experimental option.
+        :param name `<'str'>`: The name of the experimental option.
+        :raises `<'OptionsNotSetError'>`: If the experimental option is not set.
+        :returns `<'Any'>`: The value of the experimental option.
         """
         try:
             return self._experimental_options[name]
@@ -1331,7 +1318,7 @@ class BaseOptions:
     def add_arguments(self, *args: str) -> None:
         """Add arguments to browser capabilites.
 
-        :param args: `<str>` The arguments to add.
+        :param args `<'str'>`: The arguments to add.
 
         ### Example:
         >>> options.add_arguments(
@@ -1366,13 +1353,13 @@ class BaseOptions:
     # Options: preferences ----------------------------------------------------------------
     @property
     def preferences(self) -> dict[str, Any]:
-        """Access the preferences of the browser `<dict[str, Any]>`."""
+        """Access the preferences of the browser `<'dict[str, Any]'>`."""
         return deepcopy(self._preferences)
 
     def set_preferences(self, **prefs: Any) -> None:
         """Set preferences of the browser.
 
-        :param prefs [Keywords]: `<Any>` The preferences to set.
+        :param prefs [Keywords] `<'Any'>`: The preferences to set.
 
         ### Example:
         >>> options.set_preferences(
@@ -1391,9 +1378,9 @@ class BaseOptions:
     def get_preference(self, name: str) -> Any:
         """Get a preference value of the browser.
 
-        :param name: `<str>` The name of the preference.
-        :raises `OptionsNotSetError`: If the preference is not set.
-        :return `<Any>` The value of the preference.
+        :param name `<'str'>`: The name of the preference.
+        :raises `<'OptionsNotSetError'>`: If the preference is not set.
+        :returns `<'Any'>`: The value of the preference.
 
         ### Example:
         >>> options.get_preference("media.navigator.permission.disabled")
@@ -1411,7 +1398,7 @@ class BaseOptions:
     def rem_preference(self, name: str) -> None:
         """Remove a preference of the browser.
 
-        :param name: `<str>` The name of the preference.
+        :param name `<'str'>`: The name of the preference.
 
         ### Example:
         >>> options.rem_preference("media.navigator.permission.disabled")
@@ -1524,7 +1511,7 @@ class ChromiumBaseOptions(BaseOptions):
     # Caps: browser version ---------------------------------------------------------------
     @property
     def browser_version(self) -> ChromiumVersion | None:
-        """Access the version of the browser `<ChromiumVersion/None>`."""
+        """Access the version of the browser `<'ChromiumVersion/None'>`."""
         return self._capabilities.get("browserVersion")
 
     @browser_version.setter
@@ -1534,7 +1521,7 @@ class ChromiumBaseOptions(BaseOptions):
     # Options: debugger -------------------------------------------------------------------
     @property
     def debugger_address(self) -> str:
-        """Access the address of the remote devtools for debugging `<str>`.
+        """Access the address of the remote devtools for debugging `<'str'>`.
 
         ChromeDriver will try to connect to this devtools instance
         during an active wait. For example: `"hostname:port"`.
@@ -1551,7 +1538,7 @@ class ChromiumBaseOptions(BaseOptions):
         # Set debugger address
         if not isinstance(value, str):
             raise errors.InvalidOptionsError(
-                f"<{self.__class__.__name__}>\n'debugger_address' must be type of `<str>`."
+                f"<{self.__class__.__name__}>\n'debugger_address' must be type of `<'str'>`."
             )
         self.add_experimental_options(debuggerAddress=value)
 
@@ -1570,9 +1557,9 @@ class ChromiumBaseOptions(BaseOptions):
         """Set the user profile for the Chromium based browser.
         Such as: Edge, Chrome, Chromium, etc.
 
-        :param directory: `<str>` The directory of the user profile.
-        :param profile_folder: `<str>` The name of the profile folder inside of the 'directory'.
-        :return `<ChromiumProfile>`: The profile instance.
+        :param directory `<'str'>`: The directory of the user profile.
+        :param profile_folder `<'str'>`: The name of the profile folder inside of the 'directory'.
+        :returns `<'ChromiumProfile'>`: The profile instance.
 
         ### Explaination
         - When setting the profile through this method, a cloned temporary
@@ -1644,7 +1631,7 @@ class ChromiumBaseOptions(BaseOptions):
     def add_extensions(self, *paths: str) -> None:
         """Add extensions to the browser (through local file).
 
-        :param paths: `<str>` The paths to the extension files (\\*.crx).
+        :param paths `<'str'>`: The paths to the extension files (\\*.crx).
 
         ### Example:
         >>> options.add_extensions(
@@ -1685,9 +1672,9 @@ class ChromiumBaseOptions(BaseOptions):
 
     def add_extensions_base64(self, *extensions: str | bytes) -> None:
         """Add extensions to the browser (through encoded Base64 data).
-        (For extensions that have already been encoded into Base64 `<str/bytes>`.)
+        (For extensions that have already been encoded into Base64 `<'str/bytes'>`.)
 
-        :param extensions: `<str/bytes>` The Base64 encoded extension data.
+        :param extensions `<'str/bytes'>`: The Base64 encoded extension data.
         """
         # Add extionsions
         added = False

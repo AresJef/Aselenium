@@ -42,8 +42,8 @@ class Shadow:
     def __init__(self, shadow_id: str, element: Element) -> None:
         """The shadow root inside an element.
 
-        :param shadow_id: `<str>` The shadow root ID.
-        :param element: `<Element>` The element that contains the shadow root.
+        :param shadow_id `<'str'>`: The shadow root ID.
+        :param element `<'Element'>`: The element that contains the shadow root.
         """
         # Validate
         if not shadow_id or not isinstance(shadow_id, str):
@@ -67,28 +67,28 @@ class Shadow:
     # Basic -------------------------------------------------------------------------------
     @property
     def session_id(self) -> str:
-        """Access the session ID of the shadow root `<str>`.
+        """Access the session ID of the shadow root `<'str'>`.
         e.g. '62eb095e1d01b00a4dc3a497c7330aa5'
         """
         return self._session._id
 
     @property
     def element_id(self) -> str:
-        """Access the element ID of the shadow root `<str>`.
+        """Access the element ID of the shadow root `<'str'>`.
         e.g. '61A5CAC057B025F22A116E47F7950D24_element_1'
         """
         return self._element._id
 
     @property
     def id(self) -> str:
-        """The the ID of the shadow root `<str>`.
+        """The the ID of the shadow root `<'str'>`.
         e.g. '61A5CAC057B025F22A116E47F7950D24_element_1'
         """
         return self._id
 
     @property
     def base_url(self) -> str:
-        """Access the base URL of the shadow root `<str>`."""
+        """Access the base URL of the shadow root `<'str'>`."""
         return self._base_url
 
     # Execute -----------------------------------------------------------------------------
@@ -101,16 +101,16 @@ class Shadow:
     ) -> dict[str, Any]:
         """Executes a command from the shadow root.
 
-        :param command: `<str>` The command to execute.
-        :param body: `<dict/None>` The body of the command. Defaults to `None`.
-        :param keys: `<dict/None>` The keys to substitute in the command. Defaults to `None`.
-        :param timeout: `<int/float/None>` Session timeout for command execution. Defaults to `None`.
+        :param command `<'str'>`: The command to execute.
+        :param body `<'dict/None'>`: The body of the command. Defaults to `None`.
+        :param keys `<'dict/None'>`: The keys to substitute in the command. Defaults to `None`.
+        :param timeout `<'int/float/None'>`: Session timeout for command execution. Defaults to `None`.
             This arguments overwrites the default `options.session_timeout`,
             which is designed to cope with a frozen session due to unknown
             errors. For more information about session timeout, please refer
             to the documentation of `options.session_timeout` attribute.
 
-        :return `<dict>`: The response from the command.
+        :returns `<'dict'>`: The response from the command.
         """
         return await self._conn.execute(
             self._base_url,
@@ -125,8 +125,8 @@ class Shadow:
         """Check if an element exists (inside the shadow). This method ignores
         the implicit wait timeout, and returns element existence immediately.
 
-        :param value: `<str/Element>` The selector for the element (css only) *OR* an `<Element>` instance.
-        :return `<bool>`: True if the element exists, False otherwise.
+        :param value `<'str/Element'>`: The selector for the element (css only) *OR* an `<'Element'>` instance.
+        :returns `<'bool'>`: True if the element exists, False otherwise.
 
         ### Example:
         >>> await shadow.element_exists("#input_box")  # True / False
@@ -141,12 +141,12 @@ class Shadow:
         ignores the implicit wait timeout, and returns elements existence
         immediately.
 
-        :param values: `<str/Element>` The locators for multiple elements (css only) *OR* `<Element>` instances.
-        :param all_: `<bool>` Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
+        :param values `<'str/Element'>`: The locators for multiple elements (css only) *OR* `<'Element'>` instances.
+        :param all_ `<'bool'>`: Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
             - `True`: All elements must exist to return True.
             - `False`: Any one of the elements exists returns True.
 
-        :return `<bool>`: True if the elements exist, False otherwise.
+        :returns `<'bool'>`: True if the elements exist, False otherwise.
 
         ### Example:
         >>> await shadow.elements_exist(
@@ -177,8 +177,8 @@ class Shadow:
         and strategy. The timeout for finding an element is determined
         by the implicit wait of the session.
 
-        :param value: `<str>` The selector for the element `(css only)`.
-        :return `<Element/None>`: The located element, or `None` if not found.
+        :param value `<'str'>`: The selector for the element `(css only)`.
+        :returns `<'Element/None'>`: The located element, or `None` if not found.
 
         ### Example:
         >>> await shadow.find_element("#input_box")
@@ -211,8 +211,8 @@ class Shadow:
         strategy. The timeout for finding the elements is determined by
         the implicit wait of the session.
 
-        :param value: `<str>` The selector for the elements `(css only)`.
-        :return `<list[Element]>`: A list of located elements (empty if not found).
+        :param value `<'str'>`: The selector for the elements `(css only)`.
+        :returns `<'list[Element]'>`: A list of located elements (empty if not found).
 
         ### Example:
         >>> await shadow.find_elements("#input_box")
@@ -245,8 +245,8 @@ class Shadow:
         multiple locators. The timeout for finding the first element
         is determined by the implicit wait of the session.
 
-        :param values: `<str>` The locators for multiple elements `(css only)`.
-        :return `<Element/None>`: The first located element among all locators, or `None` if not found.
+        :param values `<'str'>`: The locators for multiple elements `(css only)`.
+        :returns `<'Element/None'>`: The first located element among all locators, or `None` if not found.
 
         ### Example:
         >>> await shadow.find_1st_element("#input_box", "#input_box2")
@@ -278,7 +278,7 @@ class Shadow:
     ) -> bool:
         """Wait until an element (inside the shadow) satisfies the given condition.
 
-        :param condition: `<str>` The condition to satisfy. Available options:
+        :param condition `<'str'>`: The condition to satisfy. Available options:
             - `'gone'`: Wait until an element disappears from the shadow.
             - `'exist'`: Wait until an element appears in the shadow.
             - `'visible'`: Wait until an element not only is displayed but also not
@@ -288,9 +288,9 @@ class Shadow:
             - `'enabled'`: Wait until an element is enabled.
             - `'selected'`: Wait until an element is selected.
 
-        :param value: `<str/Element>` The selector for the element (css only) *OR* an `<Element>` instance.
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return `<bool>`: True if the element satisfies the condition, False otherwise.
+        :param value `<'str/Element'>`: The selector for the element (css only) *OR* an `<'Element'>` instance.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the element satisfies the condition, False otherwise.
 
         ### Example:
         >>> await shadow.wait_until_element(
@@ -385,7 +385,7 @@ class Shadow:
     ) -> bool:
         """Wait until multiple elements (inside the shadow) satisfy the given condition.
 
-        :param condition: `<str>` The condition to satisfy. Available options:
+        :param condition `<'str'>`: The condition to satisfy. Available options:
             - `'gone'`: Wait until the elements disappear from the shadow.
             - `'exist'`: Wait until the elements appear in the shadow.
             - `'visible'`: Wait until the elements not only are displayed but also not
@@ -395,13 +395,13 @@ class Shadow:
             - `'enabled'`: Wait until the elements are enabled.
             - `'selected'`: Wait until the elements are selected.
 
-        :param values: `<str/Element>` The locators for multiple elements (css only) *OR* `<Element>` instances.
-        :param all_: `<bool>` Determine how to satisfy the condition. Defaults to `True (all elements)`.
+        :param values `<'str/Element'>`: The locators for multiple elements (css only) *OR* `<'Element'>` instances.
+        :param all_ `<'bool'>`: Determine how to satisfy the condition. Defaults to `True (all elements)`.
             - `True`: All elements must satisfy the condition to return True.
             - `False`: Any one of the elements satisfies the condition returns True.
 
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return `<bool>`: True if the elements satisfy the condition, False otherwise.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the elements satisfy the condition, False otherwise.
 
         ### Example:
         >>> await shadow.wait_until_elements(
@@ -495,7 +495,7 @@ class Shadow:
 
     async def _element_exists_no_wait(self, value: str) -> bool:
         """(Internal) Check if an element exists (inside the element)
-        without implicit wait `<bool>`. Returns `False` immediately if
+        without implicit wait `<'bool'>`. Returns `False` immediately if
         element not exists.
         """
         try:
@@ -513,7 +513,7 @@ class Shadow:
 
     async def _find_element_no_wait(self, value: str) -> Element | None:
         """(Internal) Find element (inside the element) without implicit
-        wait `<Element>`. Returns `None` immediately if element not exists.
+        wait `<'Element'>`. Returns `None` immediately if element not exists.
         """
         try:
             res = await self._session._execute_script(

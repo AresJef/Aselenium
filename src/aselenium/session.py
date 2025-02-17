@@ -59,7 +59,7 @@ class Cookie(CustomDict):
     def __init__(self, **data: Any) -> None:
         """The cookie of the webpage.
 
-        :param data [keywords]: `<Any>` The cookie data.
+        :param data [keywords] `<'Any'>`: The cookie data.
         """
         super().__init__(**data)
         # Validate name
@@ -77,7 +77,7 @@ class Cookie(CustomDict):
     # Name --------------------------------------------------------------------------------
     @property
     def name(self) -> str:
-        """Access the name of the cookie `<str>`."""
+        """Access the name of the cookie `<'str'>`."""
         return self._dict[self.__nkey]
 
     @name.setter
@@ -93,7 +93,7 @@ class Cookie(CustomDict):
     # Attributes --------------------------------------------------------------------------
     @property
     def data(self) -> dict[str, Any]:
-        """Access the data of the cookie `<dict>`."""
+        """Access the data of the cookie `<'dict'>`."""
         return self._dict
 
     # Special methods ---------------------------------------------------------------------
@@ -101,7 +101,7 @@ class Cookie(CustomDict):
         return "<Cookie (name='%s', data=%s)" % (self.name, self._dict)
 
     def copy(self) -> Cookie:
-        """Copy the cookie object `<Cookie>`."""
+        """Copy the cookie object `<'Cookie'>`."""
         return Cookie(**self._dict)
 
 
@@ -116,9 +116,9 @@ class DevToolsCMD:
     ) -> None:
         """The cached Chrome DevTools Protocol command.
 
-        :param name: `<str>` The name of the command.
-        :param cmd: `<str>` The command lines for the devtools protocal.
-        :param kwargs: `<Any>` Additional keyword arguments for the command.
+        :param name `<'str'>`: The name of the command.
+        :param cmd `<'str'>`: The command lines for the devtools protocal.
+        :param kwargs `<'Any'>`: Additional keyword arguments for the command.
         """
         # Command name
         if isinstance(name, str) and name:
@@ -144,17 +144,17 @@ class DevToolsCMD:
     # Properties --------------------------------------------------------------------------
     @property
     def name(self) -> str:
-        """Access the name of the command `<str>`."""
+        """Access the name of the command `<'str'>`."""
         return self._name
 
     @property
     def cmd(self) -> str:
-        """Access the command line `<str>`"""
+        """Access the command line `<'str'>`"""
         return self._cmd
 
     @property
     def kwargs(self) -> dict[str, Any]:
-        """Access the keyword arguments for the command `<dict>`"""
+        """Access the keyword arguments for the command `<'dict'>`"""
         return self._kwargs
 
     # Special methods ---------------------------------------------------------------------
@@ -185,7 +185,7 @@ class DevToolsCMD:
         self._kwargs = None
 
     def copy(self) -> DevToolsCMD:
-        """Copy the DevTools Command object `<DevToolsCMD>`."""
+        """Copy the DevTools Command object `<'DevToolsCMD'>`."""
         cmd = DevToolsCMD(self._name, self._cmd)
         cmd._kwargs = deepcopy(self._kwargs)
         return cmd
@@ -197,9 +197,9 @@ class JavaScript:
     def __init__(self, name: str, script: str, *args: Any) -> None:
         """The cached javascript of the session.
 
-        :param name: `<str>` The name of the javascript.
-        :param script: `<str>` The raw javascript code.
-        :param args: `<Any>` The arguments for the javascript.
+        :param name `<'str'>`: The name of the javascript.
+        :param script `<'str'>`: The raw javascript code.
+        :param args `<'Any'>`: The arguments for the javascript.
         """
         # JavaScript name
         if isinstance(name, str) and name:
@@ -225,17 +225,17 @@ class JavaScript:
     # Properties --------------------------------------------------------------------------
     @property
     def name(self) -> str:
-        """Access the name of the javascript `<str>`."""
+        """Access the name of the javascript `<'str'>`."""
         return self._name
 
     @property
     def script(self) -> str:
-        """Access the javascript code `<str>`."""
+        """Access the javascript code `<'str'>`."""
         return self._script
 
     @property
     def args(self) -> list[Any]:
-        """Access the arguments for the javascript `<list[Any]>`."""
+        """Access the arguments for the javascript `<'list[Any]'>`."""
         return self._args
 
     # Special methods ---------------------------------------------------------------------
@@ -266,7 +266,7 @@ class JavaScript:
         self._args = None
 
     def copy(self) -> JavaScript:
-        """Copy the javascript object `<JavaScript>`."""
+        """Copy the javascript object `<'JavaScript'>`."""
         js = JavaScript(self._name, self._script)
         js._args = deepcopy(self._args)
         return js
@@ -284,17 +284,17 @@ class Network:
     ) -> None:
         """The network condition of the session.
 
-        :param offline: `<bool/None>` Whether to simulate an offline
-        network condition. If `None`, set to default condition.
+        :param offline `<'bool/None'>`: Whether to simulate an offline
+          network condition. If `None`, set to default condition.
 
-        :param latency: `<int/None>` The minimum latency overhead. If
-        `None`, set to default condition.
+        :param latency `<'int/None'>`: The minimum latency overhead. If
+          `None`, set to default condition.
 
-        :param upload_throughput: `<int/None>` The maximum upload throughput
-        in bytes per second. If `None`, set to default condition.
+        :param upload_throughput `<'int/None'>`: The maximum upload throughput
+          in bytes per second. If `None`, set to default condition.
 
-        :param download_throughput: `<int/None>` The maximum download
-        throughput in bytes per second. If `None`, set to default condition.
+        :param download_throughput `<'int/None'>`: The maximum download
+          throughput in bytes per second. If `None`, set to default condition.
         """
         self._offline: bool = None
         self._latency: int = None
@@ -310,7 +310,7 @@ class Network:
     @property
     def dict(self) -> dict[str, int]:
         """Access the network condition as a
-        dictionary `<dict[str, int]>`.
+        dictionary `<'dict[str, int]'>`.
 
         Excepted format:
         >>> {
@@ -330,7 +330,7 @@ class Network:
     # Offline -----------------------------------------------------------------------------
     @property
     def offline(self) -> bool:
-        """Access the network offline condition `<bool>`."""
+        """Access the network offline condition `<'bool'>`."""
         return self._offline
 
     @offline.setter
@@ -346,7 +346,7 @@ class Network:
     # Latency -----------------------------------------------------------------------------
     @property
     def latency(self) -> int:
-        """Access the network latency condition `<int>`."""
+        """Access the network latency condition `<'int'>`."""
         return self._latency
 
     @latency.setter
@@ -368,7 +368,7 @@ class Network:
     # Upload throughput -------------------------------------------------------------------
     @property
     def upload_throughput(self) -> int:
-        """Access the network upload throughput condition `<int>`."""
+        """Access the network upload throughput condition `<'int'>`."""
         return self._upload_throughput
 
     @upload_throughput.setter
@@ -390,7 +390,7 @@ class Network:
     # Download throughput -----------------------------------------------------------------
     @property
     def download_throughput(self) -> int:
-        """Access the network download throughput condition `<int>`."""
+        """Access the network download throughput condition `<'int'>`."""
         return self._download_throughput
 
     @download_throughput.setter
@@ -454,7 +454,7 @@ class Permission:
     # Dict  --------------------------------------------------------------------------------
     @property
     def dict(self) -> dict[str, int]:
-        """Access the permission as a dictionary `<dict[str, int]>`.
+        """Access the permission as a dictionary `<'dict[str, int]'>`.
 
         Excepted format:
         >>> {"name": "video_capture", "state": "prompt"}
@@ -464,7 +464,7 @@ class Permission:
     # Name --------------------------------------------------------------------------------
     @property
     def name(self) -> str:
-        """Access the name of the permission `<str>`."""
+        """Access the name of the permission `<'str'>`."""
         return self._name
 
     @name.setter
@@ -480,7 +480,7 @@ class Permission:
     # State -------------------------------------------------------------------------------
     @property
     def state(self) -> str:
-        """Access the permission state `<str>`.
+        """Access the permission state `<'str'>`.
 
         Excepted values: `"granted"`, `"denied"`, `"prompt"`
         """
@@ -520,16 +520,16 @@ class Viewport(Rectangle):
     def __init__(self, width: int, height: int, x: int, y: int) -> None:
         """The size and relative position of the window viewport.
 
-        :param width: `<int>` The width of the viewport.
-        :param height: `<int>` The height of the viewport.
-        :param x: `<int>` The x-coordinate of the viewport.
-        :param y: `<int>` The y-coordinate of the viewport.
+        :param width `<'int'>`: The width of the viewport.
+        :param height `<'int'>`: The height of the viewport.
+        :param x `<'int'>`: The x-coordinate of the viewport.
+        :param y `<'int'>`: The y-coordinate of the viewport.
         """
         super().__init__(width, height, x, y)
 
     # Special methods ---------------------------------------------------------------------
     def copy(self) -> Viewport:
-        """Copy the viewport `<Viewport>`."""
+        """Copy the viewport `<'Viewport'>`."""
         return super().copy()
 
 
@@ -539,8 +539,8 @@ class Window:
     def __init__(self, handle: str, name: str | None = None) -> None:
         """The window of the session.
 
-        :param handle: `<str>` The unique handle of the window.
-        :param name: `<str/None>` The name of the window. Defaults to `uuid4()`.
+        :param handle `<'str'>`: The unique handle of the window.
+        :param name `<'str/None'>`: The name of the window. Defaults to `uuid4()`.
         """
         # Window handle
         if isinstance(handle, str) and handle:
@@ -566,12 +566,12 @@ class Window:
     # Properties --------------------------------------------------------------------------
     @property
     def name(self) -> str:
-        """Access the name of the window `<str>`."""
+        """Access the name of the window `<'str'>`."""
         return self._name
 
     @property
     def handle(self) -> str:
-        """Access the unique handle of the window `<str>`."""
+        """Access the unique handle of the window `<'str'>`."""
         return self._handle
 
     # Special methods ---------------------------------------------------------------------
@@ -607,16 +607,16 @@ class WindowRect(Rectangle):
     def __init__(self, width: int, height: int, x: int, y: int) -> None:
         """The size and relative position of the window.
 
-        :param width: `<int>` The width of the window.
-        :param height: `<int>` The height of the window.
-        :param x: `<int>` The x-coordinate of the window.
-        :param y: `<int>` The y-coordinate of the window.
+        :param width `<'int'>`: The width of the window.
+        :param height `<'int'>`: The height of the window.
+        :param x `<'int'>`: The x-coordinate of the window.
+        :param y `<'int'>`: The y-coordinate of the window.
         """
         super().__init__(width, height, x, y)
 
     # Special methods ---------------------------------------------------------------------
     def copy(self) -> WindowRect:
-        """Copy the window rectangle `<WindowRect>`."""
+        """Copy the window rectangle `<'WindowRect'>`."""
         return super().copy()
 
 
@@ -627,8 +627,8 @@ class Session:
     def __init__(self, options: BaseOptions, service: BaseService) -> None:
         """The session of the browser.
 
-        :param options: `<BaseOptions>` The browser options.
-        :param service: `<BaseService>` The webdriver service.
+        :param options `<'BaseOptions'>`: The browser options.
+        :param service `<'BaseService'>`: The webdriver service.
         """
         # Options
         self._options: BaseOptions = options
@@ -657,47 +657,47 @@ class Session:
     # Basic -------------------------------------------------------------------------------
     @property
     def options(self) -> BaseOptions:
-        """Access the browser options `<BaseOptions>`."""
+        """Access the browser options `<'BaseOptions'>`."""
         return self._options
 
     @property
     def browser_version(self) -> Version:
-        """Access the browser binary version of the session `<Version>`."""
+        """Access the browser binary version of the session `<'Version'>`."""
         return self._browser_version
 
     @property
     def browser_location(self) -> str:
-        """Access the browser binary location of the session `<str>`."""
+        """Access the browser binary location of the session `<'str'>`."""
         return self._browser_location
 
     @property
     def service(self) -> BaseService:
-        """Access the webdriver service `<BaseService>`."""
+        """Access the webdriver service `<'BaseService'>`."""
         return self._service
 
     @property
     def driver_version(self) -> Version:
-        """Access the webdriver binary version of the session `<Version>`."""
+        """Access the webdriver binary version of the session `<'Version'>`."""
         return self._service._driver_version
 
     @property
     def driver_location(self) -> str:
-        """Access the webdriver binary location of the session `<str>`."""
+        """Access the webdriver binary location of the session `<'str'>`."""
         return self._service._driver_location
 
     @property
     def connection(self) -> Connection:
-        """Access the session connection `<Connection>`."""
+        """Access the session connection `<'Connection'>`."""
         return self._conn
 
     @property
     def id(self) -> str:
-        """Access the ID of the session `<str>`."""
+        """Access the ID of the session `<'str'>`."""
         return self._id
 
     @property
     def base_url(self) -> str:
-        """Access the base `service` URL of the session `<str>`."""
+        """Access the base `service` URL of the session `<'str'>`."""
         return self._base_url
 
     # Execute -----------------------------------------------------------------------------
@@ -710,16 +710,16 @@ class Session:
     ) -> dict[str, Any]:
         """Executes a command from the session.
 
-        :param command: `<str>` The command to execute.
-        :param body: `<dict/None>` The body of the command. Defaults to `None`.
-        :param keys: `<dict/None>` The keys to substitute in the command. Defaults to `None`.
-        :param timeout: `<int/float/None>` Session timeout for command execution. Defaults to `None`.
+        :param command `<'str'>`: The command to execute.
+        :param body `<'dict/None'>`: The body of the command. Defaults to `None`.
+        :param keys `<'dict/None'>`: The keys to substitute in the command. Defaults to `None`.
+        :param timeout `<'int/float/None'>`: Session timeout for command execution. Defaults to `None`.
             This arguments overwrites the default `options.session_timeout`,
             which is designed to cope with a frozen session due to unknown
             errors. For more information about session timeout, please refer
             to the documentation of `options.session_timeout` attribute.
 
-        :return: `<dict>` The response from the command.
+        :returns `<'dict'>`: The response from the command.
         """
         return await self._conn.execute(
             self._base_url,
@@ -731,7 +731,7 @@ class Session:
 
     # Start / Quit ------------------------------------------------------------------------
     async def start(self) -> Window:
-        """Start the session, and return the default `<Window>`."""
+        """Start the session, and return the default `<'Window'>`."""
         # Check status
         if self.__closed:
             raise errors.InvalidSessionError(
@@ -798,11 +798,11 @@ class Session:
             self._collect_garbage()
 
     async def _start_session(self, name: str = "default") -> Window:
-        """(Internal) Start the default window of session, and returns it `<Window>`.
+        """(Internal) Start the default window of session, and returns it `<'Window'>`.
         This method should only be called when session service is started or all
         the windows of the session are closed.
 
-        :param name: `<str>` The name of the first window for the session. Defaults to `'default'`.
+        :param name `<'str'>`: The name of the first window for the session. Defaults to `'default'`.
         """
 
         def parse_session_id(res: dict) -> str:
@@ -870,9 +870,9 @@ class Session:
     ) -> None:
         """Load a web page in the actice window.
 
-        :param url: URL to be loaded.
+        :param url `<'str'>`: URL to be loaded.
 
-        :param timeout: `<int/float/None>` Session timeout for page loading. Defaults to `None`.
+        :param timeout `<'int/float/None'>`: Session timeout for page loading. Defaults to `None`.
             This arguments overwrites the default `options.session_timeout`,
             which is designed to cope with a frozen session due to unknown
             errors. For more information about session timeout, please refer
@@ -880,7 +880,7 @@ class Session:
             the webdriver fails to response in time, a `SessionTimeoutError`
             will be raised.
 
-        :param retry: `<int>` How many time to retry if failed to load the webpage. Defaults to `None`.
+        :param retry `<'int'>`: How many time to retry if failed to load the webpage. Defaults to `None`.
             Retries are attempted only when the `WebDriverTimeoutError` is
             raised due to native `pageLoad` timeout. The function does not
             retry on `SessionTimeoutError` (as mentioned above). Notice that
@@ -909,7 +909,7 @@ class Session:
     ) -> None:
         """Refresh the active page window.
 
-        :param timeout: `<int/float/None>` Session timeout for page loading. Defaults to `None`.
+        :param timeout `<'int/float/None'>`: Session timeout for page loading. Defaults to `None`.
             This arguments overwrites the default `options.session_timeout`,
             which is designed to cope with a frozen session due to unknown
             errors. For more information about session timeout, please refer
@@ -917,7 +917,7 @@ class Session:
             the webdriver fails to response in time, a `SessionTimeoutError`
             will be raised.
 
-        :param retry: `<int>` How many time to retry if failed to load the webpage. Defaults to `None`.
+        :param retry `<'int'>`: How many time to retry if failed to load the webpage. Defaults to `None`.
             Retries are attempted only when the `WebDriverTimeoutError` is
             raised due to native `pageLoad` timeout. The function does not
             retry on `SessionTimeoutError` (as mentioned above). Notice that
@@ -940,7 +940,7 @@ class Session:
     async def forward(self, timeout: int | float | None = None) -> None:
         """Navigate forwards in the browser history (if possible).
 
-        :param timeout: `<int/float/None>` Session timeout for page loading. Defaults to `None`.
+        :param timeout `<'int/float/None'>`: Session timeout for page loading. Defaults to `None`.
             This arguments overwrites the default `options.session_timeout`,
             which is designed to cope with a frozen session due to unknown
             errors. For more information about session timeout, please refer
@@ -956,7 +956,7 @@ class Session:
     async def backward(self, timeout: int | float | None = None) -> None:
         """Navigate backwards in the browser history (if possible).
 
-        :param timeout: `<int/float/None>` Session timeout for page loading. Defaults to `None`.
+        :param timeout `<'int/float/None'>`: Session timeout for page loading. Defaults to `None`.
             This arguments overwrites the default `options.session_timeout`,
             which is designed to cope with a frozen session due to unknown
             errors. For more information about session timeout, please refer
@@ -972,7 +972,7 @@ class Session:
     # Information -------------------------------------------------------------------------
     @property
     async def url(self) -> str:
-        """Access the URL of the active page window `<str>`.
+        """Access the URL of the active page window `<'str'>`.
 
         ### Example:
         >>> await session.url # "https://www.google.com/"
@@ -994,11 +994,11 @@ class Session:
     ) -> bool:
         """Wait until the URL of the active page window satisfies the given condition.
 
-        :param condition: `<str>` The condition the URL needs to satisfy.
+        :param condition `<'str'>`: The condition the URL needs to satisfy.
             Excepted values: `"equals"`, `"contains"`, `"startswith"`, `"endswith"`.
-        :param value: `<str>` The value of the condition.
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return: `<bool>` True if the URL satisfies the condition, False if timeout.
+        :param value `<'str'>`: The value of the condition.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the URL satisfies the condition, False if timeout.
 
         ### Example:
         >>> await session.load("https://www.google.com/")
@@ -1047,7 +1047,7 @@ class Session:
 
     @property
     async def title(self) -> str:
-        """Access the title of the active page window `<str>`.
+        """Access the title of the active page window `<'str'>`.
 
         ### Example:
         >>> await session.title # "Google"
@@ -1069,11 +1069,11 @@ class Session:
     ) -> bool:
         """Wait until the title of the active page window satisfies the given condition.
 
-        :param condition: `<str>` The condition the title needs to satisfy.
+        :param condition `<'str'>`: The condition the title needs to satisfy.
             Excepted values: `"equals"`, `"contains"`, `"startswith"`, `"endswith"`.
-        :param value: `<str>` The value of the condition.
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return: `<bool>` True if the title satisfies the condition, False if timeout.
+        :param value `<'str'>`: The value of the condition.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the title satisfies the condition, False if timeout.
 
         >>> await session.load("https://www.google.com/")
             await session.wait_until_title("contains", "Google", 5)  # True / False
@@ -1122,7 +1122,7 @@ class Session:
     @property
     async def viewport(self) -> Viewport:
         """Access the size and relative position of the
-        viewport for active page window `<Viewport>`.
+        viewport for active page window `<'Viewport'>`.
 
         ### Example:
         >>> viewport = await session.viewport
@@ -1145,7 +1145,7 @@ class Session:
 
     @property
     async def page_width(self) -> int:
-        """Access the width of the active page window `<int>`.
+        """Access the width of the active page window `<'int'>`.
 
         ### Example:
         >>> await session.page_width # 1200
@@ -1161,7 +1161,7 @@ class Session:
 
     @property
     async def page_height(self) -> int:
-        """Access the height of the active page window `<int>`.
+        """Access the height of the active page window `<'int'>`.
 
         ### Example:
         >>> await session.page_height # 800
@@ -1177,7 +1177,7 @@ class Session:
 
     @property
     async def page_source(self) -> str:
-        """Access the source of the active page window `<str>`.
+        """Access the source of the active page window `<'str'>`.
 
         ### Example:
         >>> source = await session.page_source
@@ -1193,7 +1193,7 @@ class Session:
             ) from err
 
     async def take_screenshot(self) -> bytes:
-        """Take a screenshot of the active page window `<bytes>`.
+        """Take a screenshot of the active page window `<'bytes'>`.
 
         ### Example:
         >>> screenshot = await session.take_screenshot()
@@ -1218,8 +1218,8 @@ class Session:
         """Take & save the screenshot of the active page window
         into a local PNG file.
 
-        :param path: `<str>` The path to save the screenshot. e.g. `~/path/to/screenshot.png`.
-        :return `<bool>`: True if the screenshot has been saved, False if failed.
+        :param path `<'str'>`: The path to save the screenshot. e.g. `~/path/to/screenshot.png`.
+        :returns `<'bool'>`: True if the screenshot has been saved, False if failed.
 
         ### Example:
         >>> await session.save_screenshot("~/path/to/screenshot.png")  # True / False
@@ -1271,18 +1271,18 @@ class Session:
     ) -> bytes:
         """Print the active page window into PDF.
 
-        :param orientation: `<str>` The print orientation. Accepts: "portrait", "landscape".
-        :param scale: `<int/float>` The scale of the page rendering. Must between 0.1 - 2.
-        :param background: `<bool>` Whether to print the CSS backgrounds.
-        :param page_width: `<int/float>` Paper width.
-        :param page_height: `<int/float>` Paper height.
-        :param margin_top: `<int/float>` Top margin size.
-        :param margin_bottom: `<int/float>` Bottom margin size.
-        :param margin_left: `<int/float>` Left margin size.
-        :param margin_right: `<int/float>` Right margin size.
-        :param shrink_to_fit: `<int/float>` Whether to scale page to fit paper size.
-        :param page_ranges: `<list[str]>` Paper ranges to print, e.g., ['1-5', '8', '11-13'].
-        :return `<bytes>`: The page PDF data.
+        :param orientation `<'str'>`: The print orientation. Accepts: "portrait", "landscape".
+        :param scale `<'int/float'>`: The scale of the page rendering. Must between 0.1 - 2.
+        :param background `<'bool'>`: Whether to print the CSS backgrounds.
+        :param page_width `<'int/float'>`: Paper width.
+        :param page_height `<'int/float'>`: Paper height.
+        :param margin_top `<'int/float'>`: Top margin size.
+        :param margin_bottom `<'int/float'>`: Bottom margin size.
+        :param margin_left `<'int/float'>`: Left margin size.
+        :param margin_right `<'int/float'>`: Right margin size.
+        :param shrink_to_fit `<'int/float'>`: Whether to scale page to fit paper size.
+        :param page_ranges `<'list[str]'>`: Paper ranges to print, e.g., ['1-5', '8', '11-13'].
+        :returns `<'bytes'>`: The page PDF data.
 
         ### Example:
         >>> await session.print_page()
@@ -1408,19 +1408,19 @@ class Session:
     ) -> bool:
         """Print & save the active page window into a local PDF file.
 
-        :param path: `<str>` The path to save the PDF. e.g. `~/path/to/screenshot.png`.
-        :param orientation: `<str>` The print orientation. Accepts: "portrait", "landscape".
-        :param scale: `<int/float>` The scale of the page rendering. Must between 0.1 - 2.
-        :param background: `<bool>` Whether to print the CSS backgrounds.
-        :param page_width: `<int/float>` Paper width.
-        :param page_height: `<int/float>` Paper height.
-        :param margin_top: `<int/float>` Top margin size.
-        :param margin_bottom: `<int/float>` Bottom margin size.
-        :param margin_left: `<int/float>` Left margin size.
-        :param margin_right: `<int/float>` Right margin size.
-        :param shrink_to_fit: `<int/float>` Whether to scale page to fit paper size.
-        :param page_ranges: `<list[str]>` Paper ranges to print, e.g., ['1-5', '8', '11-13'].
-        :return `<bool>`: True if the PDF has been saved, False if failed.
+        :param path `<'str'>`: The path to save the PDF. e.g. `~/path/to/screenshot.png`.
+        :param orientation `<'str'>`: The print orientation. Accepts: "portrait", "landscape".
+        :param scale `<'int/float'>`: The scale of the page rendering. Must between 0.1 - 2.
+        :param background `<'bool'>`: Whether to print the CSS backgrounds.
+        :param page_width `<'int/float'>`: Paper width.
+        :param page_height `<'int/float'>`: Paper height.
+        :param margin_top `<'int/float'>`: Top margin size.
+        :param margin_bottom `<'int/float'>`: Bottom margin size.
+        :param margin_left `<'int/float'>`: Left margin size.
+        :param margin_right `<'int/float'>`: Right margin size.
+        :param shrink_to_fit `<'int/float'>`: Whether to scale page to fit paper size.
+        :param page_ranges `<'list[str]'>`: Paper ranges to print, e.g., ['1-5', '8', '11-13'].
+        :returns `<'bool'>`: True if the PDF has been saved, False if failed.
 
         ### Example:
         >>> await session.save_page("~/path/to/screenshot.pdf")  # True / False
@@ -1468,7 +1468,7 @@ class Session:
     # Timeouts ----------------------------------------------------------------------------
     @property
     async def timeouts(self) -> Timeouts:
-        """Access the timeouts of the current session `<Timeouts>`.
+        """Access the timeouts of the current session `<'Timeouts'>`.
 
         ### Timeouts explain:
 
@@ -1502,19 +1502,19 @@ class Session:
         (as the webdriver protocol requires). The values will be converted to
         milliseconds automatically.
 
-        :param implicit: `<int/float/None>` Total `seconds` the current session
-        should wait when searching for an element if not immediately present.
-        If `None (default)`, keep the current implicit timeout.
+        :param implicit `<'int/float/None'>`: Total `seconds` the current session
+          should wait when searching for an element if not immediately present.
+          If `None (default)`, keep the current implicit timeout.
 
-        :param pageLoad: `<int/float/None>` Total `seconds` the current session
-        should wait for a page load to complete before returning an error. if
-        `None (default)`, keep the current pageLoad timeout.
+        :param pageLoad `<'int/float/None'>`: Total `seconds` the current session
+          should wait for a page load to complete before returning an error. if
+          `None (default)`, keep the current pageLoad timeout.
 
-        :param script: `<int/float/None>` Total `seconds` the current session
-        should wait for an asynchronous script to finish execution before
-        returning an error. if `None (default)`, keep the current script timeout.
+        :param script `<'int/float/None'>`: Total `seconds` the current session
+          should wait for an asynchronous script to finish execution before
+          returning an error. if `None (default)`, keep the current script timeout.
 
-        :return `<Timeouts>`: The timeouts after update.
+        :returns `<'Timeouts'>`: The timeouts after update.
 
         ### Example:
         >>> timeouts = await session.set_timeouts(
@@ -1539,7 +1539,7 @@ class Session:
 
     async def reset_timeouts(self) -> Timeouts:
         """Resets the timeouts of the current session to the orginal
-        options values, and returns the reset `<Timeouts>`.
+        options values, and returns the reset `<'Timeouts'>`.
 
         ### Example:
         >>> timeouts = await session.reset_timeouts()
@@ -1605,8 +1605,8 @@ class Session:
     async def get_cookie(self, name: str | Cookie) -> Cookie | None:
         """Get a specific cookie from the active page window.
 
-        :param name: `<str/Cookie>` The name of the cookie or a `<Cookie>` instance.
-        :return `<Cookie/None>`: The specified cookie, or `None` if not found.
+        :param name `<'str/Cookie'>`: The name of the cookie or a `<'Cookie'>` instance.
+        :returns `<'Cookie/None'>`: The specified cookie, or `None` if not found.
 
         ### Example:
         >>> cookie = await session.get_cookie("ZFY")
@@ -1632,8 +1632,8 @@ class Session:
     async def add_cookie(self, cookie: dict[str, Any] | Cookie) -> Cookie:
         """Add a cookie to the active page window.
 
-        :param cookie: `<dict/Cookie>` Cookie as a dictionary or a `<Cookie>` instance.
-        :return `<Cookie>`: The newly added cookie.
+        :param cookie `<'dict/Cookie'>`: Cookie as a dictionary or a `<'Cookie'>` instance.
+        :returns `<'Cookie'>`: The newly added cookie.
 
         ### Example:
         >>> cookie = await session.add_cookie({'name' : 'foo', 'value' : 'bar'})
@@ -1647,7 +1647,7 @@ class Session:
         else:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid 'cookie' arguement: {}. Must be "
-                "a dictionary or `<Cookie>` instance".format(
+                "a dictionary or `<'Cookie'>` instance".format(
                     self.__class__.__name__, cookie
                 )
             )
@@ -1658,7 +1658,7 @@ class Session:
     async def delete_cookie(self, name: str | Cookie) -> None:
         """Delete a cookie from the active page window.
 
-        :param name: `<str/Cookie>` The name of the cookie or a `<Cookie>` instance.
+        :param name `<'str/Cookie'>`: The name of the cookie or a `<'Cookie'>` instance.
 
         ### Example:
         >>> await session.delete_cookie("ZFY")
@@ -1677,7 +1677,7 @@ class Session:
         await self.execute_command(Command.DELETE_ALL_COOKIES)
 
     def _validate_cookie_name(self, name: Any) -> str:
-        """(Internal) Validate the name of a cookie `<str>`."""
+        """(Internal) Validate the name of a cookie `<'str'>`."""
         if isinstance(name, str):
             return name
         elif isinstance(name, Cookie):
@@ -1685,13 +1685,13 @@ class Session:
         else:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid cookie 'name': {} {}. Must be "
-                "a string or `<Cookie>` instance.".format(
+                "a string or `<'Cookie'>` instance.".format(
                     self.__class__.__name__, repr(name), type(name)
                 )
             )
 
     def _create_cookie(self, cookie: dict[str, Any]) -> Cookie:
-        """(Internal) Create the cookie `<Cookie>`."""
+        """(Internal) Create the cookie `<'Cookie'>`."""
         try:
             return Cookie(**cookie)
         except Exception as err:
@@ -1702,7 +1702,7 @@ class Session:
     # Window ------------------------------------------------------------------------------
     @property
     async def windows(self) -> list[Window]:
-        """Access all the open windows of the session `<list[Window]>`.
+        """Access all the open windows of the session `<'list[Window]'>`.
 
         ### Example:
         >>> windows = await session.windows
@@ -1744,7 +1744,7 @@ class Session:
 
     @property
     async def active_window(self) -> Window | None:
-        """Access the active (focused) window of the session `<Window>`.
+        """Access the active (focused) window of the session `<'Window'>`.
         Returns `None` if no window is active.
 
         ### Example:
@@ -1767,12 +1767,12 @@ class Session:
     async def get_window(self, window: str | Window) -> Window | None:
         """Get a specific open window of the session.
 
-        :param window: `<str/Window>` Accepts three kinds of input:
-            - `<str>`: The name of the window.
-            - `<str>`: The handle of the window.
-            - `<Window>`: A window instance.
+        :param window `<'str/Window'>`: Accepts three kinds of input:
+            - `<'str'>`: The name of the window.
+            - `<'str'>`: The handle of the window.
+            - `<'Window'>`: A window instance.
 
-        :return `<Window>`: The matched open window of the session, or `None` if not found.
+        :returns `<'Window'>`: The matched open window of the session, or `None` if not found.
 
         ### Example:
         >>> win = await session.get_window("default")
@@ -1796,10 +1796,10 @@ class Session:
     ) -> Window:
         """Create (open) a new window for the session.
 
-        :param name: `<str>` The name of the new window.
-        :param win_type: `<str>` The type of the window to create, accepts: `'tab'` or `'window'`. Defaults to `'tab'`.
-        :param switch: `<bool>` Whether to switch focus to the new window. Defaults to `True`.
-        :return `<Window>`: The newly created window.
+        :param name `<'str'>`: The name of the new window.
+        :param win_type `<'str'>`: The type of the window to create, accepts: `'tab'` or `'window'`. Defaults to `'tab'`.
+        :param switch `<'bool'>`: Whether to switch focus to the new window. Defaults to `True`.
+        :returns `<'Window'>`: The newly created window.
 
         ### Notice
         In the scenario when all windows are closed, this method will
@@ -1853,12 +1853,12 @@ class Session:
     async def switch_window(self, window: str | Window) -> Window:
         """Switch to a specific open window of the session.
 
-        :param window: `<str/Window>` Accepts three kinds of input:
-            - `<str>`: The name of the window.
-            - `<str>`: The handle of the window.
-            - `<Window>`: A window instance.
+        :param window `<'str/Window'>`: Accepts three kinds of input:
+            - `<'str'>`: The name of the window.
+            - `<'str'>`: The handle of the window.
+            - `<'Window'>`: A window instance.
 
-        :return `<Window>`: The new focused window.
+        :returns `<'Window'>`: The new focused window.
 
         ### Example:
         >>> win = await session.switch_window("new")
@@ -1897,13 +1897,13 @@ class Session:
         This method does not affect or make changes to the webdriver,
         but simple changes the name of the window cached in the program.
 
-        :param window: `<str/Window>` Accepts three kinds of input:
-            - `<str>`: The name of the window.
-            - `<str>`: The handle of the window.
-            - `<Window>`: A window instance.
+        :param window `<'str/Window'>`: Accepts three kinds of input:
+            - `<'str'>`: The name of the window.
+            - `<'str'>`: The handle of the window.
+            - `<'Window'>`: A window instance.
 
-        :param new_name: `<str>` The new name for the window.
-        :return `<Window>`: The window after name update.
+        :param new_name `<'str'>`: The new name for the window.
+        :returns `<'Window'>`: The window after name update.
 
         ### Example:
         >>> # Create a new window
@@ -1937,15 +1937,15 @@ class Session:
     ) -> Window | None:
         """Close the active (focus) window.
 
-        :param switch_to: `<str/Window/None>` The window to switch to after closing the active window. Accepts four kinds of input:
+        :param switch_to `<'str/Window/None'>`: The window to switch to after closing the active window. Accepts four kinds of input:
             - `None (default)`: Switch to a random open window.
-            - `<str>`: Switch to an open window by window name.
-            - `<str>`: Switch to an open window by window handle.
-            - `<Window>`: Switch to an open window by window instance.
+            - `<'str'>`: Switch to an open window by window name.
+            - `<'str'>`: Switch to an open window by window handle.
+            - `<'Window'>`: Switch to an open window by window instance.
             - `*Notice*` If the specified window does not exist, will automatically
               switch to a random open window.
 
-        :return `<Window>`: The new active (focus) window, or `None` if all windows are closed.
+        :returns `<'Window'>`: The new active (focus) window, or `None` if all windows are closed.
 
         ### Example:
         >>> win = await session.close_window()
@@ -1979,7 +1979,7 @@ class Session:
             return None  # exit: all windows are closed
 
     async def _active_window_handle(self) -> str | None:
-        """(Internal) Request the handle of the active (focus) window `<str>`.
+        """(Internal) Request the handle of the active (focus) window `<'str'>`.
         Returns `None` if all windows are closed.
         """
         # Get window handle
@@ -1997,21 +1997,21 @@ class Session:
             ) from err
 
     async def _match_session_window(self, window: str | Window) -> Window | None:
-        """(Internal) Match window from the current session `<Window>`."""
+        """(Internal) Match window from the current session `<'Window'>`."""
         for win in await self.windows:
             if window == win.handle or window == win.name:
                 return win
         return None
 
     def _cache_window(self, handle: str, name: str = None) -> Window:
-        """(Internal) Cache the new window `<Window>`."""
+        """(Internal) Cache the new window `<'Window'>`."""
         win = Window(handle, name=name)
         self._window_by_name[win.name] = win
         self._window_by_handle[win.handle] = win
         return win
 
     def _remove_window(self, window: str | Window) -> bool:
-        """(Internal) Remove cached window `<bool>`."""
+        """(Internal) Remove cached window `<'bool'>`."""
         if window in self._window_by_name:
             win = self._window_by_name.pop(window)
             self._window_by_handle.pop(win.handle, None)
@@ -2024,7 +2024,7 @@ class Session:
             return False
 
     def _validate_window_name(self, name: Any) -> str:
-        """(Internal) Validate window name `<str>`."""
+        """(Internal) Validate window name `<'str'>`."""
         if not isinstance(name, str) or not name:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid window name: {} {}.".format(
@@ -2042,7 +2042,7 @@ class Session:
     @property
     async def window_rect(self) -> WindowRect:
         """Access the size and relative position of
-        the active window `<WindowRect>`.
+        the active window `<'WindowRect'>`.
 
         ### Example:
         >>> rect = await session.window_rect
@@ -2060,10 +2060,10 @@ class Session:
     ) -> WindowRect:
         """Set the size and relative position of the active window.
 
-        :param width: `<int/None>` The new width of the window. If `None (default)`, keep the current width.
-        :param height: `<int/None>` The new height of the window. If `None (default)`, keep the current height.
-        :param x: `<int/None>` The new x coordinate of the window. If `None (default)`, keep the current x coordinate.
-        :param y: `<int/None>` The new y coordinate of the window. If `None (default)`, keep the current y coordinate.
+        :param width `<'int/None'>`: The new width of the window. If `None (default)`, keep the current width.
+        :param height `<'int/None'>`: The new height of the window. If `None (default)`, keep the current height.
+        :param x `<'int/None'>`: The new x coordinate of the window. If `None (default)`, keep the current x coordinate.
+        :param y `<'int/None'>`: The new y coordinate of the window. If `None (default)`, keep the current y coordinate.
 
         ### Example:
         >>> rect = await session.set_window_rect(800, 500, 22, 60)
@@ -2083,7 +2083,7 @@ class Session:
     async def maximize_window(self) -> WindowRect:
         """Maximize the active window.
 
-        :return: `<WindowRect>` The window ractangle after maximization.
+        :returns `<'WindowRect'>`: The window ractangle after maximization.
 
         ### Example:
         >>> rect = await session.maximize_window()
@@ -2128,8 +2128,8 @@ class Session:
     def _create_window_rect(self, res: dict) -> WindowRect:
         """(Internal) Parse & create window rect from response.
 
-        :param res: `<dict>` The direct response for window rect related response.
-        :return `<WindowRect>`: The size and relative position of the window.
+        :param res `<'dict'>`: The direct response for window rect related response.
+        :returns `<'WindowRect'>`: The size and relative position of the window.
         """
         try:
             return WindowRect(**res["value"])
@@ -2154,9 +2154,9 @@ class Session:
     ) -> None:
         """Scroll the viewport by the given height & width.
 
-        :param width: `<int>` The width to scroll. Defaults to `0`.
-        :param height: `<int>` The height to scroll. Defaults to `0`.
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param width `<'int'>`: The width to scroll. Defaults to `0`.
+        :param height `<'int'>`: The height to scroll. Defaults to `0`.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
 
@@ -2181,9 +2181,9 @@ class Session:
     ) -> None:
         """Scroll the viewport to the given x & y coordinates.
 
-        :param x: `<int>` The x-coordinate to scroll to. Defaults to `0`.
-        :param y: `<int>` The y-coordinate to scroll to. Defaults to `0`.
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param x `<'int'>`: The x-coordinate to scroll to. Defaults to `0`.
+        :param y `<'int'>`: The y-coordinate to scroll to. Defaults to `0`.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
 
@@ -2209,14 +2209,14 @@ class Session:
         """Scroll the viewport to the top of the page.
         (Does not affect the horizontal position of the viewport.)
 
-        :param value: `<int>` The value for the sroll 'by' strategy.
-        :param by: `<str>` The scrolling strategy. Defaults to `'steps'`.
+        :param value `<'int'>`: The value for the sroll 'by' strategy.
+        :param by `<'str'>`: The scrolling strategy. Defaults to `'steps'`.
             - `'steps'`: The 'value' sets the approximate steps it
                takes to scroll to the top of the page.
             - `'pixels'`: The 'value' sets the exact pixels to scroll
                for each step to the top of the page.
 
-        :param pause: `<int/flaot>` Seconds to pause between each scroll. Defaults to `0.2`.
+        :param pause `<'int/flaot'>`: Seconds to pause between each scroll. Defaults to `0.2`.
 
         ### Example:
         >>> await session.scroll_to_top(12, "count")
@@ -2258,14 +2258,14 @@ class Session:
         """Scroll the viewport to the bottom of the page.
         (Does not affect the horizontal position of the viewport.)
 
-        :param value: `<int>` The value for the sroll 'by' strategy.
-        :param by: `<str>` The scrolling strategy. Defaults to `'steps'`.
+        :param value `<'int'>`: The value for the sroll 'by' strategy.
+        :param by `<'str'>`: The scrolling strategy. Defaults to `'steps'`.
             - `'steps'`: The 'value' sets the approximate steps it
                takes to scroll to the bottom of the page.
             - `'pixels'`: The 'value' sets the exact pixels to scroll
                for each step to the bottom of the page.
 
-        :param pause: `<int/flaot>` Seconds to pause between each scroll. Defaults to `0.2`.
+        :param pause `<'int/flaot'>`: Seconds to pause between each scroll. Defaults to `0.2`.
 
         ### Example:
         >>> await session.scroll_to_bottom(100, "pixel")
@@ -2304,14 +2304,14 @@ class Session:
         """Scroll the viewport to the left of the page.
         (Does not affect the vertical position of the viewport.)
 
-        :param value: `<int>` The value for the sroll 'by' strategy.
-        :param by: `<str>` The scrolling strategy. Defaults to `'steps'`.
+        :param value `<'int'>`: The value for the sroll 'by' strategy.
+        :param by `<'str'>`: The scrolling strategy. Defaults to `'steps'`.
             - `'steps'`: The 'value' sets the approximate steps it
                takes to scroll to the left of the page.
             - `'pixels'`: The 'value' sets the exact pixels to scroll
                for each step to the left of the page.
 
-        :param pause: `<int/flaot>` Seconds to pause between each scroll. Defaults to `0.2`.
+        :param pause `<'int/flaot'>`: Seconds to pause between each scroll. Defaults to `0.2`.
 
         ### Example:
         >>> await session.scroll_to_left(12, "count")
@@ -2353,14 +2353,14 @@ class Session:
         """Scroll the viewport to the right of the page.
         (Does not affect the vertical position of the viewport.)
 
-        :param value: `<int>` The value for the sroll 'by' strategy.
-        :param by: `<str>` The scrolling strategy. Defaults to `'steps'`.
+        :param value `<'int'>`: The value for the sroll 'by' strategy.
+        :param by `<'str'>`: The scrolling strategy. Defaults to `'steps'`.
             - `'steps'`: The 'value' sets the approximate steps it
                takes to scroll to the right of the page.
             - `'pixels'`: The 'value' sets the exact pixels to scroll
                for each step to the right of the page.
 
-        :param pause: `<int/flaot>` Seconds to pause between each scroll. Defaults to `0.2`.
+        :param pause `<'int/flaot'>`: Seconds to pause between each scroll. Defaults to `0.2`.
 
         ### Example:
         >>> await session.scroll_to_right(100, "pixel")
@@ -2398,11 +2398,11 @@ class Session:
     ) -> bool:
         """Scroll the viewport to the element by the given selector and strategy.
 
-        :param value: `<str/Element>` The selector for the element, or an `<Element>` instance.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-            If the given 'value' is an `<Element>`, this argument will be ignored.
-        :param timeout: `<int/float/None>` Total seconds to wait for the element to scroll into view. Defaults to `5`.
-        :return `<bool>`: True if the element is in the viewport, False if element not exists.
+        :param value `<'str/Element'>`: The selector for the element, or an `<'Element'>` instance.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            If the given 'value' is an `<'Element'>`, this argument will be ignored.
+        :param timeout `<'int/float/None'>`: Total seconds to wait for the element to scroll into view. Defaults to `5`.
+        :returns `<'bool'>`: True if the element is in the viewport, False if element not exists.
 
         ### Example:
         >>> viewable = await session.scroll_into_view("#element", by="css")
@@ -2431,7 +2431,7 @@ class Session:
         return False
 
     def _validate_scroll_strategy(self, by: Any) -> str:
-        """(Internal) Validate the scroll 'by' strategy `<str>`"""
+        """(Internal) Validate the scroll 'by' strategy `<'str'>`"""
         if by not in Constraint.PAGE_SCROLL_BY_STRATEGIES:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid scroll 'by' strategy: {}. Available options: {}".format(
@@ -2443,7 +2443,7 @@ class Session:
         return by
 
     def _validate_scroll_value(self, value: Any) -> int:
-        """(Internal) Validate the scroll by 'value' `<int>`"""
+        """(Internal) Validate the scroll by 'value' `<'int'>`"""
         if not isinstance(value, int):
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid scroll by 'value': {} {}. Must be an integer.".format(
@@ -2462,8 +2462,8 @@ class Session:
     async def get_alert(self, timeout: int | float | None = 5) -> Alert | None:
         """Get the alert of the active page window.
 
-        :param timeout: `<int/float/None>` Total seconds to wait for the alert to pop-up. Defaults to `5`.
-        :return `<Alert>`: The alert of the active page window, or `None` if alert not exists.
+        :param timeout `<'int/float/None'>`: Total seconds to wait for the alert to pop-up. Defaults to `5`.
+        :returns `<'Alert'>`: The alert of the active page window, or `None` if alert not exists.
 
         ### Example:
         >>> alert = await session.get_alert()
@@ -2501,15 +2501,15 @@ class Session:
     ) -> bool:
         """Switch focus to a specific frame in the active page window.
 
-        :param value: `<str/Element/int>` Accepts three kinds of input:
-            - `<str>`: The selector for the element contains the frame.
-            - `<Element>`: An element instance contains the frame.
-            - `<int>`: The index (id) of the frame.
+        :param value `<'str/Element/int'>`: Accepts three kinds of input:
+            - `<'str'>`: The selector for the element contains the frame.
+            - `<'Element'>`: An element instance contains the frame.
+            - `<'int'>`: The index (id) of the frame.
 
-        :param by: `<str>` The selector strategy, accepts `'css'`, `'xpath'` or `'index'`. Defaults to `'css'`.
-            If the given 'value' is an `<Element>`, this argument will be ignored.
-        :param timeout: `<int/float/None>` Total seconds to wait for frame switching. Defaults to `5`.
-        :return `<bool>`: True if successfully switched focus, False if frame not exists.
+        :param by `<'str'>`: The selector strategy, accepts `'css'`, `'xpath'` or `'index'`. Defaults to `'css'`.
+            If the given 'value' is an `<'Element'>`, this argument will be ignored.
+        :param timeout `<'int/float/None'>`: Total seconds to wait for frame switching. Defaults to `5`.
+        :returns `<'bool'>`: True if successfully switched focus, False if frame not exists.
 
         ### Example:
         >>> # . switch by element selector
@@ -2570,7 +2570,7 @@ class Session:
     async def default_frame(self) -> bool:
         """Switch focus to the default frame (the `MAIN` document).
 
-        :return `<bool>`: True if successfully switched focus, False if failed.
+        :returns `<'bool'>`: True if successfully switched focus, False if failed.
 
         ### Example:
         >>> await session.default_frame()  # True / False
@@ -2584,7 +2584,7 @@ class Session:
     async def parent_frame(self) -> bool:
         """Switch focus to the parent frame of the current frame.
 
-        :return `<bool>`: True if successfully switched focus, False if failed.
+        :returns `<'bool'>`: True if successfully switched focus, False if failed.
 
         ### Example:
         >>> await session.parent_frame()  # True / False
@@ -2598,7 +2598,7 @@ class Session:
     # Element -----------------------------------------------------------------------------
     @property
     async def active_element(self) -> Element:
-        """Access the element in focus `<Element>`.
+        """Access the element in focus `<'Element'>`.
         If no element is in focus, returns the `<BODY>` element.
 
         ### Example:
@@ -2616,10 +2616,10 @@ class Session:
         """Check if an element exists. This method ignores the implicit wait
         timeout, and returns element existence immediately.
 
-        :param value: `<str/Element>` The selector for the element *OR* an `<Element>` instance.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-            If the given 'value' is an `<Element>`, this argument will be ignored.
-        :return `<bool>`: True if the element exists, False otherwise.
+        :param value `<'str/Element'>`: The selector for the element *OR* an `<'Element'>` instance.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            If the given 'value' is an `<'Element'>`, this argument will be ignored.
+        :returns `<'bool'>`: True if the element exists, False otherwise.
 
         ### Example:
         >>> await session.element_exists("#input_box")  # True / False
@@ -2639,14 +2639,14 @@ class Session:
         """Check if multiple elements exist. This method ignores the implicit
         wait timeout, and returns elements existence immediately.
 
-        :param values: `<str/Element>` The locators for multiple elements *OR* `<Element>` instances.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-            For values that are `<Element>` instances, this argument will be ignored.
-        :param all_: `<bool>` Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
+        :param values `<'str/Element'>`: The locators for multiple elements *OR* `<'Element'>` instances.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            For values that are `<'Element'>` instances, this argument will be ignored.
+        :param all_ `<'bool'>`: Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
             - `True`: All elements must exist to return True.
             - `False`: Any one of the elements exists returns True.
 
-        :return `<bool>`: True if the elements exist, False otherwise.
+        :returns `<'bool'>`: True if the elements exist, False otherwise.
 
         ### Example:
         >>> await session.elements_exist(
@@ -2682,9 +2682,9 @@ class Session:
         """Find the element by the given selector and strategy. The timeout for
         finding an element is determined by the implicit wait of the session.
 
-        :param value: `<str>` The selector for the element.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :return `<Element/None>`: The located element, or `None` if not found.
+        :param value `<'str'>`: The selector for the element.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :returns `<'Element/None'>`: The located element, or `None` if not found.
 
         ### Example:
         >>> await session.find_element("#input_box", by="css")
@@ -2722,9 +2722,9 @@ class Session:
         """Find elements by the given selector and strategy. The timeout for
         finding the elements is determined by the implicit wait of the session
 
-        :param value: `<str>` The selector for the elements.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :return `<list[Element]>`: A list of located elements (empty if not found).
+        :param value `<'str'>`: The selector for the elements.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :returns `<'list[Element]'>`: A list of located elements (empty if not found).
 
         ### Example:
         >>> await session.find_elements("#input_box", by="css")
@@ -2762,9 +2762,9 @@ class Session:
         """Find the first located element among multiple locators. The timeout for
         finding the first element is determined by the implicit wait of the session.
 
-        :param values: `<str>` The locators for multiple elements.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :return `<Element/None>`: The first located element among all locators, or `None` if not found.
+        :param values `<'str'>`: The locators for multiple elements.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :returns `<'Element/None'>`: The first located element among all locators, or `None` if not found.
 
         ### Example:
         >>> await session.find_1st_element("#input_box", "#input_box2", by="css")
@@ -2800,7 +2800,7 @@ class Session:
     ) -> bool:
         """Wait until an element satisfies the given condition.
 
-        :param condition: `<str>` The condition to satisfy. Available options:
+        :param condition `<'str'>`: The condition to satisfy. Available options:
             - `'gone'`: Wait until an element disappears from the DOM tree.
             - `'exist'`: Wait until an element appears in the DOM tree.
             - `'visible'`: Wait until an element not only is displayed but also not
@@ -2810,11 +2810,11 @@ class Session:
             - `'enabled'`: Wait until an element is enabled.
             - `'selected'`: Wait until an element is selected.
 
-        :param value: `<str/Element>` The selector for the element *OR* an `<Element>` instance.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-            If the given 'value' is an `<Element>`, this argument will be ignored.
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return `<bool>`: True if the element satisfies the condition, False otherwise.
+        :param value `<'str/Element'>`: The selector for the element *OR* an `<'Element'>` instance.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            If the given 'value' is an `<'Element'>`, this argument will be ignored.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the element satisfies the condition, False otherwise.
 
         ### Example:
         >>> await session.wait_until_element(
@@ -2913,7 +2913,7 @@ class Session:
     ) -> bool:
         """Wait until multiple elements satisfy the given condition.
 
-        :param condition: `<str>` The condition to satisfy. Available options:
+        :param condition `<'str'>`: The condition to satisfy. Available options:
             - `'gone'`: Wait until the elements disappear from the DOM tree.
             - `'exist'`: Wait until the elements appear in the DOM tree.
             - `'visible'`: Wait until the elements not only are displayed but also not
@@ -2923,15 +2923,15 @@ class Session:
             - `'enabled'`: Wait until the elements are enabled.
             - `'selected'`: Wait until the elements are selected.
 
-        :param values: `<str/Element>` The locators for multiple elements *OR* `<Element>` instances.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-            For values that are `<Element>` instances, this argument will be ignored.
-        :param all_: `<bool>` Determine how to satisfy the condition. Defaults to `True (all elements)`.
+        :param values `<'str/Element'>`: The locators for multiple elements *OR* `<'Element'>` instances.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            For values that are `<'Element'>` instances, this argument will be ignored.
+        :param all_ `<'bool'>`: Determine how to satisfy the condition. Defaults to `True (all elements)`.
             - `True`: All elements must satisfy the condition to return True.
             - `False`: Any one of the elements satisfies the condition returns True.
 
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return `<bool>`: True if the elements satisfy the condition, False otherwise.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the elements satisfy the condition, False otherwise.
 
         ### Example:
         >>> await session.wait_until_elements(
@@ -3027,7 +3027,7 @@ class Session:
         return False
 
     async def _element_exists_no_wait(self, value: str, strat: str) -> bool:
-        """(Internal) Check if an element exists without implicit wait `<bool>`.
+        """(Internal) Check if an element exists without implicit wait `<'bool'>`.
         Returns `False` immediately if element not exists.
         """
         try:
@@ -3050,7 +3050,7 @@ class Session:
             ) from err
 
     async def _find_element_no_wait(self, value: str, strat: str) -> Element | None:
-        """(Internal) Find element without implicit wait `<Element>`.
+        """(Internal) Find element without implicit wait `<'Element'>`.
         Returns `None` immediately if element not exists.
         """
         try:
@@ -3081,7 +3081,7 @@ class Session:
             ) from err
 
     def _validate_selector_strategy(self, by: Any) -> str:
-        """(Internal) Validate selector strategy `<str>`."""
+        """(Internal) Validate selector strategy `<'str'>`."""
         if by == "css":
             return "css selector"
         elif by == "xpath" or by == "css selector":
@@ -3093,7 +3093,7 @@ class Session:
             )
 
     def _create_element(self, element: dict[str, Any]) -> Element | None:
-        """(Internal) Create the element `<Element>`."""
+        """(Internal) Create the element `<'Element'>`."""
         if element is None:
             return None
         try:
@@ -3120,10 +3120,10 @@ class Session:
     ) -> Shadow | None:
         """Get the shadow root of an element by the given selector and strategy.
 
-        :param value: `<str>` The selector for the element contains the shadow root.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :param timeout: `<int/float/None>` Total seconds to wait for the shadow root. Defaults to `5`.
-        :return `<Shadow>`: The shadow root of the element, or `None` if not exists.
+        :param value `<'str'>`: The selector for the element contains the shadow root.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :param timeout `<'int/float/None'>`: Total seconds to wait for the shadow root. Defaults to `5`.
+        :returns `<'Shadow'>`: The shadow root of the element, or `None` if not exists.
 
         ### Example:
         >>> shadow = await session.get_shadow("#element", by="css")
@@ -3170,8 +3170,8 @@ class Session:
     def get_script(self, script: str | JavaScript) -> JavaScript | None:
         """Get the JavaScript from cache `(NOT an asyncronous method)`.
 
-        :param script: `<str/JavaScript>` Accepts both the name of the JavaScript, or the `<JavaScript>` instance.
-        :return `<JavaScript>`: The cached JavaScript, or `None` if not exist.
+        :param script `<'str/JavaScript'>`: Accepts both the name of the JavaScript, or the `<'JavaScript'>` instance.
+        :returns `<'JavaScript'>`: The cached JavaScript, or `None` if not exist.
 
         ### Example:
         >>> js = session.get_script("myscript")
@@ -3182,10 +3182,10 @@ class Session:
     def cache_script(self, name: str, script: str, *args: Any) -> JavaScript:
         """Cache a javascript for later execution `(NOT an asyncronous method)`.
 
-        :param name: `<str>` The name of the javascript (cache accessor).
-        :param script: `<str>` The raw javascript code.
-        :param args: `<Any>` The arguments for the javascript.
-        :return `<JavaScript>`: The cached javascript.
+        :param name `<'str'>`: The name of the javascript (cache accessor).
+        :param script `<'str'>`: The raw javascript code.
+        :param args `<'Any'>`: The arguments for the javascript.
+        :returns `<'JavaScript'>`: The cached javascript.
 
         ### Example:
         >>> # . without arguments
@@ -3203,8 +3203,8 @@ class Session:
     def remove_script(self, script: str | JavaScript) -> bool:
         """Remove a previously cached JavaScript `(NOT an asyncronous method)`.
 
-        :param script: `<str/JavaScript>` Accepts both the name of the javascript, or the `<JavaScript>` instance.
-        :return `<bool>`: True if the script is removed from cache, False if script not exists.
+        :param script `<'str/JavaScript'>`: Accepts both the name of the javascript, or the `<'JavaScript'>` instance.
+        :returns `<'bool'>`: True if the script is removed from cache, False if script not exists.
 
         ### Example:
         >>> session.remove_script("myscript")  # True / False
@@ -3218,9 +3218,9 @@ class Session:
     def rename_script(self, script: str | JavaScript, new_name: str) -> JavaScript:
         """Rename a previously cached JavaScript `(NOT an asyncronous method)`.
 
-        :param script: `<str/JavaScript>` Accepts both the name of the javascript, or the `<JavaScript>` instance.
-        :param new_name: `<str>` The new name for the javascript.
-        :return `<JavaScript>`: The renamed javascript.
+        :param script `<'str/JavaScript'>`: Accepts both the name of the javascript, or the `<'JavaScript'>` instance.
+        :param new_name `<'str'>`: The new name for the javascript.
+        :returns `<'JavaScript'>`: The renamed javascript.
 
         ### Example:
         >>> # . cache a script
@@ -3249,12 +3249,12 @@ class Session:
     async def execute_script(self, script: str | JavaScript, *args: Any) -> Any:
         """Execute javascript synchronously.
 
-        :param script: Accepts three kinds of input:
-            - `<str>` The raw javascript code to execute.
-            - `<str>` The name of a cached JavaScript.
-            - `<JavaScript>` A cached JavaScript instance.
+        :param script `<'str/JavaScript'>`: Accepts three kinds of input:
+            - `<'str'>` The raw javascript code to execute.
+            - `<'str'>` The name of a cached JavaScript.
+            - `<'JavaScript'>` A cached JavaScript instance.
 
-        :param args: `<Any>` The arguments for the javascript.
+        :param args `<'Any'>`: The arguments for the javascript.
             - The '*args' will be passed along with the script as an array, and
               accessable in order by the script as `arguments[0]`, `arguments[1]`,
               etc.
@@ -3262,7 +3262,7 @@ class Session:
               prioritized over the cached arguments. Only when the '*args' is empty,
               the cached arguments will be used.
 
-        :return `<Any>`: The responce from the script execution.
+        :returns `<'Any'>`: The responce from the script execution.
 
         ### Example:
         >>> # . execute raw javascript code
@@ -3288,12 +3288,12 @@ class Session:
     async def execute_async_script(self, script: str | JavaScript, *args: Any) -> Any:
         """Execute JavaScript asynchronously.
 
-        :param script: Accepts three kinds of input:
-            - `<str>` The raw async javascript code to execute.
-            - `<str>` The name of a cached JavaScript.
-            - `<JavaScript>` A cached JavaScript instance.
+        :param script `<'str/JavaScript'>`: Accepts three kinds of input:
+            - `<'str'>` The raw async javascript code to execute.
+            - `<'str'>` The name of a cached JavaScript.
+            - `<'JavaScript'>` A cached JavaScript instance.
 
-        :param args: `<Any>` The arguments for the javascript.
+        :param args `<'Any'>`: The arguments for the javascript.
             - The '*args' will be passed along with the script as an array, and
               accessable in order by the script as `arguments[0]`, `arguments[1]`,
               etc.
@@ -3301,7 +3301,7 @@ class Session:
               prioritized over the cached arguments. Only when the '*args' is empty, 
               the cached arguments will be used.
 
-        :return `<Any>`: The responce from the async script execution.
+        :returns `<'Any'>`: The responce from the async script execution.
 
         ### Example:
         >>> # . execute raw async javascript code
@@ -3332,12 +3332,12 @@ class Session:
     async def _execute_script(self, script: str, *args: Any) -> Any:
         """(Internal) Executes raw javascript synchronously.
 
-        :param script: `<str>` The raw javascript code to execute.
-        :param args: `<Any>` The arguments for the javascript.
+        :param script `<'str'>`: The raw javascript code to execute.
+        :param args `<'Any'>`: The arguments for the javascript.
             The '*args' will be passed along with the script as an array, and
             accessable in order by the script as `arguments[0]`, `arguments[1]`,
             etc.
-        :return `<Any>`: The responce from the script execution.
+        :returns `<'Any'>`: The responce from the script execution.
 
         ### Example:
         >>> # . without argument
@@ -3363,12 +3363,12 @@ class Session:
     async def _execute_async_script(self, script: str, *args: Any) -> Any:
         """(Internal) Executes raw javascript asynchronously.
 
-        :param script: `<str>` The raw async javascript code to execute.
-        :param args: `<Any>` Arguments for the async javascript.
+        :param script `<'str'>`: The raw async javascript code to execute.
+        :param args `<'Any'>`: Arguments for the async javascript.
             The '*args' will be passed along with the script as an array, and 
             accessable in order by the script as `arguments[0]`, `arguments[1]`, 
             etc.
-        :return `<Any>`: The responce from the async script execution.
+        :returns `<'Any'>`: The responce from the async script execution.
 
         ### Example:
         >>> script = "var callback = arguments[arguments.length - 1]; " \\
@@ -3389,7 +3389,7 @@ class Session:
             ) from err
 
     def _validate_script_name(self, name: Any) -> str:
-        """(Internal) Validate script name `<str>`."""
+        """(Internal) Validate script name `<'str'>`."""
         if not isinstance(name, str) or not name:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid script name: {} {}.".format(
@@ -3413,10 +3413,10 @@ class Session:
         interactions such as mouse movements, key presses, and
         wheel scrolls.
 
-        :param pointer: `<str>` The pointer type to use. Defaults to `'mouse'`.
+        :param pointer `<'str'>`: The pointer type to use. Defaults to `'mouse'`.
             Available options are: `'mouse'`, `'pen'`, `'touch'`.
-        :param duration: `<int/float>` The duration in seconds to perform a pointer move or wheel scroll action. Defaults to `0.2`.
-        :return `<Actions>`: The actions chain.
+        :param duration `<'int/float'>`: The duration in seconds to perform a pointer move or wheel scroll action. Defaults to `0.2`.
+        :returns `<'Actions'>`: The actions chain.
 
         ### Example:
         >>> from aselenium import KeyboardKeys
@@ -3436,7 +3436,7 @@ class Session:
     async def pause(self, duration: int | float | None) -> None:
         """Pause the for a given duration.
 
-        :param duration: `<int/float/None>` The duration to pause in seconds.
+        :param duration `<'int/float/None'>`: The duration to pause in seconds.
         """
         if duration is None:
             return None  # exit
@@ -3450,7 +3450,7 @@ class Session:
             ) from err
 
     def _validate_pause(self, value: Any) -> int | float:
-        """(Internal) Validate if pause value `> 0` `<int/float>`."""
+        """(Internal) Validate if pause value `> 0` `<'int/float'>`."""
         if not isinstance(value, (int, float)):
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid 'pause'. Must be an integer or float, "
@@ -3464,7 +3464,7 @@ class Session:
         return value
 
     def _validate_timeout(self, value: Any) -> int | float:
-        """(Internal) Validate if timeout value `> 0` `<int/float>`."""
+        """(Internal) Validate if timeout value `> 0` `<'int/float'>`."""
         if not isinstance(value, (int, float)):
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid 'timeout'. Must be an integer or float, "
@@ -3478,7 +3478,7 @@ class Session:
         return value
 
     def _validate_wait_str_value(self, value: Any) -> str:
-        """(Internal) Validate if wait until 'value' is a non-empty string `<str>`."""
+        """(Internal) Validate if wait until 'value' is a non-empty string `<'str'>`."""
         if not isinstance(value, str) or not value:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid wait until value: {} {}. "
@@ -3497,15 +3497,15 @@ class Session:
         )
 
     def _is_element(self, element: Any) -> bool:
-        """(Internal) Check if the given object is an `<Element>` instance."""
+        """(Internal) Check if the given object is an `<'Element'>` instance."""
         return isinstance(element, Element)
 
     def _decode_base64(self, data: str, encoding: str) -> str:
-        """(Internal) Decode base64 string to `<bytes>`."""
+        """(Internal) Decode base64 string to `<'bytes'>`."""
         return b64decode(data.encode(encoding))
 
     def _encode_base64(self, data: bytes, encoding: str) -> str:
-        """(Internal) Encode bytes to base64 `<str>`."""
+        """(Internal) Encode bytes to base64 `<'str'>`."""
         return b64encode(data).decode(encoding)
 
     # Special methods ---------------------------------------------------------------------
@@ -3569,28 +3569,28 @@ class ChromiumBaseSession(Session):
     # Basic -------------------------------------------------------------------------------
     @property
     def options(self) -> ChromiumBaseOptions:
-        """Access the browser options `<ChromiumBaseOptions>`."""
+        """Access the browser options `<’ChromiumBaseOptions‘>`."""
         return self._options
 
     @property
     def browser_version(self) -> ChromiumVersion:
-        """Access the browser binary version of the session `<ChromiumVersion>`."""
+        """Access the browser binary version of the session `<’ChromiumVersion‘>`."""
         return super().browser_version
 
     @property
     def service(self) -> ChromiumBaseService:
-        """Access the webdriver service `<ChromiumBaseService>`."""
+        """Access the webdriver service `<’ChromiumBaseService‘>`."""
         return self._service
 
     @property
     def driver_version(self) -> ChromiumVersion:
-        """Access the webdriver binary version of the session `<ChromiumVersion>`."""
+        """Access the webdriver binary version of the session `<’ChromiumVersion‘>`."""
         return super().driver_version
 
     # Chromium - Permission ---------------------------------------------------------------
     @property
     async def permissions(self) -> list[Permission]:
-        """Access all the permissions of the active page window `<list[Permission]>`.
+        """Access all the permissions of the active page window `<’list[Permission]‘>`.
 
         ### Example:
         >>> permissions = await session.permissions
@@ -3609,8 +3609,8 @@ class ChromiumBaseSession(Session):
     async def get_permission(self, name: str | Permission) -> Permission | None:
         """Get a specific permission from the active page window.
 
-        :param name: `<str>` The name of the permission or a `<Permission>` instance.
-        :return `<Permission>`: The specified permission, or `None` if not found.
+        :param name `<'str'>`: The name of the permission or a `<'Permission'>` instance.
+        :returns `<'Permission'>`: The specified permission, or `None` if not found.
 
         ### Example:
         >>> permission = await session.get_permission("geolocation")
@@ -3652,9 +3652,9 @@ class ChromiumBaseSession(Session):
     ) -> Permission:
         """Set a specific permission's state of the active page window.
 
-        :param name: `<str>` The name of the permission.
-        :param state: `<str>` The state of the permission, accepts: `'granted'`, `'denied'`, `'prompt'`.
-        :return `<Permission>`: The permission after update.
+        :param name `<'str'>`: The name of the permission.
+        :param state `<'str'>`: The state of the permission, accepts: `'granted'`, `'denied'`, `'prompt'`.
+        :returns `<'Permission'>`: The permission after update.
 
         ### Example:
         >>> perm = await session.set_permission("geolocation", "granted")
@@ -3689,7 +3689,7 @@ class ChromiumBaseSession(Session):
         return await self.get_permission(name)
 
     def _validate_permission_name(self, name: Any) -> str:
-        """(Internal) Validate the name of a permission `<str>`"""
+        """(Internal) Validate the name of a permission `<'str'>`"""
         if isinstance(name, Permission):
             return name.name
         if name not in Constraint.PERMISSION_NAMES:
@@ -3706,7 +3706,7 @@ class ChromiumBaseSession(Session):
     # Chromium - Network ------------------------------------------------------------------
     @property
     async def network(self) -> Network:
-        """Access the network conditions of the current session `<Network>`.
+        """Access the network conditions of the current session `<'Network'>`.
 
         ### Conditions explain:
 
@@ -3752,19 +3752,19 @@ class ChromiumBaseSession(Session):
     ) -> Network:
         """Set the network conditions of the current session.
 
-        :param offline: `<bool/None>` Whether to simulate an offline network
-        condition. If `None (default)`, keep the current offline condition.
+        :param offline `<'bool/None'>`: Whether to simulate an offline network
+          condition. If `None (default)`, keep the current offline condition.
 
-        :param latency: `<int/None>` The minimum latency overhead in milliseconds.
-        If `None (default)`, keep the current latency condition.
+        :param latency `<'int/None'>`: The minimum latency overhead in milliseconds.
+          If `None (default)`, keep the current latency condition.
 
-        :param upload_throughput: `<int/None>` The maximum upload throughput
-        in bytes per second. If `None (default)`, keep the current condition.
+        :param upload_throughput `<'int/None'>`: The maximum upload throughput
+          in bytes per second. If `None (default)`, keep the current condition.
 
-        :param download_throughput: `<int/None>` The maximum download throughput
-        in bytes per second. If `None (default)`, keep the current condition.
+        :param download_throughput `<'int/None'>`: The maximum download throughput
+          in bytes per second. If `None (default)`, keep the current condition.
 
-        :return `<Network>`: The network conditions after update.
+        :returns `<'Network'>`: The network conditions after update.
 
         ### Example:
         >>> network = await session.set_network(
@@ -3790,7 +3790,7 @@ class ChromiumBaseSession(Session):
 
     async def reset_network(self) -> Network:
         """Reset the network conditions of the current session to
-        the default configuration, and returns the reset `<Network>`.
+        the default configuration, and returns the reset `<'Network'>`.
 
         ### Default conditions:
         <Network (offline=False, latency=0, upload_throughput=-1, download_throughput=-1)>
@@ -3808,7 +3808,7 @@ class ChromiumBaseSession(Session):
     # Chromium - Casting ------------------------------------------------------------------
     @property
     async def cast_sinks(self) -> list[dict[str, Any]]:
-        """Access the available sinks for a Cast session `<list[dict[str, Any]]>`."""
+        """Access the available sinks for a Cast session `<'list[dict[str, Any]]'>`."""
         res = await self.execute_command(Command.GET_SINKS, keys=self._vendor)
         try:
             return res["value"]
@@ -3820,7 +3820,7 @@ class ChromiumBaseSession(Session):
 
     @property
     async def cast_issue(self) -> str:
-        """Access the issue of the Cast session `<str>`"""
+        """Access the issue of the Cast session `<'str'>`"""
         res = await self.execute_command(Command.GET_ISSUE_MESSAGE, keys=self._vendor)
         try:
             return res["value"]
@@ -3832,7 +3832,7 @@ class ChromiumBaseSession(Session):
     async def set_cast_sink(self, sink_name: str) -> None:
         """Set a specific sink as the Cast session receiver target.
 
-        :param sink_name: `<str>` Name of the sink to use as the receiver target.
+        :param sink_name `<'str'>`: Name of the sink to use as the receiver target.
         """
         await self.execute_command(
             Command.SET_SINK_TO_USE, body={"sinkName": sink_name}, keys=self._vendor
@@ -3845,8 +3845,8 @@ class ChromiumBaseSession(Session):
     ) -> None:
         """Start a Cast session with a specific sink as the receiver target.
 
-        :param sink_name: `<str>` Name of the sink to use as the casting receiver target.
-        :param mirror: `<str>` The mirroring type, accepts `'desktop'` or `'tab'`. Defaults to `'tab'`.
+        :param sink_name `<'str'>`: Name of the sink to use as the casting receiver target.
+        :param mirror `<'str'>`: The mirroring type, accepts `'desktop'` or `'tab'`. Defaults to `'tab'`.
         """
         if mirror == "tab":
             cmd = Command.START_TAB_MIRRORING
@@ -3874,7 +3874,7 @@ class ChromiumBaseSession(Session):
     async def stop_casting(self, sink_name: str) -> None:
         """Stop an active Cast session.
 
-        :param sink_name: `<str>` Name of the sink used by the Cast session .
+        :param sink_name `<'str'>`: Name of the sink used by the Cast session .
         """
         try:
             await self.execute_command(
@@ -3907,8 +3907,8 @@ class ChromiumBaseSession(Session):
         """Get the Chrome Devtools Protocol command from cache
         `(NOT an asyncronous method)`.
 
-        :param cmd: `<str/DevToolsCMD>` Accepts both the name of the DevToolsCMD, or the `<DevToolsCMD>` instance.
-        :return `<DevToolsCMD>`: The cached DevToolsCMD, or `None` if not exist.
+        :param cmd `<'str/DevToolsCMD'>`: Accepts both the name of the DevToolsCMD, or the `<'DevToolsCMD'>` instance.
+        :returns `<'DevToolsCMD'>`: The cached DevToolsCMD, or `None` if not exist.
 
         ### Example:
         >>> cmd = session.get_cdp_cmd("mycmd")
@@ -3920,10 +3920,10 @@ class ChromiumBaseSession(Session):
         """Cache a Chrome Devtools Protocol command for later execution
         `(NOT an asyncronous method)`.
 
-        :param name: `<str>` The name of the command (cache accessor).
-        :param cmd: `<str>` The command line.
-        :param kwargs: `<Any>` The keyword arguments for the command.
-        :return `<DevToolsCMD>`: The cached CDP command.
+        :param name `<'str'>`: The name of the command (cache accessor).
+        :param cmd `<'str'>`: The command line.
+        :param kwargs `<'Any'>`: The keyword arguments for the command.
+        :returns `<'DevToolsCMD'>`: The cached CDP command.
 
         ### Example:
         >>> # . without arguments
@@ -3946,8 +3946,8 @@ class ChromiumBaseSession(Session):
         """Remove a previously cached Chrome Devtools Protocol command
         `(NOT an asyncronous method)`.
 
-        :param cmd: `<str/DevToolsCMD>` Accepts both the name of the DevToolsCMD, or the `<DevToolsCMD>` instance.
-        :return `<bool>`: True if the command is removed from cache, False if command not exist.
+        :param cmd `<'str/DevToolsCMD'>`: Accepts both the name of the DevToolsCMD, or the `<'DevToolsCMD'>` instance.
+        :returns `<'bool'>`: True if the command is removed from cache, False if command not exist.
 
         ### Example:
         >>> session.remove_cdp_cmd("mycmd")  # True / False
@@ -3962,9 +3962,9 @@ class ChromiumBaseSession(Session):
         """Rename a previously cached Chrome Devtools Protocol command
         `(NOT an asyncronous method)`.
 
-        :param cmd: `<str/DevToolsCMD>` Accepts both the name of the DevToolsCMD, or the `<DevToolsCMD>` instance.
-        :param new_name: `<str>` The new name for the command.
-        :return `<DevToolsCMD>`: The renamed command.
+        :param cmd `<'str/DevToolsCMD'>`: Accepts both the name of the DevToolsCMD, or the `<'DevToolsCMD'>` instance.
+        :param new_name `<'str'>`: The new name for the command.
+        :returns `<'DevToolsCMD'>`: The renamed command.
 
         ### Example:
         >>> # . cache a command
@@ -3998,17 +3998,17 @@ class ChromiumBaseSession(Session):
         For more detail, please refer to:
         https://chromedevtools.github.io/devtools-protocol/
 
-        :param cmd: Accepts three kinds of input:
-            - `<str>` The command line for chrome devtools protocal.
-            - `<str>` The name of a cached Chrome Devtools Protocol command.
-            - `<DevToolsCMD>` A cached Chrome Devtools Protocol command instance.
+        :param cmd `<'str/DevToolsCMD'>`: Accepts three kinds of input:
+            - `<'str'>` The command line for chrome devtools protocal.
+            - `<'str'>` The name of a cached Chrome Devtools Protocol command.
+            - `<'DevToolsCMD'>` A cached Chrome Devtools Protocol command instance.
 
-        :param kwargs: `<Any>` Additional keyword arguments for the command.
+        :param kwargs `<'Any'>`: Additional keyword arguments for the command.
             - If executing a cached Chrome Devtools Protocol command, the '*kwargs'
               in this method is always prioritized over the cached arguments. Only
               when the '*kwargs' is empty, the cached arguments will be used.
 
-        :return `<dict>`: The responce from the command execution.
+        :returns `<'dict'>`: The responce from the command execution.
 
         ### Example:
         >>> # . execute command line
@@ -4037,9 +4037,9 @@ class ChromiumBaseSession(Session):
         protocol domains/commands. For more detail, please refer to:
         https://chromedevtools.github.io/devtools-protocol/
 
-        :param cmd: `<str>` The command line for chrome devtools protocal.
-        :param kwargs: `<Any>` Additional keyword arguments for the command.
-        :return `<dict>`: The responce from the command execution.
+        :param cmd `<'str'>`: The command line for chrome devtools protocal.
+        :param kwargs `<'Any'>`: Additional keyword arguments for the command.
+        :returns `<'dict'>`: The responce from the command execution.
 
         ### Example:
         >>> await session.execute_cdp_cmd(
@@ -4061,7 +4061,7 @@ class ChromiumBaseSession(Session):
             ) from err
 
     def _validate_cdp_cmd_name(self, name: str) -> None:
-        """(Internal) Validate CDP command name `<str>`."""
+        """(Internal) Validate CDP command name `<'str'>`."""
         if not isinstance(name, str) or not name:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid Chrome Devtools Protocol command "
@@ -4079,7 +4079,7 @@ class ChromiumBaseSession(Session):
     # Chromium - Logs ---------------------------------------------------------------------
     @property
     async def log_types(self) -> list[str]:
-        """Access the available log types of the session `<list[str]>`.
+        """Access the available log types of the session `<'list[str]'>`.
 
         ### Example:
         >>> log_types = await session.log_types
@@ -4101,8 +4101,8 @@ class ChromiumBaseSession(Session):
         ### Notice
         Once the logs are retrieved, they will be cleared (removed) from the session.
 
-        :param log_type: `<str>` The log type. e.g. `'browser'`, `'driver'`, `'client'`, `'server'`, etc.
-        :return `<list[dict[str, Any]]>`: The logs for the specified log type.
+        :param log_type `<'str'>`: The log type. e.g. `'browser'`, `'driver'`, `'client'`, `'server'`, etc.
+        :returns `<'list[dict[str, Any]]'>`: The logs for the specified log type.
 
         ### Example:
         >>> logs =  await session.get_logs("browser")

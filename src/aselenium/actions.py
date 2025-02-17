@@ -125,10 +125,10 @@ class Actions:
         interactions such as mouse movements, key presses, and
         wheel scrolls.
 
-        :param session: `<Session>` The session to perform the action chain.
-        :param pointer: `<str>` The pointer type to use. Defaults to `'mouse'`.
+        :param session `<'Session'>`: The session to perform the action chain.
+        :param pointer `<'str'>`: The pointer type to use. Defaults to `'mouse'`.
             Available options: `"mouse"`, `"pen"`, `"touch"`.
-        :param duration: `<int/float>` The duration in seconds to perform a pointer move or wheel scroll action. Defaults to `0.2`.
+        :param duration `<'int/float'>`: The duration in seconds to perform a pointer move or wheel scroll action. Defaults to `0.2`.
         """
         # Validate pointer
         if pointer not in Constraint.POINTER_TYPES:
@@ -163,7 +163,7 @@ class Actions:
     # Properties --------------------------------------------------------------------------
     @property
     def actions(self) -> ActionsChain:
-        """Access all the actions to be performed `<ActionsDict>`.
+        """Access all the actions to be performed `<'ActionsDict'>`.
 
         Expected format:
         >>> {
@@ -188,16 +188,16 @@ class Actions:
     ) -> Actions:
         """Move the pointer (mouse) to an element (or a location).
 
-        :param element: `<Element/None>` The Element to move to. Defaults to `None`.
+        :param element `<'Element/None'>`: The Element to move to. Defaults to `None`.
             - If specified, moves the pointer to the center of the element,
               where 'x/y' are the offsets relative to the center.
             - If not specified (`None`), moves the pointer to the given 'x/y'
               coordinates of the viewport.
 
-        :param x: `<int>` The x-coordinate of the viewport, `*OR*` the x-offset to the center of an 'element'. Defaults to `0`.
-        :param y: `<int>` The y-coordinate of the viewport, `*OR*` the y-offset to the center of an 'element'. Defaults to `0`.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param x `<'int'>`: The x-coordinate of the viewport, `*OR*` the x-offset to the center of an 'element'. Defaults to `0`.
+        :param y `<'int'>`: The y-coordinate of the viewport, `*OR*` the y-offset to the center of an 'element'. Defaults to `0`.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
 
         ### Example:
         >>> # . move the pointer to x/y coordinates of the viewport
@@ -221,10 +221,10 @@ class Actions:
     ) -> Actions:
         """Move the pointer (mouse) by the given offsets.
 
-        :param x: `<int>` The x-coordinate offset relative to the pointer. Defaults to `0`.
-        :param y: `<int>` The y-coordinate offset relative to the pointer. Defaults to `0`.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param x `<'int'>`: The x-coordinate offset relative to the pointer. Defaults to `0`.
+        :param y `<'int'>`: The y-coordinate offset relative to the pointer. Defaults to `0`.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
 
         ### Example:
         >>> # . move the pointer by x/y offset relative to its origin
@@ -242,11 +242,11 @@ class Actions:
     ) -> Actions:
         """Click a button of the pointer (mouse).
 
-        :param button: `<int>` The button to click. Defaults to `MouseButtons.LEFT`.
-        :param hold: `<bool>` Whether to hold the button down after clicked. Defaults to `False`.
-        :param double: `<bool>` Whether to perform a double click (ignored when `hold=True`). Defaults to `False`.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The Actions chian.
+        :param button `<'int'>`: The button to click. Defaults to `MouseButtons.LEFT`.
+        :param hold `<'bool'>`: Whether to hold the button down after clicked. Defaults to `False`.
+        :param double `<'bool'>`: Whether to perform a double click (ignored when `hold=True`). Defaults to `False`.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
 
         ### Example:
         >>> # . click (press & release) the left button of the pointer
@@ -276,9 +276,9 @@ class Actions:
         """Release a previously press & hold button of the pointer (mouse).
         Use after the action `click(hold=True)`.
 
-        :param button: `<int>` The button to release. Defaults to `MouseButtons.LEFT`.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param button `<'int'>`: The button to release. Defaults to `MouseButtons.LEFT`.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
 
         ### Example:
         >>> # . press & hold & release the left button of the pointer
@@ -304,14 +304,14 @@ class Actions:
     ) -> Actions:
         """Drag and drop an element (coordinates) to another element (coordinates).
 
-        :param drag: `<Element/None>` The source element to drag. Defaults to `None`.
-        :param drag_x: `<int>` The x-coordinate of the viewport, `*OR*` the x-offset to the center of a 'drag' element. Defaults to `0`.
-        :param drag_y: `<int>` The y-coordinate of the viewport, `*OR*` the y-offset to the center of a 'drag' element. Defaults to `0`.
-        :param drop: `<Element/None>` The destination element to drop. Defaults to `None`.
-        :param drop_x: `<int>` The x-coordinate of the viewport, `*OR*` the x-offset to the center of an 'drop' element. Defaults to `0`.
-        :param drop_y: `<int>` The y-coordinate of the viewport, `*OR*` the y-offset to the center of an 'drop' element. Defaults to `0`.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param drag `<'Element/None'>`: The source element to drag. Defaults to `None`.
+        :param drag_x `<'int'>`: The x-coordinate of the viewport, `*OR*` the x-offset to the center of a 'drag' element. Defaults to `0`.
+        :param drag_y `<'int'>`: The y-coordinate of the viewport, `*OR*` the y-offset to the center of a 'drag' element. Defaults to `0`.
+        :param drop `<'Element/None'>`: The destination element to drop. Defaults to `None`.
+        :param drop_x `<'int'>`: The x-coordinate of the viewport, `*OR*` the x-offset to the center of an 'drop' element. Defaults to `0`.
+        :param drop_y `<'int'>`: The y-coordinate of the viewport, `*OR*` the y-offset to the center of an 'drop' element. Defaults to `0`.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
 
         ### Notice:
         The `drag_and_drop` method eqvivalent to the following actions:
@@ -414,9 +414,9 @@ class Actions:
     ) -> Actions:
         """Press down a keyboard KEY.
 
-        :param key: `<str/KeyboardKeys>` The KEY to press down.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param key `<'str/KeyboardKeys'>`: The KEY to press down.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
 
         ### Example:
         >>> # . control + a (select all)
@@ -436,9 +436,9 @@ class Actions:
     def key_up(self, key: str, pause: int | float | None = None) -> Actions:
         """Release a keyboard KEY.
 
-        :param key: `<str>` The KEY to release.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param key `<'str'>`: The KEY to release.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
 
         ### Example:
         >>> # . control + a (select all)
@@ -467,9 +467,9 @@ class Actions:
         the actions of typing a series of keyboard keys, such as `Hello world!`.
         Each key is first pressed down and then released in the specified order.
 
-        :param keys: `<str/KeyboardKeys>` The keys to send.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param keys `<'str/KeyboardKeys'>`: The keys to send.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
 
         Example:
         >>> From aselenium import KeyboardKeys
@@ -501,9 +501,9 @@ class Actions:
         `ctrl + c` (copy), `ctrl + v` (paste), etc. Each key is first pressed down in
         the specified order, and then released in the reverse order.
 
-        :param keys: `<str/KeyboardKeys>` The keys combinations to send.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param keys `<'str/KeyboardKeys'>`: The keys combinations to send.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
 
         ### Example:
         >>> From aselenium import KeyboardKeys
@@ -568,11 +568,11 @@ class Actions:
     ) -> Actions:
         """Scroll the viewport to an element.
 
-        :param element: `<Element/None>` The Element to scroll to.
-        :param x: `<int>` The x-offset to the center of an 'element'. Defaults to `0`.
-        :param y: `<int>` The y-offset to the center of an 'element'. Defaults to `0`.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param element `<'Element/None'>`: The Element to scroll to.
+        :param x `<'int'>`: The x-offset to the center of an 'element'. Defaults to `0`.
+        :param y `<'int'>`: The y-offset to the center of an 'element'. Defaults to `0`.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
         """
         if not isinstance(element, Element):
             raise errors.InvalidArgumentError(
@@ -592,10 +592,10 @@ class Actions:
     ) -> Actions:
         """Scroll the viewport by the given offsets.
 
-        :param x: `<int>` The x-coordinate offset relative to current viewport position. Defaults to `0`.
-        :param y: `<int>` The y-coordinate offset relative to current viewport position. Defaults to `0`.
-        :param pause: `<int/float/None>` Total seconds to pause after the action. Defaults to `None`.
-        :return `<Actions>`: The actions chain.
+        :param x `<'int'>`: The x-coordinate offset relative to current viewport position. Defaults to `0`.
+        :param y `<'int'>`: The y-coordinate offset relative to current viewport position. Defaults to `0`.
+        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
+        :returns `<'Actions'>`: The actions chain.
         """
         self._wheel_scroll(x_delta=x, y_delta=y, origin="viewport")
         return self.pause(pause)
@@ -654,8 +654,8 @@ class Actions:
     def pause(self, duration: int | float | None) -> Actions:
         """Pause the chain for a given duration.
 
-        :param duration: `<int/float/None>` The duration to pause in seconds.
-        :return `<Actions>`: The actions chain.
+        :param duration `<'int/float/None'>`: The duration to pause in seconds.
+        :returns `<'Actions'>`: The actions chain.
         """
         if duration is None:
             return self
@@ -663,7 +663,7 @@ class Actions:
             duration = int(duration * 1000)
         except Exception as err:
             raise errors.InvalidArgumentError(
-                "<{}>\nArgument 'duration' must be a positive `<int/float>`, "
+                "<{}>\nArgument 'duration' must be a positive `<'int/float'>`, "
                 "instead of: {}.".format(self.__class__.__name__, repr(duration))
             ) from err
         self._add_pointer_pause(duration)
@@ -675,13 +675,13 @@ class Actions:
     async def perform(self, explicit_wait: int | float | None = None) -> None:
         """Perform (execute) the actions chain.
 
-        :param explicit_wait: `<int/float/None>` Total seconds to wait after sending the actions command. Defaults to `None`.
-        - For Chromium based browsers, this argument is usually not needed. The webdriver
-          itself will wait until all the actions are performed before returning a response.
-        - For Firefox, specifing an explicit wait is required in most cases, since the
-          webdriver will return a response immediately after receiving the actions command.
-          Without an explicit long enough block, the next line of code will be executed
-          while the browser is still performing the actions.
+        :param explicit_wait `<'int/float/None'>`: Total seconds to wait after sending the actions command. Defaults to `None`.
+            - For Chromium based browsers, this argument is usually not needed. The webdriver
+              itself will wait until all the actions are performed before returning a response.
+            - For Firefox, specifing an explicit wait is required in most cases, since the
+              webdriver will return a response immediately after receiving the actions command.
+              Without an explicit long enough block, the next line of code will be executed
+              while the browser is still performing the actions.
         """
         # Perform the actions
         try:
@@ -716,7 +716,7 @@ class Actions:
         except Exception as err:
             raise errors.InvalidArgumentError(
                 "<{}>\nArgument 'explicit_wait' must "
-                "be a positive `<int/float>`, instead of: {} {}.".format(
+                "be a positive `<'int/float'>`, instead of: {} {}.".format(
                     self.__class__.__name__, repr(explicit_wait), type(explicit_wait)
                 )
             ) from err

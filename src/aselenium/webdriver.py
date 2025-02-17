@@ -42,14 +42,14 @@ class SessionContext:
     ) -> None:
         """The context manager for a browser session.
 
-        :param manager: `<DriverManager>` The driver manager.
-        :param manager_install_args: `<tuple[Any]>` The arguments for installing the webdriver.
-        :param manager_install_kwargs: `<dict[str, Any]>` The keyword arguments for installing the webdriver.
-        :param service_cls: `<type[BaseService]>` The webdriver service class.
-        :param service_timeout: `<int/float>` Timeout in seconds for starting/stopping the service.
-        :param service_args: `<tuple[Any]>` Additional arguments for service `subprocess.Popen` constructor.
-        :param service_kwargs: `<dict[str, Any]>` Additional keyword arguments for service `subprocess.Popen` constructor.
-        :param options: `<BaseOptions>` The browser options.
+        :param manager `<'DriverManager'>`: The driver manager.
+        :param manager_install_args `<'tuple[Any]'>`: The arguments for installing the webdriver.
+        :param manager_install_kwargs `<'dict[str/Any]'>`: The keyword arguments for installing the webdriver.
+        :param service_cls `<'type[BaseService]'>`: The webdriver service class.
+        :param service_timeout `<'int/float'>`: Timeout in seconds for starting/stopping the service.
+        :param service_args `<'tuple[Any]'>`: Additional arguments for service `subprocess.Popen` constructor.
+        :param service_kwargs `<'dict[str/Any]'>`: Additional keyword arguments for service `subprocess.Popen` constructor.
+        :param options `<'BaseOptions'>`: The browser options.
         """
         # Session
         self._session: Session | None = None
@@ -70,7 +70,7 @@ class SessionContext:
         pass
 
     async def start(self) -> Session:
-        """Start & return the session `<Session>`."""
+        """Start & return the session `<'Session'>`."""
         try:
             # Install webdriver
             await self._manager.install(
@@ -163,29 +163,29 @@ class WebDriver:
 
         ### Driver Manager Arguments:
 
-        :param directory: `<str/None>` The directory to cache the webdrivers. Defaults to `None`.
+        :param directory `<'str/None'>`: The directory to cache the webdrivers. Defaults to `None`.
             - If `None`, the webdrivers will be automatically cache in the following default directory:
               1. MacOS default: `'/Users/<user>/.aselenium'`.
               2. Windows default: `'C:\\Users\\<user>\\.aselenium'`.
               3. Linux default: `'/home/<user>/.aselenium'`.
             - If specified, a folder named `'.aselenium'` will be created in the given directory.
 
-        :param max_cache_size: `<int/None>` The maximum cache size of the webdrivers. Defaults to `None`.
+        :param max_cache_size `<'int/None'>`: The maximum cache size of the webdrivers. Defaults to `None`.
             - If `None`, all webdrivers will be cached to local storage without limit.
             - For value > 1, if the cached webdrivers exceed this limit, the oldest
               webdrivers will be deleted.
 
-        :param request_timeout: `<int/float>` The timeout in seconds for api requests. Defaults to `10`.
-        :param download_timeout: `<int/float>` The timeout in seconds for file download. Defaults to `300`.
-        :param proxy: `<str/None>` The proxy for http requests. Defaults to `None`.
+        :param request_timeout `<'int/float'>`: The timeout in seconds for api requests. Defaults to `10`.
+        :param download_timeout `<'int/float'>`: The timeout in seconds for file download. Defaults to `300`.
+        :param proxy `<'str/None'>`: The proxy for http requests. Defaults to `None`.
             This might be needed for some users that cannot access the webdriver api directly
             due to internet restrictions. Only accepts proxy startswith `'http://'`.
 
         ### Driver Service Arguments:
 
-        :param service_timeout: `<int/float>` Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
-        :param service_args: `<Any>` Additional arguments for the webdriver service.
-        :param service_kwargs: `<Any>` Additional keyword arguments for the webdriver service.
+        :param service_timeout `<'int/float'>`: Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
+        :param service_args `<'Any'>`: Additional arguments for the webdriver service.
+        :param service_kwargs `<'Any'>`: Additional keyword arguments for the webdriver service.
         """
         # Driver Manager
         self._manager = manager_cls(
@@ -208,17 +208,17 @@ class WebDriver:
     # Properties ------------------------------------------------------------------
     @property
     def manager(self) -> DriverManager:
-        """Access the driver manager `<DriverManager>`."""
+        """Access the driver manager `<'DriverManager'>`."""
         return self._manager
 
     @property
     def options(self) -> BaseOptions:
-        """Access the webdriver options for the browser `<BaseOptions>`."""
+        """Access the webdriver options for the browser `<'BaseOptions'>`."""
         return self._options
 
     # Acquire ---------------------------------------------------------------------
     def acquire(self, *args, **kwargs) -> SessionContext:
-        """Acquire a new browser session `<Session>`."""
+        """Acquire a new browser session `<'Session'>`."""
         return self._session_context_cls(
             self._manager,
             args,
@@ -257,10 +257,10 @@ class ChromiumBaseWebDriver(WebDriver):
     # Properties ------------------------------------------------------------------
     @property
     def manager(self) -> ChromiumDriverManager:
-        """Access the driver manager `<ChromiumDriverManager>`."""
+        """Access the driver manager `<'ChromiumDriverManager'>`."""
         return self._manager
 
     @property
     def options(self) -> ChromiumBaseOptions:
-        """Access the webdriver options for the browser `<ChromiumBaseOptions>`."""
+        """Access the webdriver options for the browser `<'ChromiumBaseOptions'>`."""
         return self._options

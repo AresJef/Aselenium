@@ -53,11 +53,11 @@ class BaseService:
 
         Service launch a subprocess as the interim process to communicate with the browser.
 
-        :param driver_version: `<Version>` The version of the webdriver executable.
-        :param driver_location: `<str>` The path to the webdriver executable.
-        :param timeout: `<int/float>` Timeout in seconds for starting/stopping the service. Defaults to `10`.
-        :param args: `<Any>` Additional arguments for `subprocess.Popen` constructor.
-        :param kwargs: `<Any>` Additional keyword arguments for `subprocess.Popen` constructor.
+        :param driver_version `<'Version'>`: The version of the webdriver executable.
+        :param driver_location `<'str'>`: The path to the webdriver executable.
+        :param timeout `<'int/float'>`: Timeout in seconds for starting/stopping the service. Defaults to `10`.
+        :param args `<'Any'>`: Additional arguments for `subprocess.Popen` constructor.
+        :param kwargs `<'Any'>`: Additional keyword arguments for `subprocess.Popen` constructor.
         """
         # Driver
         try:
@@ -87,19 +87,19 @@ class BaseService:
     # Driver ------------------------------------------------------------------------------
     @property
     def driver_version(self) -> Version:
-        """Access the version of the webdriver executable `<Version>`."""
+        """Access the version of the webdriver executable `<'Version'>`."""
         return self._driver_version
 
     @property
     def driver_location(self) -> str:
-        """Access the location for the webdriver executable `<str>`."""
+        """Access the location for the webdriver executable `<'str'>`."""
         return self._driver_location
 
     # Timeout -----------------------------------------------------------------------------
     @property
     def timeout(self) -> int | float:
         """Access the timeout for starting/stopping the service
-        in seconds `<int/float>`.
+        in seconds `<'int/float'>`.
         """
         return self._timeout
 
@@ -113,7 +113,7 @@ class BaseService:
     # Socket ------------------------------------------------------------------------------
     @property
     def port(self) -> int:
-        """Access the socket port of the service `<int>`."""
+        """Access the socket port of the service `<'int'>`."""
         if self._port == -1:
             self._port = self.get_free_port()
             self._port_str = str(self._port)
@@ -121,7 +121,7 @@ class BaseService:
 
     @property
     def port_str(self) -> str:
-        """Access the socket port of the service in string format `<str>`."""
+        """Access the socket port of the service in string format `<'str'>`."""
         if self._port == -1:
             self.port
         return self._port_str
@@ -129,7 +129,7 @@ class BaseService:
     @property
     def port_connectable(self) -> bool:
         """Access whether the socket port of the service
-        is connectable `<bool>`.
+        is connectable `<'bool'>`.
         """
         if self._port == -1:
             return False
@@ -151,7 +151,7 @@ class BaseService:
         )
 
     def get_free_port(self) -> int:
-        """Acquire a free socket port for the service `<int>`.
+        """Acquire a free socket port for the service `<'int'>`.
 
         This port is garanteed to be available and conflicts
         free from other service instances.
@@ -163,7 +163,7 @@ class BaseService:
         return port
 
     def _free_port(self) -> int:
-        """(Internal) Acquire a free socket port `<int>`."""
+        """(Internal) Acquire a free socket port `<'int'>`."""
         try:
             with socket(AF_INET, SOCK_STREAM) as sock:
                 sock.bind(("127.0.0.1", 0))
@@ -176,7 +176,7 @@ class BaseService:
             ) from err
 
     def _ping_port(self, port: int) -> bool:
-        """(Internal) Check if the socket port is in use `<bool>`."""
+        """(Internal) Check if the socket port is in use `<'bool'>`."""
         sock = None
         try:
             sock = create_connection(("localhost", port), 1)
@@ -205,12 +205,12 @@ class BaseService:
     # Process -----------------------------------------------------------------------------
     @property
     def process(self) -> Process:
-        """Access the process of the service `<Process>`."""
+        """Access the process of the service `<'Process'>`."""
         return self._process
 
     @property
     def process_running(self) -> bool:
-        """Access whether the service process is running `<bool>`."""
+        """Access whether the service process is running `<'bool'>`."""
         try:
             return self._process.is_running()
         except Exception:
@@ -303,12 +303,12 @@ class BaseService:
     # Session -----------------------------------------------------------------------------
     @property
     def session(self) -> ClientSession:
-        """Access the http session of the service `<ClientSession>."""
+        """Access the http session of the service `<'ClientSession'>`."""
         return self._session
 
     @property
     def session_connectable(self) -> bool:
-        """Access whether the service http session is connectable `<bool>`."""
+        """Access whether the service http session is connectable `<'bool'>`."""
         try:
             return not self._session.closed
         except Exception:
@@ -366,14 +366,14 @@ class BaseService:
     # Service -----------------------------------------------------------------------------
     @property
     def url(self) -> str:
-        """Access the base url of the Service `<str>`."""
+        """Access the base url of the Service `<'str'>`."""
         if self._url is None:
             self._url = "http://localhost:" + self.port_str
         return self._url
 
     @property
     def running(self) -> bool:
-        """Access whether the service is running `<bool>`."""
+        """Access whether the service is running `<'bool'>`."""
         return (
             self.process_running and self.port_connectable and self.session_connectable
         )
@@ -456,7 +456,7 @@ class ChromiumBaseService(BaseService):
     # Driver ------------------------------------------------------------------------------
     @property
     def driver_version(self) -> ChromiumVersion:
-        """Access the version of the webdriver executable `<ChromiumVersion>`."""
+        """Access the version of the webdriver executable `<'ChromiumVersion'>`."""
         return self._driver_version
 
     # Socket ------------------------------------------------------------------------------
@@ -464,7 +464,7 @@ class ChromiumBaseService(BaseService):
     def port_args(self) -> list[str]:
         """Access the part arguments for the service Process constructor.
 
-        :return `<list[str]>`: `["--port=" + self.port_str]`
+        :returns `<'list[str]'>`: `["--port=" + self.port_str]`
         """
         return ["--port=" + self.port_str]
 

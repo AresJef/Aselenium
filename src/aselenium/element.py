@@ -44,16 +44,16 @@ class ElementRect(Rectangle):
     def __init__(self, width: int, height: int, x: int, y: int) -> None:
         """The size and relative position of the element.
 
-        :param width: `<int>` The width of the element.
-        :param height: `<int>` The height of the element.
-        :param x: `<int>` The x-coordinate of the element.
-        :param y: `<int>` The y-coordinate of the element.
+        :param width `<'int'>`: The width of the element.
+        :param height `<'int'>`: The height of the element.
+        :param x `<'int'>`: The x-coordinate of the element.
+        :param y `<'int'>`: The y-coordinate of the element.
         """
         super().__init__(width, height, x, y)
 
     # Special methods ---------------------------------------------------------------------
     def copy(self) -> ElementRect:
-        """Copy the element rectangle `<ElementRect>`."""
+        """Copy the element rectangle `<'ElementRect'>`."""
         return super().copy()
 
 
@@ -64,8 +64,8 @@ class Element:
     def __init__(self, element_id: str, session: Session) -> None:
         """The DOM tree element.
 
-        :param element_id: `<str>` The element ID.
-        :param session: `<Session>` The session of the element.
+        :param element_id `<'str'>`: The element ID.
+        :param session `<'Session'>`: The session of the element.
         """
         # Validate
         if not element_id or not isinstance(element_id, str):
@@ -87,21 +87,21 @@ class Element:
     # Basic -------------------------------------------------------------------------------
     @property
     def session_id(self) -> str:
-        """Access the session ID of the element `<str>`.
+        """Access the session ID of the element `<'str'>`.
         e.g. '62eb095e1d01b00a4dc3a497c7330aa5'
         """
         return self._session._id
 
     @property
     def id(self) -> str:
-        """Access the ID of the element `<str>`.
+        """Access the ID of the element `<'str'>`.
         e.g. '61A5CAC057B025F22A116E47F7950D24_element_1'
         """
         return self._id
 
     @property
     def base_url(self) -> str:
-        """Access the base service URL of the element `<str>`."""
+        """Access the base service URL of the element `<'str'>`."""
         return self._base_url
 
     # Execute -----------------------------------------------------------------------------
@@ -114,16 +114,16 @@ class Element:
     ) -> dict[str, Any]:
         """Executes a command from the element.
 
-        :param command: `<str>` The command to execute.
-        :param body: `<dict/None>` The body of the command. Defaults to `None`.
-        :param keys: `<dict/None>` The keys to substitute in the command. Defaults to `None`.
-        :param timeout: `<int/float/None>` Session timeout for command execution. Defaults to `None`.
+        :param command `<'str'>`: The command to execute.
+        :param body `<'dict/None'>`: The body of the command. Defaults to `None`.
+        :param keys `<'dict/None'>`: The keys to substitute in the command. Defaults to `None`.
+        :param timeout `<'int/float/None'>`: Session timeout for command execution. Defaults to `None`.
             This arguments overwrites the default `options.session_timeout`,
             which is designed to cope with a frozen session due to unknown
             errors. For more information about session timeout, please refer
             to the documentation of `options.session_timeout` attribute.
 
-        :return: `<dict>` The response from the command.
+        :returns `<'dict'>`: The response from the command.
         """
         return await self._conn.execute(
             self._base_url,
@@ -137,7 +137,7 @@ class Element:
     @property
     async def exists(self) -> bool:
         """Access whether the element still exists in the
-        DOM tree when this attribute is called `<bool>`.
+        DOM tree when this attribute is called `<'bool'>`.
         """
         try:
             return await self._session._execute_script(
@@ -156,7 +156,7 @@ class Element:
 
     @property
     async def visible(self) -> bool:
-        """Access whether the element is visible `<bool>`.
+        """Access whether the element is visible `<'bool'>`.
 
         Visible means that the element is not only displayed but also
         not blocked by any other elements (e.g. an overlay or modal).
@@ -178,7 +178,7 @@ class Element:
 
     @property
     async def viewable(self) -> bool:
-        """Access whether the element is in the viewport `<bool>`.
+        """Access whether the element is in the viewport `<'bool'>`.
 
         Viewable means that the element is displayed regardless whether
         it is blocked by other elements (e.g. an overlay or modal).
@@ -200,7 +200,7 @@ class Element:
 
     @property
     async def enabled(self) -> bool:
-        """Access whether the element is enabled `<bool>`."""
+        """Access whether the element is enabled `<'bool'>`."""
         try:
             res = await self.execute_command(Command.IS_ELEMENT_ENABLED)
         except errors.ElementNotFoundError:
@@ -217,7 +217,7 @@ class Element:
 
     @property
     async def selected(self) -> bool:
-        """Access whether the element is selected `<bool>`.
+        """Access whether the element is selected `<'bool'>`.
 
         Primarily used for checking if a checkbox or radio button is selected.
         """
@@ -238,7 +238,7 @@ class Element:
     async def click(self, pause: int | float | None = None) -> None:
         """Click the element.
 
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
         """
@@ -253,8 +253,8 @@ class Element:
         """Simulate typing or keyboard keys pressing into the element.
         (To send local files, use the `upload()` method.)
 
-        :param keys: `<str/KeyboardKeys>` strings to be typed or keyboard keys to be pressed.
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param keys `<'str/KeyboardKeys'>`: strings to be typed or keyboard keys to be pressed.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
 
@@ -284,8 +284,8 @@ class Element:
     async def upload(self, *files: str, pause: int | float | None = None) -> None:
         """Upload local files to the element.
 
-        :param files: `<str>` The absolute path of the files to upload.
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param files `<'str'>`: The absolute path of the files to upload.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
 
@@ -310,7 +310,7 @@ class Element:
     async def submit(self, pause: int | float | None = None) -> None:
         """Submit a form (must be an element nested inside a form).
 
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
         """
@@ -326,7 +326,7 @@ class Element:
     async def clear(self, pause: int | float | None = None) -> None:
         """Clear the text for the text entry element.
 
-        :param pause: `<int/float/None>` The pause in seconds after execution. Defaults to `None`.
+        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
             This can be useful to wait for the command to take effect,
             before executing the next command. Defaults to `None` - no pause.
         """
@@ -336,7 +336,7 @@ class Element:
     async def switch_frame(self) -> bool:
         """Switch focus to the frame of the element.
 
-        :return `<bool>`: True if the focus has been switched, False if frame was not found.
+        :returns `<'bool'>`: True if the focus has been switched, False if frame was not found.
 
         ### Example:
         >>> switch = await element.switch_frame()  # True / Flase
@@ -356,7 +356,7 @@ class Element:
     async def scroll_into_view(self) -> bool:
         """Scroll the viewport to the element location.
 
-        :return `<bool>`: True if the element is scrolled into view, False if the element is not viewable.
+        :returns `<'bool'>`: True if the element is scrolled into view, False if the element is not viewable.
 
         ### Example:
         >>> viewable = await element.scroll_into_view()  # True / False
@@ -383,7 +383,7 @@ class Element:
     ) -> bool:
         """Wait until the element satisfies a condition.
 
-        :param condition: `<str>` The condition to satisfy. Available options:
+        :param condition `<'str'>`: The condition to satisfy. Available options:
             - `'gone'`: Wait until the element disappears from the DOM tree.
             - `'visible'`: Wait until the element not only is displayed but also not
                 blocked by any other elements (e.g. an overlay or modal).
@@ -392,8 +392,8 @@ class Element:
             - `'enabled'`: Wait until the element is enabled.
             - `'selected'`: Wait until the element is selected.
 
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return `<bool>`: True if the element satisfies the condition, False otherwise.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the element satisfies the condition, False otherwise.
 
         ### Example:
         >>> await element.wait_until("visible", timeout=5)  # True / False
@@ -446,7 +446,7 @@ class Element:
     # Information -------------------------------------------------------------------------
     @property
     async def tag(self) -> str | None:
-        """Access the tag name of the element `<str>`."""
+        """Access the tag name of the element `<'str'>`."""
         try:
             res = await self.execute_command(Command.GET_ELEMENT_TAG_NAME)
         except errors.InvalidMethodError:
@@ -467,11 +467,11 @@ class Element:
     ) -> bool:
         """Wait until the tag of the element satisfies the given condition.
 
-        :param condition: `<str>` The condition the tag needs to satisfy.
+        :param condition `<'str'>`: The condition the tag needs to satisfy.
             Excepted values: `"equals"`, `"contains"`, `"startswith"`, `"endswith"`.
-        :param value: `<str>` The value of the condition.
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return: `<bool>` True if the tag satisfies the condition, False if timeout.
+        :param value `<'str'>`: The value of the condition.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the tag satisfies the condition, False if timeout.
 
         ### Example:
         >>> await element.wait_until_tag("equals", "div", 5)  # True / False
@@ -522,7 +522,7 @@ class Element:
 
     @property
     async def text(self) -> str | None:
-        """Access the text of the element `<str>`."""
+        """Access the text of the element `<'str'>`."""
         try:
             res = await self.execute_command(Command.GET_ELEMENT_TEXT)
         except errors.InvalidMethodError:
@@ -543,11 +543,11 @@ class Element:
     ) -> bool:
         """Wait until the text of the element satisfies the given condition.
 
-        :param condition: `<str>` The condition the text needs to satisfy.
+        :param condition `<'str'>`: The condition the text needs to satisfy.
             Excepted values: `"equals"`, `"contains"`, `"startswith"`, `"endswith"`.
-        :param value: `<str>` The value of the condition.
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return: `<bool>` True if the text satisfies the condition, False if timeout.
+        :param value `<'str'>`: The value of the condition.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the text satisfies the condition, False if timeout.
 
         ### Example:
         >>> await element.wait_until_text("startswith", "google", 5)  # True / False
@@ -598,7 +598,7 @@ class Element:
 
     @property
     async def rect(self) -> ElementRect | None:
-        """Access the size and relative position of the element `<ElementRect>`.
+        """Access the size and relative position of the element `<'ElementRect'>`.
 
         ### Example:
         >>> rect = await element.rect
@@ -624,7 +624,7 @@ class Element:
 
     @property
     async def aria_role(self) -> str | None:
-        """Acess the aria role of the element `<str>`."""
+        """Acess the aria role of the element `<'str'>`."""
         try:
             res = await self.execute_command(Command.GET_ELEMENT_ARIA_ROLE)
         except errors.InvalidMethodError:
@@ -639,7 +639,7 @@ class Element:
 
     @property
     async def aria_label(self) -> str | None:
-        """Access the aria label of the element `<str>`."""
+        """Access the aria label of the element `<'str'>`."""
         try:
             res = await self.execute_command(Command.GET_ELEMENT_ARIA_LABEL)
         except errors.InvalidMethodError:
@@ -654,7 +654,7 @@ class Element:
 
     @property
     async def properties(self) -> list[str]:
-        """Access the property names of the element `<list[str]>`.
+        """Access the property names of the element `<'list[str]'>`.
 
         ### Example:
         >>> names = await element.properties
@@ -679,8 +679,8 @@ class Element:
     ) -> str | int | float | bool | list | dict | Element | None:
         """Get the property of the element by name.
 
-        :param name: `<str>` Name of the property from the element.
-        :return `<Any>`: The property value. If the property is an element, returns <class 'Element'>.
+        :param name `<'str'>`: Name of the property from the element.
+        :returns `<'Any'>`: The property value. If the property is an element, returns <class 'Element'>.
         """
         # Get property
         try:
@@ -706,7 +706,7 @@ class Element:
 
     @property
     async def properties_css(self) -> dict[str, str]:
-        """Acess all the css (style) properties of the element `<dict[str, str]>`.
+        """Acess all the css (style) properties of the element `<'dict[str, str]'>`.
 
         ### Example:
         >>> css_props = await element.css_properties
@@ -728,8 +728,8 @@ class Element:
     async def get_property_css(self, name: str) -> str | None:
         """Get the css (style) property of the element by name.
 
-        :param name: `<str>` Name of the css property from the element.
-        :return `<str>`: The css property value.
+        :param name `<'str'>`: Name of the css property from the element.
+        :returns `<'str'>`: The css property value.
 
         ### Example:
         >>> css_prop = await element.get_css_property("align-content")  # "normal"
@@ -750,7 +750,7 @@ class Element:
 
     @property
     async def attributes(self) -> dict[str, str]:
-        """Access the attributes of the element `<dict[str, str]>`.
+        """Access the attributes of the element `<'dict[str, str]'>`.
 
         ### Example:
         >>> attrs = await element.attributes
@@ -775,8 +775,8 @@ class Element:
         If the attribute's value has been changed after the page loaded,
         this method will always return the latest updated value.
 
-        :param name: `<str>` Name of the attribute from the element.
-        :return `<str>`: The latest attribute value.
+        :param name `<'str'>`: Name of the attribute from the element.
+        :returns `<'str'>`: The latest attribute value.
 
         ### Example:
         >>> attr = await element.get_attribute("#input")
@@ -802,8 +802,8 @@ class Element:
         To get the updated value (if changed) of the attribute, use
         the `get_attribute()` method instead.
 
-        :param name: `<str>` Name of the attribute from the element.
-        :return `<str>`: The initial attribute value.
+        :param name `<'str'>`: Name of the attribute from the element.
+        :returns `<'str'>`: The initial attribute value.
 
         ### Example:
         >>> attr = await element.get_attribute_dom("#input")
@@ -824,7 +824,7 @@ class Element:
             ) from err
 
     async def take_screenshot(self) -> bytes | None:
-        """Take a screenshot of the element `<bytes>`."""
+        """Take a screenshot of the element `<'bytes'>`."""
         try:
             res = await self.execute_command(Command.ELEMENT_SCREENSHOT)
         except errors.InvalidMethodError:
@@ -845,8 +845,8 @@ class Element:
     async def save_screenshot(self, path: str) -> bool:
         """Take & save the screenshot of the element into local PNG file.
 
-        :param path: `<str>` The absolute path to save the screenshot.
-        :return `<bool>`: True if the screenshot has been saved, False if failed.
+        :param path `<'str'>`: The absolute path to save the screenshot.
+        :returns `<'bool'>`: True if the screenshot has been saved, False if failed.
 
         ### Example:
         >>> await element.save_screenshot("~/path/to/screenshot.png")  # True / False
@@ -886,10 +886,10 @@ class Element:
         """Check if an element exists (inside the element). This method ignores
         the implicit wait timeout, and returns element existence immediately.
 
-        :param value: `<str/Element>` The selector for the element *OR* an `<Element>` instance.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-            If the given 'value' is an `<Element>`, this argument will be ignored.
-        :return `<bool>`: True if the element exists, False otherwise.
+        :param value `<'str/Element'>`: The selector for the element *OR* an `<'Element'>` instance.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            If the given 'value' is an `<'Element'>`, this argument will be ignored.
+        :returns `<'bool'>`: True if the element exists, False otherwise.
 
         ### Example:
         >>> await element.element_exists("#input_box", by="css")  # True / False
@@ -910,14 +910,14 @@ class Element:
         ignores the implicit wait timeout, and returns elements existence
         immediately.
 
-        :param values: `<str/Element>` The locators for multiple elements *OR* `<Element>` instances.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-            For values that are `<Element>` instances, this argument will be ignored.
-        :param all_: `<bool>` Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
+        :param values `<'str/Element'>`: The locators for multiple elements *OR* `<'Element'>` instances.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            For values that are `<'Element'>` instances, this argument will be ignored.
+        :param all_ `<'bool'>`: Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
             - `True`: All elements must exist to return True.
             - `False`: Any one of the elements exists returns True.
 
-        :return `<bool>`: True if the elements exist, False otherwise.
+        :returns `<'bool'>`: True if the elements exist, False otherwise.
 
         ### Example:
         >>> await element.elements_exist(
@@ -954,9 +954,9 @@ class Element:
         and strategy. The timeout for finding an element is determined
         by the implicit wait of the session.
 
-        :param value: `<str>` The selector for the element.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :return `<Element/None>`: The located element, or `None` if not found.
+        :param value `<'str'>`: The selector for the element.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :returns `<'Element/None'>`: The located element, or `None` if not found.
 
         ### Example:
         >>> await element.find_element("#input_box", by="css")
@@ -995,9 +995,9 @@ class Element:
         strategy. The timeout for finding the elements is determined by
         the implicit wait of the session.
 
-        :param value: `<str>` The selector for the elements.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :return `<list[Element]>`: A list of located elements (empty if not found).
+        :param value `<'str'>`: The selector for the elements.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :returns `<'list[Element]'>`: A list of located elements (empty if not found).
 
         ### Example:
         >>> await element.find_elements("#input_box", by="css")
@@ -1036,9 +1036,9 @@ class Element:
         multiple locators. The timeout for finding the first element
         is determined by the implicit wait of the session.
 
-        :param values: `<str>` The locators for multiple elements.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-        :return `<Element/None>`: The first located element among all locators, or `None` if not found.
+        :param values `<'str'>`: The locators for multiple elements.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+        :returns `<'Element/None'>`: The first located element among all locators, or `None` if not found.
 
         ### Example:
         >>> await element.find_1st_element("#input_box", "#input_box2", by="css")
@@ -1074,7 +1074,7 @@ class Element:
     ) -> bool:
         """Wait until an element (inside the element) satisfies the given condition.
 
-        :param condition: `<str>` The condition to satisfy. Available options:
+        :param condition `<'str'>`: The condition to satisfy. Available options:
             - `'gone'`: Wait until an element disappears from the element.
             - `'exist'`: Wait until an element appears in the element.
             - `'visible'`: Wait until an element not only is displayed but also not
@@ -1084,11 +1084,11 @@ class Element:
             - `'enabled'`: Wait until an element is enabled.
             - `'selected'`: Wait until an element is selected.
 
-        :param value: `<str/Element>` The selector for the element *OR* an `<Element>` instance.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-            If the given 'value' is an `<Element>`, this argument will be ignored.
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return `<bool>`: True if the element satisfies the condition, False otherwise.
+        :param value `<'str/Element'>`: The selector for the element *OR* an `<'Element'>` instance.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            If the given 'value' is an `<'Element'>`, this argument will be ignored.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the element satisfies the condition, False otherwise.
 
         ### Example:
         >>> await element.wait_until_element(
@@ -1187,7 +1187,7 @@ class Element:
     ) -> bool:
         """Wait until multiple elements (inside the element) satisfy the given condition.
 
-        :param condition: `<str>` The condition to satisfy. Available options:
+        :param condition `<'str'>`: The condition to satisfy. Available options:
             - `'gone'`: Wait until the elements disappear from the element.
             - `'exist'`: Wait until the elements appear in the element.
             - `'visible'`: Wait until the elements not only are displayed but also not
@@ -1197,15 +1197,15 @@ class Element:
             - `'enabled'`: Wait until the elements are enabled.
             - `'selected'`: Wait until the elements are selected.
 
-        :param values: `<str/Element>` The locators for multiple elements *OR* `<Element>` instances.
-        :param by: `<str>` The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-            For values that are `<Element>` instances, this argument will be ignored.
-        :param all_: `<bool>` Determine how to satisfy the condition. Defaults to `True (all elements)`.
+        :param values `<'str/Element'>`: The locators for multiple elements *OR* `<'Element'>` instances.
+        :param by `<'str'>`: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
+            For values that are `<'Element'>` instances, this argument will be ignored.
+        :param all_ `<'bool'>`: Determine how to satisfy the condition. Defaults to `True (all elements)`.
             - `True`: All elements must satisfy the condition to return True.
             - `False`: Any one of the elements satisfies the condition returns True.
 
-        :param timeout: `<int/float/None>` Total seconds to wait until timeout. Defaults to `5`.
-        :return `<bool>`: True if the elements satisfy the condition, False otherwise.
+        :param timeout `<'int/float/None'>`: Total seconds to wait until timeout. Defaults to `5`.
+        :returns `<'bool'>`: True if the elements satisfy the condition, False otherwise.
 
         ### Example:
         >>> await element.wait_until_elements(
@@ -1302,8 +1302,9 @@ class Element:
 
     async def _element_exists_no_wait(self, value: str, strat: str) -> bool:
         """(Internal) Check if an element exists (inside the element)
-        without implicit wait `<bool>`. Returns `False` immediately if
-        element not exists.
+        without implicit wait `<'bool'>`. 
+        
+        Returns `False` immediately if element not exists.
         """
         try:
             return await self._session._execute_script(
@@ -1326,7 +1327,7 @@ class Element:
 
     async def _find_element_no_wait(self, value: str, strat: str) -> Element | None:
         """(Internal) Find element (inside the element) without implicit
-        wait `<Element>`. Returns `None` immediately if element not exists.
+        wait `<'Element'>`. Returns `None` immediately if element not exists.
         """
         try:
             res = await self._session._execute_script(
@@ -1360,7 +1361,7 @@ class Element:
     async def shadow(self) -> Shadow | None:
         """Access the shadow root of the element.
 
-        :return `<Shadow/None>`: The shadow root, or `None` if not found.
+        :returns `<'Shadow/None'>`: The shadow root, or `None` if not found.
 
         ### Example:
         >>> shadow = await element.shadow
@@ -1391,9 +1392,9 @@ class Element:
     def _create_shadow(self, shadow_id: str) -> Shadow:
         """(Internal) Create the shadow root.
 
-        :param shadow_id: `<str>` The id of the element.
+        :param shadow_id `<'str'>`: The id of the element.
             e.g. "289DEC2B8885F15A2BDD2E92AC0404F3_element_1"
-        :return `<Shadow>`: The shadow root.
+        :returns `<'Shadow'>`: The shadow root.
         """
         return Shadow(shadow_id, self)
 
@@ -1401,7 +1402,7 @@ class Element:
     async def pause(self, duration: int | float | None) -> None:
         """Pause the for a given duration.
 
-        :param duration: `<int/float/None>` The duration to pause in seconds.
+        :param duration `<'int/float/None'>`: The duration to pause in seconds.
         """
         if duration is None:
             return None  # exit
@@ -1429,7 +1430,7 @@ class Element:
         return value
 
     def _validate_wait_str_value(self, value: Any) -> str:
-        """(Internal) Validate if wait until 'value' is a non-empty string `<str>`."""
+        """(Internal) Validate if wait until 'value' is a non-empty string `<'str'>`."""
         if not isinstance(value, str) or not value:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid wait until value: {} {}. "
