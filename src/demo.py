@@ -103,9 +103,9 @@ async def test_driver_options(browser: T) -> None:
         driver.options.page_load_strategy = "eager"
         # . proxy
         proxy = Proxy(
-            http_proxy="http://127.0.0.1:7890",
-            https_proxy="http://127.0.0.1:7890",
-            socks_proxy="socks5://127.0.0.1:7890",
+            http_proxy=f"http://{PROXY_SERVER}",
+            https_proxy=f"http://{PROXY_SERVER}",
+            socks_proxy=f"socks5://{PROXY_SERVER}",
         )
         if SYSTEM == "Darwin":
             driver.options.proxy = proxy
@@ -1750,6 +1750,7 @@ async def test_driver_automation(browser: T) -> None:
 if __name__ == "__main__":
     ABS_PATH = os.path.abspath(os.path.dirname(__file__))
     TEST_FOLDER = os.path.join(ABS_PATH, "test_files")
+    PROXY_SERVER = "127.0.0.1:7898"
 
     asyncio.run(test_driver_manager("chrome"))
     asyncio.run(test_driver_manager("chromium"))
