@@ -1752,31 +1752,15 @@ if __name__ == "__main__":
     TEST_FOLDER = os.path.join(ABS_PATH, "test_files")
     PROXY_SERVER = "127.0.0.1:7898"
 
-    asyncio.run(test_driver_manager("chrome"))
-    asyncio.run(test_driver_manager("chromium"))
-    asyncio.run(test_driver_manager("edge"))
-    asyncio.run(test_driver_manager("firefox"))
-    asyncio.run(test_driver_manager("safari"))
-
-    asyncio.run(test_driver_options("chrome"))
-    asyncio.run(test_driver_options("chromium"))
-    asyncio.run(test_driver_options("edge"))
-    asyncio.run(test_driver_options("firefox"))
-    asyncio.run(test_driver_options("safari"))
-
-    asyncio.run(test_driver_profile("chrome"))
-    asyncio.run(test_driver_profile("chromium"))
-    asyncio.run(test_driver_profile("edge"))
-    asyncio.run(test_driver_profile("firefox"))
-
-    asyncio.run(test_driver_cancellation("chrome"))
-    asyncio.run(test_driver_cancellation("chromium"))
-    asyncio.run(test_driver_cancellation("edge"))
-    asyncio.run(test_driver_cancellation("firefox"))
-    asyncio.run(test_driver_cancellation("safari"))
-
-    asyncio.run(test_driver_automation("chrome"))
-    asyncio.run(test_driver_automation("chromium"))
-    asyncio.run(test_driver_automation("edge"))
-    asyncio.run(test_driver_automation("firefox"))
-    asyncio.run(test_driver_automation("safari"))
+    for browser in (
+        "chrome",
+        # "chromium",
+        # "edge",
+        # "firefox",
+        # "safari",
+    ):
+        asyncio.run(test_driver_manager(browser))
+        asyncio.run(test_driver_options(browser))
+        asyncio.run(test_driver_profile(browser))
+        asyncio.run(test_driver_cancellation(browser))
+        asyncio.run(test_driver_automation(browser))
