@@ -3,4 +3,5 @@ include README.md
 
 include src/aselenium/*.pxd
 include src/aselenium/*.py
+include src/aselenium/*.pyi
 include src/aselenium/*.pyx
