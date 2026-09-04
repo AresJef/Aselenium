@@ -230,6 +230,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--sections", nargs="+", choices=("all", *SECTIONS), default=["all"]
     )
     run.add_argument(
+        "--session-timeout",
+        type=positive_seconds,
+        default=30,
+        help="per-command and session-start deadline in seconds; default 30",
+    )
+    run.add_argument(
         "--headed",
         action="store_true",
         help="show browser UI (Safari is always headed)",
@@ -336,7 +342,7 @@ def configure(
         A mapping containing the configure data.
     """
     options = driver.options
-    options.session_timeout = 30
+    options.session_timeout = args.session_timeout
     options.set_timeouts(
         implicit=0, pageLoad=20, script=5
     )  # Public setters use seconds.
@@ -391,7 +397,7 @@ def configure(
             options.set_profile(profile_source)
     return {
         "implicit_wait_seconds": 0,
-        "session_timeout_seconds": 30,
+        "session_timeout_seconds": args.session_timeout,
         "defensive_capabilities": True,
         "proxy": "serialization only; not enabled",
         "profile": "empty template cloned per acquisition"

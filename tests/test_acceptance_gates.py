@@ -144,6 +144,7 @@ def test_installed_tours_isolate_concurrent_report_outputs(
             Successful child result after both reports become visible.
         """
         assert "--profile-root" not in command
+        assert command[command.index("--session-timeout") + 1] == "30"
         owned = Path(command[command.index("--output-dir") + 1]) / "local-chrome-owned"
         owned.mkdir()
         (owned / "report.json").write_text(json.dumps(report()))
@@ -207,6 +208,7 @@ def test_linux_firefox_tour_shares_nonhidden_profile_filesystem(
             Successful child result with a complete synthetic report.
         """
         profile_root = Path(command[command.index("--profile-root") + 1])
+        assert command[command.index("--session-timeout") + 1] == "60"
         working = Path(kwargs["cwd"])
         assert profile_root.parent == home
         assert not profile_root.name.startswith(".")

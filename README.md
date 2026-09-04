@@ -1288,7 +1288,7 @@ For a Snap/Flatpak Firefox, create a shared directory once and pass it explicitl
 ```bash
 mkdir -p "$HOME/aselenium-firefox-profiles"
 .venv/bin/python src/demo_local.py run --browser firefox --allow-download \
-  --profile-root "$HOME/aselenium-firefox-profiles"
+  --profile-root "$HOME/aselenium-firefox-profiles" --session-timeout 60
 ```
 
 Driver management and options run first. The 13 selectable chapters cover
@@ -1297,6 +1297,10 @@ artifacts, vendor commands, concurrency, and cancellation: **15 stages** in a fu
 tour. Browser-specific limitations are reported as skipped, not counted as passes.
 The `--profile-demo` option clones a new empty profile template, never your
 personal profile.
+The local tour's `--session-timeout` option is the per-command and session-start
+deadline (30 seconds by default); a cold Snap/Flatpak Firefox launch may need a
+larger value such as 60 seconds. Its separate `--timeout` option bounds the whole
+tour and defaults to 240 seconds.
 
 To provision without opening a browser:
 

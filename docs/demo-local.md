@@ -217,7 +217,10 @@ The cancellation example intentionally waits inside an owned task, cancels that
 task, awaits it, and calls idempotent `quit()`. It creates a **new** context for the
 next session: a closed context is not restarted. The `--timeout` budget defaults
 to 240 seconds; it bounds work, but cancellation-safe cleanup may take additional
-time. Ctrl+C also initiates cleanup; forcibly killing the process bypasses it.
+time. `--session-timeout` separately controls each WebDriver command and session
+startup; it defaults to 30 seconds. Increase it for a cold or containerized browser
+when startup legitimately needs longer. Ctrl+C also initiates cleanup; forcibly
+killing the process bypasses it.
 
 ## Browser-specific boundaries
 

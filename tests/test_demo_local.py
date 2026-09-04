@@ -129,6 +129,8 @@ def test_discovery_never_probes_browsers_or_creates_files(
         ["run", "--timeout", "inf"],
         ["run", "--timeout", "0"],
         ["run", "--timeout", "-1"],
+        ["run", "--session-timeout", "nan"],
+        ["run", "--session-timeout", "0"],
     ],
 )
 def test_invalid_cli_is_rejected_before_side_effects(
@@ -266,8 +268,28 @@ def test_options_and_constructor_work_without_browser_probes(
         assert details["defensive_capabilities"] is True
         assert driver.options.timeouts.implicit == 0
         assert driver.options.session_timeout == 30
+        assert details["session_timeout_seconds"] == 30
         assert driver.options.proxy is None  # Serialization-only proxy example.
         assert args.cache_dir.exists() == (browser != "safari")
+    finally:
+        driver.options.close()
+
+
+def test_run_accepts_an_explicit_session_timeout(demo: Any, tmp_path: Path) -> None:
+    """Apply a user-selected session deadline through the real options API.
+
+    Args:
+        demo: Imported local demonstration module.
+        tmp_path: Empty profile source used without launching a browser.
+    """
+    args = demo.parse_args(["run", "--browser", "firefox", "--session-timeout", "75"])
+    driver = demo.make_driver(args)
+    source = tmp_path / "source"
+    source.mkdir()
+    try:
+        details = demo.configure(driver, args, source)
+        assert driver.options.session_timeout == 75
+        assert details["session_timeout_seconds"] == 75
     finally:
         driver.options.close()
 

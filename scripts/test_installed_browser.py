@@ -232,6 +232,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             str(output),
             "--timeout",
             str(args.timeout),
+            "--session-timeout",
+            "60" if working_parent is not None else "30",
         ]
         if args.allow_download:
             command.append("--allow-download")
