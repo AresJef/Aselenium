@@ -293,8 +293,8 @@ async def test_acquisition_consumes_its_result_even_after_a_later_install(
     context._SESSION_CLS = Session
     session = await context.start()
     try:
-        assert services == [(result.driver_version, result.driver_location)]
-        assert services[0][1] != later.driver_location
+        assert services == [(result.driver_version, Path(result.driver_location))]
+        assert services[0][1] != Path(later.driver_location)
         assert str(session.options.browser_version) == result.browser_version
     finally:
         await context.quit()

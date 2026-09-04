@@ -17,6 +17,7 @@ from aselenium import errors
 from aselenium.chrome.options import ChromeOptions
 from aselenium.chrome.service import ChromeService
 from aselenium.chrome.webdriver import ChromeSessionContext
+from aselenium.manager._installation import InstallationRequest, InstallationResult
 from aselenium.manager.driver import (
     ChromeDriverManager,
     DriverManager,
@@ -26,7 +27,7 @@ from aselenium.manager.file import ChromeBinaryFile, ChromeDriverFile, File
 from aselenium.manager.version import ChromiumVersion, FirefoxVersion
 from aselenium.service import BaseService, ChromiumBaseService
 from aselenium.session import Session
-from aselenium.webdriver import ChromiumBaseWebDriver, WebDriver
+from aselenium.webdriver import ChromiumBaseWebDriver, SessionContext, WebDriver
 
 
 @pytest.fixture
@@ -68,6 +69,73 @@ def test_base_service_public_state_and_abstract_port_arguments(
         service.port_args
     service.timeout = 1
     assert service.timeout == 1
+
+
+@pytest.mark.asyncio
+async def test_session_context_retains_paths_across_installation_handoff(
+    tmp_path: Path,
+) -> None:
+    """Reuse each parsed result path through every downstream consumer.
+
+    Args:
+        tmp_path: Disposable directory containing inert executable fixtures.
+    """
+    driver = tmp_path / "driver with spaces"
+    browser = tmp_path / "browser-测试"
+    driver.write_bytes(b"inert driver fixture; never execute")
+    browser.write_bytes(b"inert browser fixture; never execute")
+    installation = InstallationResult(
+        InstallationRequest(
+            "Chrome",
+            "120.0.1.2",
+            "stable",
+            None,
+            None,
+            "linux",
+            "64",
+            False,
+        ),
+        str(driver),
+        "120.0.1.2",
+        str(browser),
+        "120.0.1.2",
+        "stable",
+    )
+    cache = SimpleNamespace(lease=Mock(return_value=None))
+    manager = SimpleNamespace(
+        _file_manager=cache,
+        install_result=AsyncMock(return_value=installation),
+        _parse_browser_version=Mock(return_value="parsed-browser-version"),
+        _parse_driver_version=Mock(return_value="parsed-driver-version"),
+    )
+    service_factory = Mock(return_value=SimpleNamespace(stop=AsyncMock()))
+    session = SimpleNamespace(start=AsyncMock(), quit=AsyncMock())
+    session_factory = Mock(return_value=session)
+    context = SessionContext(
+        manager,
+        (),
+        {},
+        service_factory,
+        7,
+        (),
+        {},
+        SimpleNamespace(arguments=(), browser_version=None, browser_location=None),
+    )
+    context._SESSION_CLS = session_factory
+
+    assert await context.start() is session
+
+    lease_paths = [call.args[0] for call in cache.lease.call_args_list]
+    assert len(lease_paths) == 2
+    assert all(isinstance(location, Path) for location in lease_paths)
+    assert service_factory.call_args.args[1] is lease_paths[0]
+    assert context._options.browser_location is lease_paths[1]
+    assert installation.driver_location == str(driver)
+    assert installation.browser_location == str(browser)
+    session.start.assert_awaited_once_with()
+
+    await context.quit()
+    session.quit.assert_awaited_once_with()
 
 
 @pytest.mark.parametrize(

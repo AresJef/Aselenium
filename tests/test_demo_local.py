@@ -123,6 +123,7 @@ def test_discovery_never_probes_browsers_or_creates_files(
         ],
         ["run", "--browser", "firefox", "--channel", "dev"],
         ["run", "--browser", "chromium", "--channel", "beta"],
+        ["run", "--browser", "chrome", "--profile-root", "/shared/profiles"],
         ["run", "--sections", "unknown"],
         ["run", "--timeout", "nan"],
         ["run", "--timeout", "inf"],
@@ -267,6 +268,35 @@ def test_options_and_constructor_work_without_browser_probes(
         assert driver.options.session_timeout == 30
         assert driver.options.proxy is None  # Serialization-only proxy example.
         assert args.cache_dir.exists() == (browser != "safari")
+    finally:
+        driver.options.close()
+
+
+def test_firefox_profile_root_remains_a_path_until_service_start(
+    demo: Any, tmp_path: Path
+) -> None:
+    """Forward the CLI Path without reparsing it in the demonstration layer.
+
+    Args:
+        demo: Imported local demonstration module.
+        tmp_path: Existing shared profile root and dedicated demo cache parent.
+    """
+    profile_root = tmp_path / "shared-profiles"
+    profile_root.mkdir()
+    args = demo.parse_args(
+        [
+            "run",
+            "--browser",
+            "firefox",
+            "--profile-root",
+            str(profile_root),
+        ]
+    )
+    driver = demo.make_driver(args)
+    try:
+        assert args.profile_root == profile_root
+        assert isinstance(driver._service_kwargs["profile_root"], Path)
+        assert driver._service_kwargs["profile_root"] is args.profile_root
     finally:
         driver.options.close()
 

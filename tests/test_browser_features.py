@@ -33,7 +33,7 @@ from aselenium.firefox.service import FirefoxService
 from aselenium.firefox.session import FirefoxSession
 from aselenium.firefox.utils import FirefoxAddon, extract_firefox_addon_details
 from aselenium.manager.version import ChromiumVersion, FirefoxVersion, GeckoVersion
-from aselenium.options import BaseOptions, ChromiumBaseOptions, Proxy
+from aselenium.options import BaseOptions, ChromiumBaseOptions, ChromiumProfile, Proxy
 from aselenium.safari.options import SafariOptions
 from aselenium.safari.service import SafariService
 from aselenium.safari.session import SafariSession
@@ -870,6 +870,104 @@ def test_chromium_profile_arguments_and_replacement_cleanup(
         assert (tmp_path / "Default" / "Preferences").read_text() == "original"
     finally:
         options.close()
+
+
+@pytest.mark.parametrize(
+    "profile_folder", ["Default", "Profile 1", " Profile", ".profile", "用户 配置"]
+)
+def test_chromium_profile_accepts_portable_single_directory_names(
+    tmp_path: Path, profile_folder: str
+) -> None:
+    """Preserve ordinary spaces, dot prefixes, and Unicode in profile names.
+
+    Args:
+        tmp_path: Isolated user-data directory containing the selected profile.
+        profile_folder: Portable single-component profile-directory name.
+    """
+    source = tmp_path / profile_folder
+    source.mkdir()
+    (source / "Preferences").write_text("original", encoding="utf-8")
+    profile = ChromiumProfile(tmp_path, profile_folder)
+    assert profile.directory_temp is not None
+    clone = Path(profile.directory_temp)
+    try:
+        assert profile.profile_folder == profile_folder
+        assert profile._profile_dir == source
+        assert clone.is_dir()
+        assert (clone / "TEMP_PROFILE" / "Preferences").read_text(
+            encoding="utf-8"
+        ) == "original"
+    finally:
+        profile._delete_temp_profile()
+
+
+@pytest.mark.parametrize(
+    "profile_folder",
+    [
+        "",
+        ".",
+        "..",
+        "../Default",
+        "..\\Default",
+        "/Default",
+        "\\Default",
+        "Default/Profile 1",
+        "Default\\Profile 1",
+        "Default/",
+        "Default\\",
+        "C:",
+        "C:Default",
+        "C:\\Default",
+        "//server/share/Default",
+        "\\\\server\\share\\Default",
+        "Default\x00Profile",
+        "Default:stream",
+        'Default"Profile',
+        "Default*Profile",
+        "Default<Profile",
+        "Default>Profile",
+        "Default?Profile",
+        "Default|Profile",
+        "Default.",
+        "Default ",
+        "CON",
+        "con.profile",
+        "CON .profile",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "com¹.log",
+        "LPT9",
+        "CONIN$",
+        "CONOUT$",
+    ],
+)
+def test_chromium_profile_rejects_ambiguous_or_reserved_path_names(
+    tmp_path: Path, profile_folder: str
+) -> None:
+    """Reject cross-platform path syntax before selecting or copying a profile.
+
+    Args:
+        tmp_path: Existing user-data root that must not override validation.
+        profile_folder: Malformed, escaping, or reserved profile-folder value.
+    """
+    with pytest.raises(errors.InvalidProfileError, match="portable directory basename"):
+        ChromiumProfile(tmp_path, profile_folder)
+
+
+@pytest.mark.parametrize("profile_folder", [None, b"Default", Path("Default"), 1])
+def test_chromium_profile_rejects_non_string_folder_names(
+    tmp_path: Path, profile_folder: Any
+) -> None:
+    """Reject path-like and other non-string values for the basename-only input.
+
+    Args:
+        tmp_path: Existing user-data root that must not override validation.
+        profile_folder: Non-string value supplied despite the public annotation.
+    """
+    with pytest.raises(errors.InvalidProfileError, match="portable directory basename"):
+        ChromiumProfile(tmp_path, profile_folder)
 
 
 @pytest.mark.parametrize(

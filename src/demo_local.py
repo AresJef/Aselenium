@@ -240,6 +240,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="clone a new, empty demo profile; never reads a personal profile",
     )
     run.add_argument(
+        "--profile-root",
+        type=Path,
+        help="existing shared writable Firefox profile root (Snap/Flatpak workaround)",
+    )
+    run.add_argument(
         "--output-dir",
         type=Path,
         default=ROOT / ".demo-output",
@@ -257,6 +262,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         )
     if args.browser == "edge" and args.channel == "cft":
         parser.error("--channel cft is only available for Chrome")
+    if (
+        args.command == "run"
+        and args.profile_root is not None
+        and args.browser != "firefox"
+    ):
+        parser.error("--profile-root is only available for Firefox")
     if args.channel == "cft":
         if args.command == "run":
             parser.error(

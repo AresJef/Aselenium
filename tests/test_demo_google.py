@@ -101,6 +101,7 @@ def test_google_defaults_are_headed_homepage_only_and_offline_provisioning(
         ["run", "--browser", "firefox", "--channel", "dev"],
         ["run", "--browser", "chromium", "--channel", "beta"],
         ["run", "--channel", "cft"],
+        ["run", "--browser", "chrome", "--profile-root", "/shared/profiles"],
     ],
 )
 def test_invalid_arguments_fail_before_any_browser_operation(
@@ -156,6 +157,34 @@ def test_display_options_match_the_selected_browser(
             "user-data-dir" in argument or "user-agent" in argument
             for argument in arguments
         )
+    finally:
+        driver.options.close()
+
+
+def test_google_demo_forwards_firefox_profile_root_as_path(
+    demo: Any, tmp_path: Path
+) -> None:
+    """Keep the optional Firefox service directory typed through the demo facade.
+
+    Args:
+        demo: Imported real-world demonstration module.
+        tmp_path: Existing shared profile root and dedicated demo cache parent.
+    """
+    profile_root = tmp_path / "shared-profiles"
+    profile_root.mkdir()
+    args = demo.parse_args(
+        [
+            "run",
+            "--browser",
+            "firefox",
+            "--profile-root",
+            str(profile_root),
+        ]
+    )
+    driver = demo.make_driver(args)
+    try:
+        assert args.profile_root == profile_root
+        assert driver._service_kwargs["profile_root"] is args.profile_root
     finally:
         driver.options.close()
 

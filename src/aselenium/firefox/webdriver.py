@@ -66,9 +66,10 @@ class Firefox(WebDriver):
         proxy: str | None = None,
         service_timeout: int = 10,
         *service_args: Any,
+        profile_root: PathInput | None = None,
         **service_kwargs: Any,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Initialize a reusable Firefox facade without launching a browser.
 
         Args:
             directory: Cache parent directory; None uses the default per-user cache location.
@@ -77,9 +78,28 @@ class Firefox(WebDriver):
             download_timeout: Positive total timeout in seconds for an artifact download.
             proxy: Explicit provisioning proxy URL, or None for a direct connection.
             service_timeout: Positive timeout in seconds for service startup and shutdown.
-            *service_args: Additional positional arguments forwarded to the service constructor.
-            **service_kwargs: Additional keyword arguments forwarded to the service constructor.
+            *service_args: Additional GeckoDriver command-line arguments.
+            profile_root: Existing directory in which GeckoDriver may create
+                temporary Firefox profiles. Use a non-hidden, shared writable
+                directory when a Snap or Flatpak Firefox cannot access the host
+                temporary directory. Requires GeckoDriver 0.32.0 or newer. None
+                uses GeckoDriver's default.
+            **service_kwargs: Additional keyword arguments for the GeckoDriver
+                ``subprocess.Popen`` call.
+
+        Example:
+            >>> import tempfile
+            >>> from pathlib import Path
+            >>> from aselenium import Firefox
+
+            >>> with tempfile.TemporaryDirectory(
+            ...     prefix="aselenium-firefox-", dir=Path.home()
+            ... ) as directory:
+            ...     driver = Firefox(profile_root=Path(directory))
+            ...     driver.options.close()
         """
+        if profile_root is not None:
+            service_kwargs["profile_root"] = profile_root
         super().__init__(
             FirefoxDriverManager,
             FirefoxService,

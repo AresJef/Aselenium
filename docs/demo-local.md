@@ -190,6 +190,23 @@ It never reads the user's real browser profile. Both session-owned resources and
 the facade's template are explicitly closed; the empty source directory is then
 removed. Without the flag, sessions use fresh browser profiles.
 
+`--profile-root PATH` is a separate Firefox-only service option. It selects the
+existing parent in which GeckoDriver creates those temporary profiles; it does
+not select or reuse a personal browser profile. Ubuntu's Snap-packaged Firefox
+and some Flatpak/container installations may need a non-hidden directory under
+the user's home because Firefox cannot see GeckoDriver's ordinary host `/tmp`:
+
+```bash
+mkdir -p "$HOME/aselenium-firefox-profiles"
+python src/demo_local.py run --browser firefox --allow-download \
+  --profile-root "$HOME/aselenium-firefox-profiles" --profile-demo
+```
+
+The directory must already exist, be readable/writable by both processes, and
+be used with GeckoDriver 0.32.0 or newer. The demo and package do not delete
+this caller-owned parent. See Mozilla's
+[container-package guidance](https://firefox-source-docs.mozilla.org/testing/geckodriver/Usage.html#running-firefox-in-a-container-based-package).
+
 The concurrency example changes the facade's timeout **after** creating each
 context, verifies that captured values remain unchanged, and checks independent
 cookies after both workers have written. It owns and drains all worker tasks,
@@ -211,7 +228,7 @@ or that every route has been validated on this machine.
 | --- | --- |
 | Chrome / Edge | Full headless tour, including CDP and browser-specific commands. Stable/beta/dev executable selection is supported. |
 | Chromium | Same family of features; choose a compatible installed executable with `--binary`. No release-channel flag beyond stable. |
-| Firefox | Uses Gecko selectors, `-headless`, full-page capture, and a bundled temporary add-on scoped to loopback pages. It does not enter the privileged `chrome` context. |
+| Firefox | Uses Gecko selectors, `-headless`, full-page capture, and a bundled temporary add-on scoped to loopback pages. `--profile-root` supports Snap/Flatpak shared-filesystem startup. It does not enter the privileged `chrome` context. |
 | Safari | macOS only, always headed. Remote Automation must already be enabled by the user. The current facade disables frame switching, action chains, and PDF printing; those examples are skipped. The concurrency chapter is skipped because Safari's automation service is single-session. |
 
 Chromium PDF printing is skipped with `--headed` in this demo. Media/casting

@@ -15,6 +15,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Sequence
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Any
 
@@ -141,6 +142,25 @@ def validate_report(report: dict[str, Any], browser: str) -> None:
         raise ValueError("Acceptance must record actual browser and driver versions")
 
 
+def firefox_profile_parent(browser: str) -> Path | None:
+    """Select the shared filesystem parent required by containerized Firefox.
+
+    Ubuntu's Firefox package uses Snap confinement and may not see the host
+    process's private temporary directory. A non-hidden directory under the
+    current user's home is visible to both Firefox and the host GeckoDriver.
+
+    Args:
+        browser: Browser selected for the installed-wheel acceptance tour.
+
+    Returns:
+        The existing home directory for Linux Firefox, or None when the
+        platform/browser does not require the container workaround.
+    """
+    if browser == "firefox" and sys.platform.startswith("linux"):
+        return Path.home()
+    return None
+
+
 def run(args: argparse.Namespace) -> dict[str, Any]:
     """Copy only demo fixtures and execute them using the installed-package interpreter.
 
@@ -161,7 +181,22 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
     for key in ("PYTHONPATH", "PYTHONHOME", "MYPYPATH"):
         environment.pop(key, None)
     environment["PYTHONNOUSERSITE"] = "1"
-    with tempfile.TemporaryDirectory(prefix="aselenium-installed-tour-") as directory:
+    with ExitStack() as resources:
+        profile_root: Path | None = None
+        working_parent = firefox_profile_parent(args.browser)
+        if working_parent is not None:
+            profile_root = Path(
+                resources.enter_context(
+                    tempfile.TemporaryDirectory(
+                        prefix="aselenium-firefox-profile-root-", dir=working_parent
+                    )
+                )
+            )
+        directory = resources.enter_context(
+            tempfile.TemporaryDirectory(
+                prefix="aselenium-installed-tour-", dir=profile_root
+            )
+        )
         working = Path(directory)
         identity = subprocess.run(
             [executable, "-I", "-c", IDENTITY, str(ROOT)],
@@ -202,6 +237,8 @@ def run(args: argparse.Namespace) -> dict[str, Any]:
             command.append("--allow-download")
         if args.browser != "safari":
             command.append("--profile-demo")
+        if profile_root is not None:
+            command.extend(["--profile-root", str(profile_root)])
         before = set(output.glob("local-*/report.json"))
         try:
             completed = run_owned(

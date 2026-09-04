@@ -46,11 +46,18 @@ def make_driver(args: argparse.Namespace) -> WebDriver:
         return Safari()  # Safari has no download/cache constructor parameters.
     cache = args.cache_dir.expanduser()
     cache.mkdir(parents=True, exist_ok=True)
+    kwargs: dict[str, Any] = {
+        "directory": cache,
+        "max_cache_size": None,
+        "request_timeout": 20,
+        "download_timeout": 90,
+    }
+    profile_root = getattr(args, "profile_root", None)
+    if args.browser == "firefox" and profile_root is not None:
+        # Preserve the Path value; FirefoxService owns parsing and validation.
+        kwargs["profile_root"] = profile_root
     return BROWSERS[args.browser](
-        directory=cache,
-        max_cache_size=None,
-        request_timeout=20,
-        download_timeout=90,
+        **kwargs,
     )
 
 

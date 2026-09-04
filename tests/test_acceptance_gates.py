@@ -143,6 +143,7 @@ def test_installed_tours_isolate_concurrent_report_outputs(
         Returns:
             Successful child result after both reports become visible.
         """
+        assert "--profile-root" not in command
         owned = Path(command[command.index("--output-dir") + 1]) / "local-chrome-owned"
         owned.mkdir()
         (owned / "report.json").write_text(json.dumps(report()))
@@ -164,6 +165,79 @@ def test_installed_tours_isolate_concurrent_report_outputs(
     result = NATIVE["run"](args)
     assert result["tour"]["browser"] == "chrome"
     assert Path(result["report"]).parent.parent != parent
+
+
+def test_linux_firefox_tour_shares_nonhidden_profile_filesystem(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Place Gecko profiles, copied fixtures, and uploads below one shared root.
+
+    Args:
+        tmp_path: Isolated executable, home, cache, and report parents.
+        monkeypatch: Replace process boundaries and Linux detection deterministically.
+    """
+    executable = tmp_path / "firefox"
+    executable.touch()
+    home = tmp_path / "home"
+    home.mkdir()
+    output_parent = tmp_path / "reports"
+    identity = {"package": "installed-package", "prefix": "installed-environment"}
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0], 0, json.dumps(identity), ""
+        ),
+    )
+    monkeypatch.setitem(
+        NATIVE["run"].__globals__,
+        "firefox_profile_parent",
+        lambda browser: home if browser == "firefox" else None,
+    )
+    observed: dict[str, Path] = {}
+
+    def run_tour(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        """Validate shared paths and emit one complete Firefox report.
+
+        Args:
+            command: Copied local-demo command.
+            **kwargs: Owned child execution settings including its working directory.
+
+        Returns:
+            Successful child result with a complete synthetic report.
+        """
+        profile_root = Path(command[command.index("--profile-root") + 1])
+        working = Path(kwargs["cwd"])
+        assert profile_root.parent == home
+        assert not profile_root.name.startswith(".")
+        assert working.is_relative_to(profile_root)
+        assert (working / "demo_assets" / "upload.txt").is_file()
+        observed.update(profile_root=profile_root, working=working)
+        report_parent = (
+            Path(command[command.index("--output-dir") + 1]) / "local-firefox-owned"
+        )
+        report_parent.mkdir()
+        (report_parent / "report.json").write_text(
+            json.dumps(report("firefox")), encoding="utf-8"
+        )
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setitem(NATIVE["run"].__globals__, "run_owned", run_tour)
+    args = argparse.Namespace(
+        python=executable,
+        browser="firefox",
+        binary=str(executable),
+        cache_dir=tmp_path / "cache",
+        output_dir=output_parent,
+        allow_download=False,
+        timeout=30,
+    )
+
+    result = NATIVE["run"](args)
+
+    assert result["tour"]["browser"] == "firefox"
+    assert not observed["working"].exists()
+    assert not observed["profile_root"].exists()
 
 
 def coverage_report() -> dict[str, Any]:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from os import PathLike
+from pathlib import Path
 from typing import Literal
 
 from typing_extensions import assert_type
@@ -74,3 +76,15 @@ async def vendor_usage() -> None:
         edge.options.use_webview = False
     finally:
         edge.options.close()
+
+
+def firefox_profile_root_usage(profile_root: str | PathLike[str]) -> None:
+    """Accept standard text/path-like profile roots through the public facade.
+
+    Args:
+        profile_root: Existing directory visible to Firefox and GeckoDriver.
+    """
+    first = Firefox(profile_root=profile_root)
+    second = Firefox(profile_root=Path("shared-firefox-profiles"))
+    first.options.close()
+    second.options.close()

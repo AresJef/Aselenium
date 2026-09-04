@@ -155,6 +155,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="demo cache parent, shared with demo_local.py",
     )
     run.add_argument(
+        "--profile-root",
+        type=Path,
+        help="existing shared writable Firefox profile root (Snap/Flatpak workaround)",
+    )
+    run.add_argument(
         "--output-dir",
         type=Path,
         default=ROOT / ".demo-output",
@@ -166,6 +171,8 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         return args
     if args.browser in {"firefox", "chromium"} and args.channel != "stable":
         parser.error("Firefox/Chromium use --binary, not release-channel selection")
+    if args.profile_root is not None and args.browser != "firefox":
+        parser.error("--profile-root is only available for Firefox")
     if args.browser == "safari" and (args.headless or args.channel == "beta"):
         parser.error("Safari is always headed and supports only stable/dev channels")
     return args

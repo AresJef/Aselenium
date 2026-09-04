@@ -23,7 +23,7 @@ from __future__ import annotations
 from base64 import b64encode
 from copy import deepcopy
 from math import isfinite
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from platform import system
 from shutil import copytree, ignore_patterns, rmtree
 from tempfile import mkdtemp
@@ -45,6 +45,66 @@ __all__ = ["Proxy", "Timeouts", "ChromiumProfile"]
 
 # Constants ---------------------------------------------------------------------------------------
 PROXY_TYPES: set[str] = {"DEFAULT", "AUTODETECT", "MANUAL", "PAC"}
+_WINDOWS_PROFILE_DEVICE_NAMES = frozenset(
+    {
+        "CON",
+        "PRN",
+        "AUX",
+        "NUL",
+        "CONIN$",
+        "CONOUT$",
+        *("COM" + suffix for suffix in "123456789¹²³"),
+        *("LPT" + suffix for suffix in "123456789¹²³"),
+    }
+)
+_WINDOWS_PROFILE_RESERVED_CHARACTERS = frozenset(
+    {chr(codepoint) for codepoint in range(32)} | set('"*:<>?|/\\')
+)
+
+
+def _validate_chromium_profile_folder(profile_folder: object) -> str:
+    """Validate one portable Chromium profile-directory basename.
+
+    Args:
+        profile_folder: Candidate child-directory name supplied by a public
+            Chromium options API.
+
+    Returns:
+        The unchanged profile-folder name after validation.
+
+    Raises:
+        errors.InvalidProfileError: The value is not a nonempty string or can
+            be interpreted as anything other than one portable child-directory
+            name.
+    """
+    if not isinstance(profile_folder, str) or not profile_folder:
+        raise errors.InvalidProfileError(
+            "<ChromiumProfile> 'profile_folder' must be a nonempty portable "
+            "directory basename: {} {}.".format(
+                repr(profile_folder), type(profile_folder)
+            )
+        )
+
+    posix_path = PurePosixPath(profile_folder)
+    windows_path = PureWindowsPath(profile_folder)
+    device_stem = profile_folder.partition(".")[0].rstrip(" ").upper()
+    if (
+        profile_folder in {".", ".."}
+        or posix_path.is_absolute()
+        or windows_path.is_absolute()
+        or bool(windows_path.drive)
+        or posix_path.parts != (profile_folder,)
+        or windows_path.parts != (profile_folder,)
+        or bool(_WINDOWS_PROFILE_RESERVED_CHARACTERS.intersection(profile_folder))
+        or profile_folder.endswith((" ", "."))
+        or device_stem in _WINDOWS_PROFILE_DEVICE_NAMES
+    ):
+        raise errors.InvalidProfileError(
+            "<ChromiumProfile> 'profile_folder' must be a nonempty portable "
+            "directory basename without path syntax or reserved filesystem "
+            "semantics: {} {}.".format(repr(profile_folder), type(profile_folder))
+        )
+    return profile_folder
 
 
 # Option Objects ----------------------------------------------------------------------------------
@@ -966,16 +1026,18 @@ class ChromiumProfile(Profile):
 
         Args:
             directory: The directory of the user profile.
-            profile_folder: The name of the profile folder inside of the 'directory'.
+            profile_folder: Nonempty name of exactly one child directory inside
+                `directory`, such as `Default` or `Profile 1`. Paths, `.` and
+                `..`, separators, drive prefixes, control characters, colons
+                or other Windows-reserved punctuation, trailing spaces or dots,
+                and Windows device names are rejected.
+
+        Raises:
+            errors.InvalidProfileError: The directory is invalid or
+                `profile_folder` is not a portable single-directory name.
         """
-        # Pre-validation
-        if not isinstance(profile_folder, str):
-            raise errors.InvalidProfileError(
-                "<ChromiumProfile> Invalid profile folder name: {} {}".format(
-                    repr(profile_folder), type(profile_folder)
-                )
-            )
-        super().__init__(directory, profile_folder)
+        validated_profile_folder = _validate_chromium_profile_folder(profile_folder)
+        super().__init__(directory, validated_profile_folder)
 
     # Properties --------------------------------------------------------------------------
     @property
@@ -2076,10 +2138,18 @@ class ChromiumBaseOptions(BaseOptions):
 
         Args:
             directory: The directory of the user profile.
-            profile: Profile used by this operation.
+            profile: Nonempty name of exactly one child directory inside
+                `directory`, such as `Default` or `Profile 1`. Paths, `.` and
+                `..`, separators, drive prefixes, control characters, colons
+                or other Windows-reserved punctuation, trailing spaces or dots,
+                and Windows device names are rejected.
 
         Returns:
             The profile instance.
+
+        Raises:
+            errors.InvalidProfileError: The directory is invalid or `profile`
+                is not a portable single-directory name.
         """
         # Create profile
         value = ChromiumProfile(directory, profile)

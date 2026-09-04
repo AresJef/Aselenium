@@ -67,6 +67,11 @@ concurrent sessions. Those are recorded as skips, never counted as passes.
 Safari must already have Remote Automation enabled. The local harness does not
 enable it, change permissions, or use a personal profile. Firefox uses a fresh
 profile and installs/removes only the bundled temporary demonstration add-on.
+On Linux Firefox, the harness creates a disposable non-hidden profile root under
+the current user's home and places its copied upload fixtures beneath that same
+root. This follows GeckoDriver's container-package guidance while continuing to
+test the manager-downloaded host GeckoDriver. The owned root is removed after the
+tour; no permanent profile or personal Firefox data is used.
 
 ## Crash, hang and resource checks
 

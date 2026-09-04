@@ -31,7 +31,7 @@ from typing import (
 
 from aselenium import errors
 from aselenium._async import finish_owned, run_blocking
-from aselenium._paths import PathInput
+from aselenium._paths import PathInput, parse_path
 from aselenium._profiles import claim_profile, release_profile
 from aselenium.options import BaseOptions, ChromiumBaseOptions
 
@@ -129,11 +129,22 @@ class SessionContext:
                     **self._manager_install_kwargs,
                 )
                 self._installation = installation
+                # InstallationResult deliberately exposes stable text fields. Parse
+                # each one once at this internal handoff, then retain the same Path
+                # objects through leasing, options setup, and service construction.
+                # The downstream consumers still perform their existing file checks,
+                # preserving disappearance/TOCTOU failure classification.
+                driver_location = parse_path(installation.driver_location)
+                browser_location = (
+                    None
+                    if installation.browser_location is None
+                    else parse_path(installation.browser_location)
+                )
                 cache = getattr(self._manager, "_file_manager", None)
                 if cache is not None and hasattr(cache, "lease"):
                     for location in (
-                        installation.driver_location,
-                        installation.browser_location,
+                        driver_location,
+                        browser_location,
                     ):
                         if location:
 
@@ -147,11 +158,11 @@ class SessionContext:
                 self._options.browser_version = self._manager._parse_browser_version(
                     installation.browser_version
                 )
-                self._options.browser_location = installation.browser_location
+                self._options.browser_location = browser_location
                 self._extra_options_updates()
                 self._service = self._service_cls(
                     self._manager._parse_driver_version(installation.driver_version),
-                    installation.driver_location,
+                    driver_location,
                     self._service_timeout,
                     *self._service_args,
                     **self._service_kwargs,

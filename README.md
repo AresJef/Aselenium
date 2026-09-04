@@ -456,6 +456,10 @@ Chrome/Chromium/Edge/Firefox constructors accept `directory`, `max_cache_size`,
 `service_timeout`. Safari does **not** accept download/cache constructor settings;
 do not copy those keyword arguments into `Safari()`.
 
+Firefox additionally accepts `profile_root`. This is the parent in which
+GeckoDriver creates temporary browser profiles; it is not the same setting as
+`driver.options.set_profile()`, which selects profile content to clone.
+
 ### Options and proxies
 
 Configure `driver.options` before calling `acquire()`. Importing a separate
@@ -528,6 +532,9 @@ and does not implicitly use environment-proxy discovery.
 `set_profile()` makes a temporary copy instead of launching against the original
 profile. Chromium-family browsers take a user-data directory and profile folder;
 Firefox takes a profile directory directly. Safari does not expose this feature.
+The Chromium profile folder must be a portable single child-directory name, not
+a path: separators, absolute or drive syntax, `.`/`..`, and reserved names are
+rejected.
 
 ```python
 from aselenium import Chrome
@@ -563,6 +570,40 @@ profile synchronously; large profiles can block the event loop during this step.
 
 Do not share a manually supplied `--user-data-dir` between running sessions.
 Same-process active sharing is rejected; cross-process sharing is unsupported.
+
+#### Firefox Snap/Flatpak profile root
+
+Container-packaged Firefox can have a different temporary-filesystem view from
+the host GeckoDriver. On affected Linux systems, pass an existing, non-hidden
+directory under your home directory that both processes can read and write:
+
+```python
+from pathlib import Path
+
+from aselenium import Firefox
+
+
+async def open_google_with_containerized_firefox():
+    profile_root = Path.home() / "aselenium-firefox-profiles"
+    profile_root.mkdir(parents=True, exist_ok=True)
+
+    driver = Firefox(profile_root=profile_root)
+    driver.options.add_arguments("-headless")
+    try:
+        async with driver.acquire("auto") as session:
+            await session.load("https://www.google.com/")
+            return await session.title
+    finally:
+        driver.options.close()
+```
+
+The public argument accepts `str` or a string-valued `os.PathLike`; the service
+validates it once and retains a `pathlib.Path` until it constructs the process
+command. The directory must already exist and GeckoDriver must be 0.32.0 or
+newer. It remains caller-owned and is never deleted by Aselenium. Do not also
+pass a raw `--profile-root` service argument.
+See Mozilla's [container-package guidance](https://firefox-source-docs.mozilla.org/testing/geckodriver/Usage.html#running-firefox-in-a-container-based-package)
+for the underlying GeckoDriver/Firefox filesystem constraint.
 
 ### Session lifecycle
 
@@ -1240,6 +1281,14 @@ Once provisioned, run offline, make the browser visible, or select chapters:
 .venv/bin/python src/demo_local.py run --browser chrome
 .venv/bin/python src/demo_local.py run --browser chrome --headed
 .venv/bin/python src/demo_local.py run --sections concurrency cancellation --profile-demo
+```
+
+For a Snap/Flatpak Firefox, create a shared directory once and pass it explicitly:
+
+```bash
+mkdir -p "$HOME/aselenium-firefox-profiles"
+.venv/bin/python src/demo_local.py run --browser firefox --allow-download \
+  --profile-root "$HOME/aselenium-firefox-profiles"
 ```
 
 Driver management and options run first. The 13 selectable chapters cover
