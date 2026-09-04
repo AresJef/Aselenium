@@ -120,7 +120,7 @@ async def test_all_output_callers_reject_directory_destinations(
 
 
 @pytest.mark.parametrize("caller", ["element", "screenshot", "pdf", "firefox-full"])
-@pytest.mark.parametrize("name", ["capture", "  ", "中文 capture"])
+@pytest.mark.parametrize("name", ["capture", "  capture  ", "中文 capture"])
 @pytest.mark.asyncio
 async def test_output_callers_accept_relative_pathlikes_and_preserve_names(
     output_session: FirefoxSession,
@@ -136,7 +136,7 @@ async def test_output_callers_accept_relative_pathlikes_and_preserve_names(
         tmp_path: Isolated working directory receiving the output.
         monkeypatch: Fixture restoring the working directory after the test.
         caller: Public binary-output entry point under test.
-        name: Valid filename, including Unicode and whitespace-only names.
+        name: Valid filename, including Unicode and meaningful whitespace.
     """
     monkeypatch.chdir(tmp_path)
     data = b"%PDF-fixture" if caller == "pdf" else b"\x89PNG\r\n\x1a\nfixture"
@@ -151,6 +151,57 @@ async def test_output_callers_accept_relative_pathlikes_and_preserve_names(
     }[caller]
     assert await save(TextPath(name)) is True
     suffix = ".pdf" if caller == "pdf" else ".png"
+    assert (tmp_path / (name + suffix)).read_bytes() == data
+    assert output_session._conn.execute.await_count == 1
+
+
+@pytest.mark.parametrize("caller", ["element", "screenshot", "pdf", "firefox-full"])
+@pytest.mark.asyncio
+async def test_space_only_output_name_obeys_native_directory_semantics(
+    output_session: FirefoxSession,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caller: str,
+) -> None:
+    """Treat a space-only component according to the host filesystem safely.
+
+    Windows aliases a component containing only spaces to its parent directory,
+    while POSIX filesystems generally permit it as a distinct filename. A directory
+    alias must be rejected before browser I/O instead of being changed into a sibling
+    file by suffix addition.
+
+    Args:
+        output_session: Real session supplying base64 binary output.
+        tmp_path: Isolated working directory receiving any supported output.
+        monkeypatch: Fixture restoring the working directory after the test.
+        caller: Public binary-output entry point under test.
+    """
+    monkeypatch.chdir(tmp_path)
+    name = "  "
+    suffix = ".pdf" if caller == "pdf" else ".png"
+    data = b"%PDF-fixture" if caller == "pdf" else b"\x89PNG\r\n\x1a\nfixture"
+    save = {
+        "element": Element("field", output_session).save_screenshot,
+        "screenshot": output_session.save_screenshot,
+        "pdf": output_session.save_page,
+        "firefox-full": output_session.save_full_screenshot,
+    }[caller]
+
+    if Path(name).is_dir():
+        output_session._conn.execute.side_effect = AssertionError(
+            "Directory alias reached browser transport"
+        )
+        with pytest.raises(errors.InvalidArgumentError) as caught:
+            await save(TextPath(name))
+        assert isinstance(caught.value.__cause__, errors.AseleniumInvalidPathError)
+        output_session._conn.execute.assert_not_called()
+        assert not (tmp_path / (name + suffix)).exists()
+        return
+
+    output_session._conn.execute.return_value = {
+        "value": base64.b64encode(data).decode("ascii")
+    }
+    assert await save(TextPath(name)) is True
     assert (tmp_path / (name + suffix)).read_bytes() == data
     assert output_session._conn.execute.await_count == 1
 
@@ -240,13 +291,13 @@ def test_input_validators_expand_home_and_preserve_symlink_names(
 
 
 @pytest.mark.parametrize("kind", ["file", "directory"])
-def test_input_validators_preserve_symlink_parent_traversal(
+def test_input_validators_preserve_native_symlink_parent_traversal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str
 ) -> None:
-    """Do not silently choose a lexical decoy when '..' follows a directory symlink.
+    """Preserve path text while respecting native symlink-parent traversal.
 
     Args:
-        tmp_path: Isolated working directory containing intended and decoy targets.
+        tmp_path: Isolated working directory containing both possible targets.
         monkeypatch: Fixture restoring the working directory after the test.
         kind: Whether the validated target is a file or directory.
     """
@@ -264,17 +315,22 @@ def test_input_validators_preserve_symlink_parent_traversal(
         target.mkdir()
         decoy.mkdir()
         validate = validate_dir
-    result = validate(Path("launch/link/../target"))
+    source = Path("launch/link/../target")
+    target_is_native = source.samefile(target)
+    decoy_is_native = source.samefile(decoy)
+    assert target_is_native is not decoy_is_native
+
+    result = validate(source)
     assert Path(result).is_absolute() and ".." in Path(result).parts
-    assert Path(result).samefile(target)
-    assert not Path(result).samefile(decoy)
+    assert Path(result).samefile(target) is target_is_native
+    assert Path(result).samefile(decoy) is decoy_is_native
 
 
 @pytest.mark.asyncio
 async def test_output_path_preserves_symlink_parent_destination(
     output_session: FirefoxSession, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Write to the filesystem-intended parent without collapsing a symlink traversal.
+    """Write through symlink-parent traversal using host filesystem semantics.
 
     Args:
         output_session: Real session returning synthetic screenshot bytes.
@@ -289,9 +345,18 @@ async def test_output_path_preserves_symlink_parent_destination(
     output_session._conn.execute.return_value = {
         "value": base64.b64encode(b"PNG fixture").decode("ascii")
     }
+    native_parent = Path("launch/link/..")
+    actual_is_native = native_parent.samefile(actual)
+    launch_is_native = native_parent.samefile(launch)
+    assert actual_is_native is not launch_is_native
+    validated = validate_save_file_path("launch/link/../capture", ".png")
+    assert Path(validated).is_absolute() and ".." in Path(validated).parts
+
     assert await output_session.save_screenshot("launch/link/../capture") is True
-    assert (actual / "capture.png").read_bytes() == b"PNG fixture"
-    assert not (launch / "capture.png").exists()
+    expected_parent = actual if actual_is_native else launch
+    other_parent = launch if actual_is_native else actual
+    assert (expected_parent / "capture.png").read_bytes() == b"PNG fixture"
+    assert not (other_parent / "capture.png").exists()
 
 
 @pytest.mark.asyncio

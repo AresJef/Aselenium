@@ -153,7 +153,13 @@ def test_proxy_forwards_only_hardcoded_loopback_origin(
     handler.respond.assert_called_once_with(200, b"proof", "text/html")
 
 
-@pytest.mark.parametrize("failure", [OSError("origin unavailable"), b"x" * 65537])
+@pytest.mark.parametrize(
+    "failure",
+    [
+        pytest.param(OSError("origin unavailable"), id="origin-unavailable"),
+        pytest.param(b"x" * 65537, id="oversized-response"),
+    ],
+)
 def test_proxy_forwarding_failure_still_closes_connection(
     proxy_harness: ModuleType, monkeypatch: pytest.MonkeyPatch, failure: Any
 ) -> None:

@@ -74,6 +74,25 @@ def test_annotation_escapes_workflow_control_characters() -> None:
     assert "\n" not in line
 
 
+def test_reporter_bounds_node_id_before_preserving_diagnostic() -> None:
+    """Keep a pathological parameter ID from hiding the useful failure cause."""
+    issue = JUnitIssue(
+        "tests::test_case[" + ("x" * 65_537) + "]",
+        "error",
+        "PYTEST_CURRENT_TEST exceeds the Windows environment limit",
+        "",
+    )
+
+    line = format_annotation(issue)
+    summary = format_summary([issue])
+
+    assert "... node id truncated ..." in line
+    assert "PYTEST_CURRENT_TEST exceeds the Windows environment limit" in line
+    assert "... node id truncated ..." in summary
+    assert "PYTEST_CURRENT_TEST exceeds the Windows environment limit" in summary
+    assert len(line) < 1_000
+
+
 def test_summary_uses_indented_diagnostic_text() -> None:
     """Render traceback text as inert Markdown rather than executable markup."""
     summary = format_summary(

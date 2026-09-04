@@ -598,14 +598,16 @@ def is_file_dir_exists(file: str | Any) -> bool:
 
 
 def _absolute_path(path: str | PathLike[str]) -> str:
-    """Expand a nonempty text path without changing symlink-sensitive traversal.
+    """Expand a nonempty text path without resolving filesystem aliases.
 
     Args:
         path: Nonempty path string or string-valued filesystem-path object.
 
     Returns:
-        An absolute string with user-home expansion applied. Symbolic links are
-        not resolved and parent components are preserved.
+        An absolute string with user-home expansion applied. Symbolic-link names
+        and parent components remain in the returned text. When the path is later
+        accessed, its target is selected according to the host operating system's
+        native symlink and parent-traversal semantics.
 
     Raises:
         errors.AseleniumInvalidPathError: The path is empty, contains a null
@@ -631,8 +633,9 @@ def validate_dir(path: str | PathLike[str]) -> str:
             leading user-home markers are expanded.
 
     Returns:
-        Absolute directory path, preserving symbolic-link names and parent
-        components rather than resolving or normalizing their traversal.
+        Absolute directory path whose text preserves symbolic-link names and
+        parent components rather than explicitly resolving them. Filesystem access
+        still follows the host operating system's native traversal semantics.
 
     Raises:
         errors.AseleniumInvalidPathError: The input is not a nonempty text path.
@@ -661,8 +664,9 @@ def validate_file(path: str | PathLike[str]) -> str:
             leading user-home markers are expanded.
 
     Returns:
-        Absolute file path, preserving symbolic-link names and parent components
-        rather than resolving or normalizing their traversal.
+        Absolute file path whose text preserves symbolic-link names and parent
+        components rather than explicitly resolving them. Filesystem access still
+        follows the host operating system's native traversal semantics.
 
     Raises:
         errors.AseleniumInvalidPathError: The input is not a nonempty text path.
@@ -683,13 +687,16 @@ def validate_save_file_path(path: str | PathLike[str], file_ext: str) -> str:
     Args:
         path: Nonempty file path string or string-valued pathlike object. Relative
             paths are made absolute and leading user-home markers are expanded.
-            Whitespace in a filename is preserved rather than stripped.
+            Whitespace is not stripped. A supplied path that the host filesystem
+            identifies as a directory is rejected before a suffix is appended.
         file_ext: Required case-sensitive suffix, such as ".png" or ".pdf".
 
     Returns:
         Absolute destination with the suffix appended if necessary. The parent
         directory must already exist; this function creates no files or folders.
-        Symbolic-link names and parent traversal components are preserved.
+        Symbolic-link names and parent components remain in the returned text;
+        filesystem access follows the host operating system's native traversal
+        semantics.
 
     Raises:
         errors.AseleniumInvalidPathError: The input is not a nonempty text path,

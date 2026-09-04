@@ -11,6 +11,7 @@ from typing import Literal, Sequence
 
 ANNOTATION_LIMIT = 3_500
 SUMMARY_DETAIL_LIMIT = 8_000
+NODE_ID_LIMIT = 300
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,6 +86,21 @@ def _bounded(value: str, limit: int) -> str:
     return value[: max(0, limit - len(suffix))] + suffix
 
 
+def _bounded_node_id(value: str) -> str:
+    """Bound a test identifier without consuming its diagnostic budget.
+
+    Args:
+        value: Fully qualified pytest node identifier.
+
+    Returns:
+        Original identifier, or an explicitly truncated representation.
+    """
+    if len(value) <= NODE_ID_LIMIT:
+        return value
+    suffix = "... node id truncated ..."
+    return value[: NODE_ID_LIMIT - len(suffix)] + suffix
+
+
 def _escape_command_data(value: str) -> str:
     """Escape untrusted text for the GitHub workflow-command data field.
 
@@ -109,9 +125,8 @@ def format_annotation(issue: JUnitIssue) -> str:
     diagnostic = issue.message or issue.details or "pytest reported no diagnostic text"
     if issue.message and issue.details and issue.message not in issue.details:
         diagnostic = f"{issue.message}\n{issue.details}"
-    content = _bounded(
-        f"{issue.node_id} [{issue.kind}]\n{diagnostic}", ANNOTATION_LIMIT
-    )
+    node_id = _bounded_node_id(issue.node_id)
+    content = _bounded(f"{node_id} [{issue.kind}]\n{diagnostic}", ANNOTATION_LIMIT)
     return f"::error::{_escape_command_data(content)}"
 
 
@@ -126,7 +141,7 @@ def format_summary(issues: Sequence[JUnitIssue]) -> str:
     """
     lines = ["## Pytest failure diagnostics", ""]
     for issue in issues:
-        lines.extend((f"### `{issue.node_id}` ({issue.kind})", ""))
+        lines.extend((f"### `{_bounded_node_id(issue.node_id)}` ({issue.kind})", ""))
         diagnostic = (
             issue.details or issue.message or "pytest reported no diagnostic text"
         )
