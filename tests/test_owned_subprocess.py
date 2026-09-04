@@ -221,7 +221,7 @@ def test_real_command_captures_streams_cwd_environment_and_exit_code(
         "isolated",
         "$(must-not-run);",
     ]
-    assert result.stderr == "fixture stderr\n"
+    assert result.stderr == f"fixture stderr{os.linesep}"
 
 
 def test_real_command_large_output_does_not_deadlock(
@@ -359,7 +359,7 @@ def test_completed_owned_tree_is_accepted(
         [sys.executable, "-c", code], cwd=tmp_path, env=None, timeout=5
     )
     assert result.returncode == 0
-    assert result.stdout == "complete\n"
+    assert result.stdout == f"complete{os.linesep}"
 
 
 def test_cleanup_access_denial_is_retained_and_bounded(

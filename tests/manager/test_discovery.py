@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import plistlib
-from os.path import join as join_path
 from pathlib import Path
+from posixpath import join as posix_join
 from typing import Any
 
 import pytest
@@ -138,18 +138,17 @@ def test_windows_location_discovery_uses_synthetic_environment_path(
 
 
 def test_mac_discovery_checks_default_then_synthetic_environment_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Verify mac discovery checks default then synthetic environment path.
 
     Args:
-        tmp_path: Isolated temporary directory supplied by pytest.
         monkeypatch: Pytest fixture for reversible environment, attribute, and path patches.
     """
     manager = drivers.DriverManager("fixture", None, None, None)
-    manager._DriverManager__environ_paths = [str(tmp_path)]
+    manager._DriverManager__environ_paths = ["/synthetic-environment"]
     relative = "Fixture.app/Contents/MacOS/Fixture"
-    expected = str(tmp_path / relative)
+    expected = posix_join("/synthetic-environment", relative)
     checked = []
 
     def is_fake_browser(path: Any) -> Any:
@@ -165,9 +164,11 @@ def test_mac_discovery_checks_default_then_synthetic_environment_path(
         return path == expected
 
     monkeypatch.setattr(drivers, "is_path_file", is_fake_browser)
+    monkeypatch.setattr(drivers, "join_path", posix_join)
+    monkeypatch.setattr(manager, "_absolute_location", lambda path: path)
 
     assert manager._find_mac_browser_location(relative) == expected
-    assert checked == [join_path("/Applications", relative), expected]
+    assert checked == [posix_join("/Applications", relative), expected]
 
 
 @pytest.mark.parametrize("plist_name", ["version.plist", "Info.plist"])

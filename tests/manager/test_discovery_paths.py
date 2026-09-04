@@ -137,6 +137,10 @@ def test_explicit_binary_preserves_leading_and_trailing_filename_spaces(
 
 
 @pytest.mark.parametrize("path_kind", ["absolute", "relative"])
+@pytest.mark.skipif(
+    os.name == "nt",
+    reason="Symlink-plus-parent traversal has intentionally different Windows semantics.",
+)
 def test_absolute_binary_normalization_preserves_symlink_parent_traversal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, path_kind: Any
 ) -> None:
@@ -277,24 +281,22 @@ def test_environment_roots_omit_empty_entries_and_deduplicate(
         os_name: Fixture or parametrized os name input for this regression.
     """
     manager = _manager(tmp_path, os_name=os_name)
-    roots = [tmp_path / name for name in ("first", "second", "third")]
-    for root in roots:
-        root.mkdir()
+    prefix = "C:\\synthetic" if os_name == "win" else "/synthetic"
+    roots = [f"{prefix}/{name}" for name in ("first", "second", "third")]
     separator = ";" if os_name == "win" else ":"
     monkeypatch.setattr(drivers, "pathsep", separator)
-    environment = {
-        "PATH": separator.join([str(roots[0]), "", str(roots[1]), str(roots[0]), ""])
-    }
-    expected = {str(roots[0]), str(roots[1])}
+    monkeypatch.setattr(manager, "_absolute_location", lambda path: path)
+    environment = {"PATH": separator.join([roots[0], "", roots[1], roots[0], ""])}
+    expected = {roots[0], roots[1]}
     if os_name == "win":
         environment.update(
             {
-                "PROGRAMFILES": str(roots[1]),
-                "LOCALAPPDATA": str(roots[2]),
+                "PROGRAMFILES": roots[1],
+                "LOCALAPPDATA": roots[2],
                 "PROGRAMFILES(X86)": "",
             }
         )
-        expected.add(str(roots[2]))
+        expected.add(roots[2])
     monkeypatch.setattr(drivers, "environ", environment)
 
     assert set(manager._environ_paths) == expected
