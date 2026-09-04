@@ -59,6 +59,65 @@ def fake_process(pid: int, created: float = 10, parent: int | None = None) -> Mo
     return process
 
 
+@pytest.mark.parametrize(
+    "error_type", (BrokenPipeError, ConnectionResetError, TimeoutError)
+)
+def test_recovery_server_ignores_expected_fault_disconnects(
+    recovery: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    error_type: type[OSError],
+) -> None:
+    """Suppress only socket failures caused by deliberate browser interruption.
+
+    Args:
+        recovery: Imported recovery harness.
+        monkeypatch: Fixture replacing the standard fallback error handler.
+        error_type: Expected disconnect raised while a request is being handled.
+    """
+    delegated: list[BaseException | None] = []
+
+    def base_handle_error(
+        server: object, request: object, client_address: tuple[str, int]
+    ) -> None:
+        """Record an unexpected delegation without printing a traceback."""
+        delegated.append(sys.exc_info()[1])
+
+    monkeypatch.setattr(recovery.ThreadingHTTPServer, "handle_error", base_handle_error)
+    server = object.__new__(recovery.RecoveryServer)
+    try:
+        raise error_type("expected fixture disconnect")
+    except error_type:
+        server.handle_error(object(), ("127.0.0.1", 12345))
+    assert delegated == []
+
+
+def test_recovery_server_delegates_unexpected_request_errors(
+    recovery: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Preserve standard traceback handling for genuine fixture-server defects.
+
+    Args:
+        recovery: Imported recovery harness.
+        monkeypatch: Fixture replacing the standard fallback error handler.
+    """
+    delegated: list[BaseException | None] = []
+
+    def base_handle_error(
+        server: object, request: object, client_address: tuple[str, int]
+    ) -> None:
+        """Record the active exception delegated by the recovery server."""
+        delegated.append(sys.exc_info()[1])
+
+    monkeypatch.setattr(recovery.ThreadingHTTPServer, "handle_error", base_handle_error)
+    server = object.__new__(recovery.RecoveryServer)
+    failure = ValueError("unexpected fixture defect")
+    try:
+        raise failure
+    except ValueError:
+        server.handle_error(object(), ("127.0.0.1", 12345))
+    assert delegated == [failure]
+
+
 def test_capture_requires_owned_service(recovery: ModuleType) -> None:
     """Reject a service with foreign ancestry before enumerating its children.
 
@@ -181,6 +240,189 @@ def test_fault_target_requires_owned_tree_and_exact_profile(
     for process in processes.values():
         process.kill.assert_not_called()
         process.suspend.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["browser", "--user-data-dir=/owned/profile"],
+        ["browser", "--user-data-dir", "/owned/profile"],
+    ],
+)
+def test_profile_argument_accepts_assignment_and_split_forms(
+    recovery: ModuleType, arguments: list[str]
+) -> None:
+    """Extract both Chromium profile flag forms without interpreting a shell.
+
+    Args:
+        recovery: Imported recovery target selector.
+        arguments: Already-tokenized process command line under test.
+    """
+    assert recovery._user_data_dir_argument(arguments) == "/owned/profile"
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        ["browser"],
+        ["browser", "--user-data-dir"],
+        ["browser", "--user-data-dir="],
+        [
+            "browser",
+            "--user-data-dir=/owned/profile",
+            "--user-data-dir",
+            "/other/profile",
+        ],
+    ],
+)
+def test_profile_argument_rejects_missing_empty_and_repeated_values(
+    recovery: ModuleType, arguments: list[str]
+) -> None:
+    """Fail closed when a browser profile flag cannot identify one value.
+
+    Args:
+        recovery: Imported recovery target selector.
+        arguments: Malformed or ambiguous process command line under test.
+    """
+    assert recovery._user_data_dir_argument(arguments) is None
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        r"c:/users/jef/appdata/local/aselenium/profile",
+        r"C:\Users\JEF\AppData\Local\Aselenium\Profile",
+        r"\\?\C:\Users\Jef\AppData\Local\Aselenium\Profile",
+        r"//?/C:/Users/Jef/AppData/Local/Aselenium/Profile",
+    ],
+)
+def test_windows_profile_matching_accepts_equivalent_native_spellings(
+    recovery: ModuleType, candidate: str
+) -> None:
+    """Treat Windows case, separator, and valid extended-prefix forms equally.
+
+    Args:
+        recovery: Imported recovery target selector.
+        candidate: Equivalent command-line spelling to compare.
+    """
+    expected = Path(r"C:\Users\Jef\AppData\Local\Aselenium\Profile")
+    assert recovery._profile_path_matches(candidate, expected, windows=True)
+
+
+def test_windows_profile_matching_accepts_extended_unc_spelling(
+    recovery: ModuleType,
+) -> None:
+    """Map an extended UNC profile to the same ordinary UNC path.
+
+    Args:
+        recovery: Imported recovery target selector.
+    """
+    expected = Path(r"\\server\share\Aselenium\Profile")
+    candidate = r"\\?\UNC\SERVER\SHARE\aselenium\profile"
+    assert recovery._profile_path_matches(candidate, expected, windows=True)
+
+
+@pytest.mark.parametrize(
+    "candidate",
+    [
+        r"C:Users\Jef\Aselenium\Profile",
+        r"\\.\C:\Users\Jef\Aselenium\Profile",
+        r"\\?\GLOBALROOT\Device\HarddiskVolume1\Aselenium\Profile",
+        r"D:\Users\Jef\Aselenium\Profile",
+    ],
+)
+def test_windows_profile_matching_rejects_unsafe_or_different_paths(
+    recovery: ModuleType, candidate: str
+) -> None:
+    """Reject drive-relative, device-namespace, and different-volume paths.
+
+    Args:
+        recovery: Imported recovery target selector.
+        candidate: Non-equivalent command-line path spelling.
+    """
+    expected = Path(r"C:\Users\Jef\Aselenium\Profile")
+    assert not recovery._profile_path_matches(candidate, expected, windows=True)
+
+
+def test_windows_profile_parser_rejects_device_namespace(
+    recovery: ModuleType,
+) -> None:
+    """Reject a device namespace before any filesystem identity comparison.
+
+    Args:
+        recovery: Imported recovery target selector.
+    """
+    assert recovery._windows_profile_path(r"\\.\C:\Aselenium\Profile") is None
+
+
+def test_windows_profile_matching_does_not_probe_a_foreign_unc_share(
+    recovery: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Avoid filesystem access when an unexpected UNC anchor cannot be owned.
+
+    Args:
+        recovery: Imported recovery target selector.
+        monkeypatch: Fixture replacing the filesystem identity helper.
+    """
+    samefile = Mock(return_value=True)
+    monkeypatch.setattr(recovery, "_same_existing_path", samefile)
+    expected = Path(r"C:\Users\Jef\Aselenium\Profile")
+    assert not recovery._profile_path_matches(
+        r"\\foreign\share\Aselenium\Profile", expected, windows=True
+    )
+    samefile.assert_not_called()
+
+
+def test_posix_profile_matching_remains_case_sensitive(
+    recovery: ModuleType,
+) -> None:
+    """Keep POSIX lexical matching exact when no filesystem alias exists.
+
+    Args:
+        recovery: Imported recovery target selector.
+    """
+    expected = Path("/tmp/Aselenium/Profile")
+    assert recovery._profile_path_matches(str(expected), expected, windows=False)
+    assert not recovery._profile_path_matches(
+        "/tmp/aselenium/profile", expected, windows=False
+    )
+
+
+def test_profile_matching_uses_samefile_for_existing_alias(
+    recovery: ModuleType, tmp_path: Path
+) -> None:
+    """Recognize a distinct absolute spelling of the same existing directory.
+
+    Args:
+        recovery: Imported recovery target selector.
+        tmp_path: Parent for an owned profile and harmless path alias.
+    """
+    profile = tmp_path / "profile"
+    profile.mkdir()
+    intermediate = tmp_path / "intermediate"
+    intermediate.mkdir()
+    alias = intermediate / ".." / profile.name
+    assert str(alias) != str(profile)
+    assert recovery._profile_path_matches(str(alias), profile, windows=False)
+
+
+def test_browser_target_accepts_split_profile_flag(
+    recovery: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Select an owned browser whose profile flag and value are separate tokens.
+
+    Args:
+        recovery: Imported recovery target selector.
+        monkeypatch: Fixture restoring controlled process lookups.
+        tmp_path: Owned profile path represented in the command line.
+    """
+    profile = tmp_path / "profile"
+    browser = fake_process(40002)
+    browser.cmdline.return_value = ["browser", "--user-data-dir", str(profile)]
+    monkeypatch.setattr(recovery.psutil, "Process", Mock(return_value=browser))
+    identity = recovery.OwnedProcess(40002, 10, os.getpid(), 40001)
+    selected = recovery.select_target([identity], "browser-crash", "browser", profile)
+    assert selected == identity
 
 
 def test_ambiguous_browser_target_fails_closed(

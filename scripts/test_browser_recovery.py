@@ -13,23 +13,28 @@ import asyncio
 import json
 import os
 import platform
+import sys
 import threading
 import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from secrets import token_hex
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator, cast
+from typing import TYPE_CHECKING, Any, Iterator, cast
 
 import psutil
 
 from aselenium import Chrome, Edge, errors
 
+if TYPE_CHECKING:
+    from aselenium.options import ChromiumBaseOptions
+
 SCENARIOS = ("browser-crash", "driver-crash", "browser-hang", "driver-hang")
 HOLD_SCRIPT = "fetch(arguments[0], {cache:'no-store'}).then(() => {window.recoveryCommandStarted=true;});"
 PAGE = b"<!doctype html><title>Aselenium recovery fixture</title><link rel='icon' href='data:,'><input id='field'>"
+USER_DATA_DIR_FLAG = "--user-data-dir"
 
 
 @dataclass(frozen=True)
@@ -129,8 +134,133 @@ def signal_owned(identity: OwnedProcess, action: str) -> bool:
     return True
 
 
+def _user_data_dir_argument(arguments: list[str]) -> str | None:
+    """Extract one unambiguous Chromium profile argument without shell parsing.
+
+    Args:
+        arguments: Process arguments returned as already-tokenized strings.
+
+    Returns:
+        The profile value from either supported flag form, or None when the flag
+        is absent, malformed, empty, or repeated.
+    """
+    values: list[str] = []
+    index = 0
+    assignment_prefix = USER_DATA_DIR_FLAG + "="
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == USER_DATA_DIR_FLAG:
+            index += 1
+            if index >= len(arguments):
+                return None
+            values.append(arguments[index])
+        elif argument.startswith(assignment_prefix):
+            values.append(argument[len(assignment_prefix) :])
+        index += 1
+    if len(values) != 1 or not values[0]:
+        return None
+    return values[0]
+
+
+def _windows_profile_path(value: str) -> PureWindowsPath | None:
+    """Create a conservative lexical Windows path for identity comparison.
+
+    Args:
+        value: Native command-line path spelling.
+
+    Returns:
+        An absolute Windows path with a standard drive or UNC anchor, or None
+        for relative, malformed, and unsupported device-namespace paths.
+    """
+    if not value or "\x00" in value:
+        return None
+    normalized = value.replace("/", "\\")
+    if normalized.casefold().startswith("\\\\.\\".casefold()):
+        return None
+    extended_prefix = "\\\\?\\"
+    if normalized.casefold().startswith(extended_prefix.casefold()):
+        remainder = normalized[len(extended_prefix) :]
+        if remainder.casefold().startswith("unc\\"):
+            normalized = "\\\\" + remainder[4:]
+        else:
+            unprefixed = PureWindowsPath(remainder)
+            if not (
+                len(unprefixed.drive) == 2
+                and unprefixed.drive.endswith(":")
+                and bool(unprefixed.root)
+            ):
+                return None
+            normalized = remainder
+    try:
+        parsed = PureWindowsPath(normalized)
+    except ValueError:
+        return None
+    return parsed if parsed.is_absolute() else None
+
+
+def _same_existing_path(candidate: Path, expected: Path) -> bool:
+    """Compare existing paths by filesystem identity without resolving either.
+
+    Args:
+        candidate: Path reported by the owned browser process.
+        expected: Fresh profile path created by this harness.
+
+    Returns:
+        True only when both paths exist and identify the same filesystem object.
+    """
+    try:
+        return candidate.exists() and expected.exists() and candidate.samefile(expected)
+    except (OSError, ValueError):
+        return False
+
+
+def _profile_path_matches(
+    candidate_value: str, expected: Path, *, windows: bool
+) -> bool:
+    """Match a browser-reported profile to the harness-owned profile safely.
+
+    Args:
+        candidate_value: Value extracted from the browser command line.
+        expected: Parsed fresh profile path owned by this acquisition.
+        windows: Whether to apply native Windows lexical path rules.
+
+    Returns:
+        True for the same safe profile pathname or existing filesystem object.
+    """
+    if windows:
+        candidate_lexical = _windows_profile_path(candidate_value)
+        expected_lexical = _windows_profile_path(str(expected))
+        if candidate_lexical is None or expected_lexical is None:
+            return False
+        if candidate_lexical == expected_lexical:
+            return True
+        # Limit filesystem probing to the already-selected drive/share. In
+        # particular, a local expected path must never cause an arbitrary UNC
+        # path from a process command line to be contacted.
+        if candidate_lexical.anchor.casefold() != expected_lexical.anchor.casefold():
+            return False
+        try:
+            candidate = Path(candidate_value)
+        except (OSError, ValueError):
+            return False
+        return _same_existing_path(candidate, expected)
+
+    if candidate_value == str(expected):
+        return True
+    try:
+        candidate = Path(candidate_value)
+    except (OSError, ValueError):
+        return False
+    if not candidate.is_absolute() or not expected.is_absolute():
+        return False
+    return _same_existing_path(candidate, expected)
+
+
 def select_target(
-    identities: list[OwnedProcess], scenario: str, binary: str, profile: Path
+    identities: list[OwnedProcess],
+    scenario: str,
+    binary: str,
+    profile: str | os.PathLike[str],
 ) -> OwnedProcess:
     """Select the service or unique fresh-profile browser from captured identities.
 
@@ -149,6 +279,7 @@ def select_target(
     """
     if scenario not in SCENARIOS:
         raise RuntimeError("Unknown recovery scenario")
+    profile_path = profile if isinstance(profile, Path) else Path(profile)
     selected = []
     for identity in identities:
         process = current_process(identity)
@@ -159,9 +290,16 @@ def select_target(
                 selected.append(identity)
         elif identity.pid != identity.service_pid:
             arguments = process.cmdline()
-            if "--user-data-dir=" + str(profile) in arguments and not any(
-                argument == "--type" or argument.startswith("--type=")
-                for argument in arguments
+            profile_argument = _user_data_dir_argument(arguments)
+            if (
+                profile_argument is not None
+                and _profile_path_matches(
+                    profile_argument, profile_path, windows=os.name == "nt"
+                )
+                and not any(
+                    argument == "--type" or argument.startswith("--type=")
+                    for argument in arguments
+                )
             ):
                 selected.append(identity)
     if len(selected) != 1:
@@ -234,6 +372,25 @@ class RecoveryServer(ThreadingHTTPServer):
         """
         self.state = state
         super().__init__(("127.0.0.1", 0), RecoveryHandler)
+
+    def handle_error(self, request: Any, client_address: tuple[str, int]) -> None:
+        """Ignore only disconnects expected after an injected browser fault.
+
+        Args:
+            request: Client socket being handled when the exception occurred.
+            client_address: Client host and port associated with the request.
+
+        Notes:
+            The recovery fixture deliberately kills or suspends a browser while
+            an HTTP request is outstanding. Windows can surface the resulting
+            socket close while the base handler is still reading the request,
+            before :meth:`RecoveryHandler.do_GET` can catch it. All unrelated
+            server exceptions continue through the standard error handler.
+        """
+        cause = sys.exc_info()[1]
+        if isinstance(cause, (BrokenPipeError, ConnectionResetError, TimeoutError)):
+            return
+        super().handle_error(request, client_address)
 
 
 class RecoveryHandler(BaseHTTPRequestHandler):
@@ -345,6 +502,24 @@ def validate_injection_window(
         )
 
 
+def owned_profile_directory(options: ChromiumBaseOptions) -> Path:
+    """Return the active owned Chromium profile directory as a concrete path.
+
+    Args:
+        options: Chromium options expected to own a cloned temporary profile.
+
+    Returns:
+        The active temporary profile directory.
+
+    Raises:
+        RuntimeError: The recovery fixture has no active owned profile directory.
+    """
+    profile = options.profile
+    if profile is None or profile.directory_temp is None:
+        raise RuntimeError("Recovery fixture requires an active owned profile")
+    return Path(profile.directory_temp)
+
+
 async def verify_fresh_session(
     driver: Chrome | Edge, binary: str, url: str
 ) -> dict[str, Any]:
@@ -360,7 +535,7 @@ async def verify_fresh_session(
     """
     context = driver.acquire("offline", binary=binary)
     async with context as session:
-        profile = Path(session.options.profile.directory_temp)
+        profile = owned_profile_directory(session.options)
         identifier = session.id
         await session.load(url)
         element = await session.find_element("#field")
@@ -413,10 +588,10 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
         driver.options.set_profile(template, "Default")
         driver.options.set_timeouts(implicit=0, pageLoad=10, script=30)
         driver.options.session_timeout = args.command_timeout
-        template_profile = Path(driver.options.profile.directory_temp)
+        template_profile = owned_profile_directory(driver.options)
         identities: list[OwnedProcess] = []
         context = driver.acquire("offline", binary=args.binary)
-        profile = Path(context._options.profile.directory_temp)
+        profile = owned_profile_directory(cast("ChromiumBaseOptions", context._options))
         pending: asyncio.Task[Any] | None = None
         suspended: OwnedProcess | None = None
         failure: BaseException | None = None
