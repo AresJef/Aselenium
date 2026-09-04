@@ -147,6 +147,37 @@ def test_capture_preserves_root_and_descendant_identity(recovery: ModuleType) ->
     service.children.assert_called_once_with(recursive=True)
 
 
+@pytest.mark.parametrize("lookup", ["ppid", "create_time", "children"])
+def test_capture_reports_a_vanished_service(recovery: ModuleType, lookup: str) -> None:
+    """Convert service-root observation races into a controlled harness failure.
+
+    Args:
+        recovery: Imported recovery harness.
+        lookup: Root process observation that races with service exit.
+    """
+    service = fake_process(40001)
+    getattr(service, lookup).side_effect = psutil.NoSuchProcess(service.pid)
+    with pytest.raises(RuntimeError, match="service exited"):
+        recovery.capture_owned(service)
+
+
+def test_capture_skips_a_descendant_that_exits_during_identity_read(
+    recovery: ModuleType,
+) -> None:
+    """Retain the stable root while ignoring an already-exited child.
+
+    Args:
+        recovery: Imported recovery harness.
+    """
+    service = fake_process(40001)
+    child = fake_process(40002, parent=service.pid)
+    child.create_time.side_effect = psutil.NoSuchProcess(child.pid)
+    service.children.return_value = [child]
+    assert recovery.capture_owned(service) == [
+        recovery.OwnedProcess(service.pid, 10, os.getpid(), service.pid)
+    ]
+
+
 @pytest.mark.parametrize("action", ["kill", "suspend", "resume"])
 def test_signal_requires_unchanged_identity(
     recovery: ModuleType, monkeypatch: pytest.MonkeyPatch, action: str
@@ -224,6 +255,7 @@ def test_fault_target_requires_owned_tree_and_exact_profile(
     browser = tmp_path / "browser"
     profile = tmp_path / "profile"
     service = fake_process(40001)
+    service.exe.return_value = str(browser)
     child = fake_process(40002)
     child.exe.return_value = str(browser)
     child.cmdline.return_value = [str(browser), "--user-data-dir=" + str(profile)]
@@ -236,7 +268,8 @@ def test_fault_target_requires_owned_tree_and_exact_profile(
     ]
     monkeypatch.setattr(recovery.psutil, "Process", lambda pid: processes[pid])
     selected = recovery.select_target(identities, scenario, str(browser), profile)
-    assert selected.pid == (40001 if scenario.startswith("driver") else 40002)
+    assert selected.identity.pid == (40001 if scenario.startswith("driver") else 40002)
+    assert selected.executable == str(browser)
     for process in processes.values():
         process.kill.assert_not_called()
         process.suspend.assert_not_called()
@@ -417,12 +450,16 @@ def test_browser_target_accepts_split_profile_flag(
         tmp_path: Owned profile path represented in the command line.
     """
     profile = tmp_path / "profile"
+    service = fake_process(40001)
     browser = fake_process(40002)
     browser.cmdline.return_value = ["browser", "--user-data-dir", str(profile)]
-    monkeypatch.setattr(recovery.psutil, "Process", Mock(return_value=browser))
-    identity = recovery.OwnedProcess(40002, 10, os.getpid(), 40001)
-    selected = recovery.select_target([identity], "browser-crash", "browser", profile)
-    assert selected == identity
+    processes = {service.pid: service, browser.pid: browser}
+    monkeypatch.setattr(recovery.psutil, "Process", lambda pid: processes[pid])
+    identities = [
+        recovery.OwnedProcess(pid, 10, os.getpid(), service.pid) for pid in processes
+    ]
+    selected = recovery.select_target(identities, "browser-crash", "browser", profile)
+    assert selected.identity == identities[1]
 
 
 def test_ambiguous_browser_target_fails_closed(
@@ -435,10 +472,12 @@ def test_ambiguous_browser_target_fails_closed(
         monkeypatch: Fixture restoring process lookup.
         tmp_path: Synthetic executable and profile directory.
     """
-    processes = {pid: fake_process(pid) for pid in (40002, 40003)}
-    for process in processes.values():
+    service = fake_process(40001)
+    browsers = {pid: fake_process(pid) for pid in (40002, 40003)}
+    for process in browsers.values():
         process.exe.return_value = str(tmp_path / "browser")
         process.cmdline.return_value = ["--user-data-dir=" + str(tmp_path / "profile")]
+    processes = {service.pid: service, **browsers}
     monkeypatch.setattr(recovery.psutil, "Process", lambda pid: processes[pid])
     identities = [
         recovery.OwnedProcess(pid, 10, os.getpid(), 40001) for pid in processes
@@ -460,6 +499,7 @@ def test_browser_launcher_wrapper_does_not_require_same_runtime_executable(
         tmp_path: Fresh-profile identity used by the owned browser and renderer.
     """
     profile = tmp_path / "profile"
+    service = fake_process(40001)
     browser = fake_process(40002)
     browser.exe.return_value = "/opt/google/chrome/chrome"
     browser.cmdline.return_value = [
@@ -473,7 +513,7 @@ def test_browser_launcher_wrapper_does_not_require_same_runtime_executable(
         "--type=renderer",
         "--user-data-dir=" + str(profile),
     ]
-    processes = {40002: browser, 40003: renderer}
+    processes = {service.pid: service, browser.pid: browser, renderer.pid: renderer}
     monkeypatch.setattr(recovery.psutil, "Process", lambda pid: processes[pid])
     identities = [
         recovery.OwnedProcess(pid, 10, os.getpid(), 40001) for pid in processes
@@ -481,9 +521,159 @@ def test_browser_launcher_wrapper_does_not_require_same_runtime_executable(
     selected = recovery.select_target(
         identities, "browser-hang", "/usr/bin/google-chrome", profile
     )
-    assert selected.pid == 40002
+    assert selected.identity.pid == 40002
+    assert selected.executable == "/opt/google/chrome/chrome"
     browser.suspend.assert_not_called()
     renderer.suspend.assert_not_called()
+
+
+def test_target_selection_skips_a_helper_that_exits_during_cmdline(
+    recovery: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Ignore a transient helper without losing the unique live browser target.
+
+    Args:
+        recovery: Imported recovery harness.
+        monkeypatch: Fixture restoring controlled process lookups.
+        tmp_path: Fresh profile used to identify the owned browser.
+    """
+    profile = tmp_path / "profile"
+    service = fake_process(40001)
+    helper = fake_process(40002)
+    helper.cmdline.side_effect = psutil.NoSuchProcess(helper.pid)
+    browser = fake_process(40003)
+    browser.cmdline.return_value = ["browser", "--user-data-dir=" + str(profile)]
+    browser.exe.return_value = str(tmp_path / "browser")
+    processes = {service.pid: service, helper.pid: helper, browser.pid: browser}
+    monkeypatch.setattr(recovery.psutil, "Process", lambda pid: processes[pid])
+    identities = [
+        recovery.OwnedProcess(pid, 10, os.getpid(), 40001) for pid in processes
+    ]
+    selected = recovery.select_target(
+        identities, "browser-crash", str(tmp_path / "browser"), profile
+    )
+    assert selected.identity.pid == browser.pid
+
+
+@pytest.mark.parametrize("observation", ["cmdline", "exe"])
+def test_target_selection_fails_cleanly_when_candidate_exits(
+    recovery: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    observation: str,
+) -> None:
+    """Report no selectable target when its metadata disappears during inspection.
+
+    Args:
+        recovery: Imported recovery harness.
+        monkeypatch: Fixture restoring controlled process lookups.
+        tmp_path: Fresh profile used to identify the candidate.
+        observation: Process metadata call that races with candidate exit.
+    """
+    profile = tmp_path / "profile"
+    service = fake_process(40001)
+    browser = fake_process(40002)
+    browser.cmdline.return_value = ["browser", "--user-data-dir=" + str(profile)]
+    getattr(browser, observation).side_effect = psutil.NoSuchProcess(browser.pid)
+    processes = {service.pid: service, browser.pid: browser}
+    monkeypatch.setattr(recovery.psutil, "Process", lambda pid: processes[pid])
+    identities = [
+        recovery.OwnedProcess(pid, 10, os.getpid(), service.pid) for pid in processes
+    ]
+    with pytest.raises(RuntimeError, match="found 0"):
+        recovery.select_target(
+            identities, "browser-crash", str(tmp_path / "browser"), profile
+        )
+
+
+def test_target_selection_keeps_access_denied_fail_closed(
+    recovery: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Do not reinterpret an access-control failure as a harmless process exit.
+
+    Args:
+        recovery: Imported recovery harness.
+        monkeypatch: Fixture restoring controlled process lookups.
+        tmp_path: Fresh profile used to invoke browser selection.
+    """
+    service = fake_process(40001)
+    browser = fake_process(40002)
+    browser.cmdline.side_effect = psutil.AccessDenied(browser.pid)
+    processes = {service.pid: service, browser.pid: browser}
+    monkeypatch.setattr(recovery.psutil, "Process", lambda pid: processes[pid])
+    identities = [
+        recovery.OwnedProcess(pid, 10, os.getpid(), service.pid) for pid in processes
+    ]
+    with pytest.raises(psutil.AccessDenied):
+        recovery.select_target(
+            identities,
+            "browser-crash",
+            str(tmp_path / "browser"),
+            tmp_path / "profile",
+        )
+
+
+def test_browser_selection_requires_a_live_service_root(
+    recovery: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Reject a browser candidate after its owned driver root has disappeared.
+
+    Args:
+        recovery: Imported recovery harness.
+        monkeypatch: Fixture restoring controlled process lookups.
+        tmp_path: Fresh profile used to identify the browser candidate.
+    """
+    service = fake_process(40001)
+    browser = fake_process(40002)
+    profile = tmp_path / "profile"
+    browser.cmdline.return_value = ["browser", "--user-data-dir=" + str(profile)]
+    processes = {service.pid: service, browser.pid: browser}
+
+    def lookup(pid: int) -> Mock:
+        """Return the browser but report the captured service as exited."""
+        if pid == service.pid:
+            raise psutil.NoSuchProcess(pid)
+        return processes[pid]
+
+    monkeypatch.setattr(recovery.psutil, "Process", lookup)
+    identities = [
+        recovery.OwnedProcess(pid, 10, os.getpid(), service.pid) for pid in processes
+    ]
+    with pytest.raises(RuntimeError, match="live owned service root"):
+        recovery.select_target(identities, "browser-crash", "browser", profile)
+
+
+@pytest.mark.asyncio
+async def test_wait_owned_exit_allows_normal_signal_delivery_delay(
+    recovery: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Wait for a killed process instead of misclassifying kernel exit latency.
+
+    Args:
+        recovery: Imported recovery harness.
+        monkeypatch: Fixture restoring controlled identity observations.
+    """
+    identity = recovery.OwnedProcess(40002, 10, os.getpid(), 40001)
+    live = fake_process(identity.pid)
+    observations = iter((live, live, None))
+    monkeypatch.setattr(recovery, "current_process", lambda item: next(observations))
+    assert await recovery.wait_owned_exit(identity, 1)
+
+
+@pytest.mark.asyncio
+async def test_wait_owned_exit_reports_a_live_process_at_deadline(
+    recovery: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Return false without hiding a process that outlives the bounded wait.
+
+    Args:
+        recovery: Imported recovery harness.
+        monkeypatch: Fixture pinning process and clock observations.
+    """
+    identity = recovery.OwnedProcess(40002, 10, os.getpid(), 40001)
+    process = fake_process(identity.pid)
+    monkeypatch.setattr(recovery, "current_process", lambda item: process)
+    assert not await recovery.wait_owned_exit(identity, 0)
 
 
 def test_same_profile_with_foreign_ownership_is_never_a_target(
@@ -498,7 +688,7 @@ def test_same_profile_with_foreign_ownership_is_never_a_target(
     """
     lookup = Mock()
     monkeypatch.setattr(recovery.psutil, "Process", lookup)
-    identity = recovery.OwnedProcess(40002, 10, os.getpid() + 1, 40001)
+    identity = recovery.OwnedProcess(40001, 10, os.getpid() + 1, 40001)
     with pytest.raises(RuntimeError, match="not owned"):
         recovery.select_target(
             [identity], "browser-crash", "/usr/bin/google-chrome", tmp_path

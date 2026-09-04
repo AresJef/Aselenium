@@ -54,6 +54,19 @@ class OwnedProcess:
     service_pid: int
 
 
+@dataclass(frozen=True)
+class FaultTarget:
+    """Retain one selected process identity and its observed executable.
+
+    Attributes:
+        identity: Revalidated process identity eligible for fault injection.
+        executable: Executable observed while the process was still selectable.
+    """
+
+    identity: OwnedProcess
+    executable: str
+
+
 def capture_owned(service_process: psutil.Process) -> list[OwnedProcess]:
     """Capture only the current harness's direct service and its descendants.
 
@@ -67,11 +80,25 @@ def capture_owned(service_process: psutil.Process) -> list[OwnedProcess]:
         RuntimeError: The supplied service is not a direct child of this harness.
     """
     owner = os.getpid()
-    if service_process.ppid() != owner or service_process.pid == owner:
+    try:
+        parent = service_process.ppid()
+    except psutil.NoSuchProcess as cause:
+        raise RuntimeError(
+            "Owned service exited while its process tree was captured"
+        ) from cause
+    if parent != owner or service_process.pid == owner:
         raise RuntimeError("Refusing a service not directly owned by this harness")
-    processes = [service_process, *service_process.children(recursive=True)]
-    identities = []
-    for process in processes:
+    try:
+        service_created = service_process.create_time()
+        descendants = service_process.children(recursive=True)
+    except psutil.NoSuchProcess as cause:
+        raise RuntimeError(
+            "Owned service exited while its process tree was captured"
+        ) from cause
+    identities = [
+        OwnedProcess(service_process.pid, service_created, owner, service_process.pid)
+    ]
+    for process in descendants:
         try:
             identities.append(
                 OwnedProcess(
@@ -261,7 +288,7 @@ def select_target(
     scenario: str,
     binary: str,
     profile: str | os.PathLike[str],
-) -> OwnedProcess:
+) -> FaultTarget:
     """Select the service or unique fresh-profile browser from captured identities.
 
     Args:
@@ -272,7 +299,7 @@ def select_target(
         profile: Fresh profile directory owned by this acquisition.
 
     Returns:
-        Exactly one validated target for fault injection.
+        Exactly one validated target and its observed executable.
 
     Raises:
         RuntimeError: The scenario does not identify exactly one safe target.
@@ -280,16 +307,31 @@ def select_target(
     if scenario not in SCENARIOS:
         raise RuntimeError("Unknown recovery scenario")
     profile_path = profile if isinstance(profile, Path) else Path(profile)
-    selected = []
+    service_roots = [
+        identity for identity in identities if identity.pid == identity.service_pid
+    ]
+    if len(service_roots) != 1 or current_process(service_roots[0]) is None:
+        raise RuntimeError(
+            "Expected one live owned service root before target selection"
+        )
+    selected: list[FaultTarget] = []
     for identity in identities:
         process = current_process(identity)
         if process is None:
             continue
         if scenario.startswith("driver-"):
             if identity.pid == identity.service_pid:
-                selected.append(identity)
+                try:
+                    selected.append(FaultTarget(identity, process.exe()))
+                except psutil.NoSuchProcess:
+                    continue
         elif identity.pid != identity.service_pid:
-            arguments = process.cmdline()
+            try:
+                arguments = process.cmdline()
+            except psutil.NoSuchProcess:
+                # Chromium creates short-lived helpers. Their normal exit must
+                # not abort selection of the still-live, uniquely owned browser.
+                continue
             profile_argument = _user_data_dir_argument(arguments)
             if (
                 profile_argument is not None
@@ -301,12 +343,34 @@ def select_target(
                     for argument in arguments
                 )
             ):
-                selected.append(identity)
+                try:
+                    selected.append(FaultTarget(identity, process.exe()))
+                except psutil.NoSuchProcess:
+                    continue
     if len(selected) != 1:
         raise RuntimeError(
             f"Expected one safely identified target for launcher {binary!r}, found {len(selected)}"
         )
     return selected[0]
+
+
+async def wait_owned_exit(identity: OwnedProcess, timeout: float) -> bool:
+    """Wait a bounded interval for a signalled process identity to disappear.
+
+    Args:
+        identity: Previously selected and signalled process identity.
+        timeout: Maximum seconds to wait for operating-system exit observation.
+
+    Returns:
+        True when the same process has exited; False when it remains live at the
+        deadline.
+    """
+    deadline = time.monotonic() + timeout
+    while current_process(identity) is not None:
+        if time.monotonic() >= deadline:
+            return False
+        await asyncio.sleep(0.01)
+    return True
 
 
 def alive_owned(identities: list[OwnedProcess]) -> list[int]:
@@ -609,14 +673,10 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
                     )
                     await await_started(state, pending)
                     identities = capture_owned(session.service.process)
-                    target = select_target(identities, scenario, args.binary, profile)
+                    selected = select_target(identities, scenario, args.binary, profile)
+                    target = selected.identity
                     result["target"] = asdict(target)
-                    observed_target = current_process(target)
-                    if observed_target is None:
-                        raise RuntimeError(
-                            "Target exited before its executable could be recorded"
-                        )
-                    result["target_executable"] = observed_target.exe()
+                    result["target_executable"] = selected.executable
                     result["selected_launcher"] = str(Path(args.binary).resolve())
                     result["command_acknowledged_before_fault"] = True
                     validate_injection_window(
@@ -624,11 +684,19 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
                     )
                     injected = time.monotonic()
                     if scenario.endswith("hang"):
-                        if not signal_owned(target, "suspend"):
+                        result["fault_signal_sent"] = signal_owned(target, "suspend")
+                        if not result["fault_signal_sent"]:
                             raise RuntimeError("Target exited before hang injection")
                         suspended = target
-                    elif not signal_owned(target, "kill"):
-                        raise RuntimeError("Target exited before crash injection")
+                    else:
+                        result["fault_signal_sent"] = signal_owned(target, "kill")
+                        if not result["fault_signal_sent"]:
+                            raise RuntimeError("Target exited before crash injection")
+                        exit_timeout = min(3.0, args.command_timeout - 1)
+                        if not await wait_owned_exit(target, exit_timeout):
+                            raise RuntimeError(
+                                "Target remained live after crash injection"
+                            )
                     try:
                         await asyncio.wait_for(
                             pending, timeout=args.command_timeout + 2
@@ -684,6 +752,7 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
                 if failure is None
                 and not result["library_cleanup_survivors"]
                 and result["library_profile_removed"]
+                and result.get("fault_signal_sent") is True
                 and result.get("command_failure_type")
                 else "failed"
             )

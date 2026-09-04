@@ -198,6 +198,10 @@ def validate_recovery(data: dict[str, Any]) -> None:
             "Fault was not proven to occur during an acknowledged command",
         )
         require(
+            scenario.get("fault_signal_sent") is True,
+            "Fault target was not proven to receive the requested signal",
+        )
+        require(
             text_field(scenario, "command_failure_type") in RECOVERY_FAILURES,
             "Fault did not cause an expected connection/session failure",
         )

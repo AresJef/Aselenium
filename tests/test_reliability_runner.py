@@ -60,6 +60,7 @@ def valid_report(
                 "scenario": scenario,
                 "status": "passed",
                 "command_acknowledged_before_fault": True,
+                "fault_signal_sent": True,
                 "command_failure_type": "SessionTimeoutError"
                 if scenario.endswith("hang")
                 else "SessionClientError",
@@ -220,6 +221,7 @@ def test_incomplete_json_never_counts_as_success(
         ("recovery", ("scenarios", 0, "scenario"), "driver-crash"),
         ("recovery", ("scenarios", 0, "status"), "failed"),
         ("recovery", ("scenarios", 0, "command_acknowledged_before_fault"), 1),
+        ("recovery", ("scenarios", 0, "fault_signal_sent"), False),
         ("recovery", ("scenarios", 0, "command_failure_type"), "AssertionError"),
         (
             "recovery",
@@ -308,6 +310,20 @@ def test_invalid_or_inconsistent_success_claim_is_rejected(
     current[path[-1]] = value
     with pytest.raises(ValueError):
         controller["validate_report"](gate, report, "chrome", 1)
+
+
+def test_recovery_signal_proof_cannot_be_omitted(
+    controller: dict[str, Any],
+) -> None:
+    """Reject recovery evidence that never proves the target received a signal.
+
+    Args:
+        controller: Loaded real reliability report validator.
+    """
+    report = valid_report("recovery")
+    report["scenarios"][0].pop("fault_signal_sent")
+    with pytest.raises(ValueError, match="requested signal"):
+        controller["validate_report"]("recovery", report, "chrome", 1)
 
 
 @pytest.mark.parametrize("gate", GATES)
