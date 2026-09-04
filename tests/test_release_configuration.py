@@ -103,10 +103,18 @@ def test_ci_covers_current_package_without_removed_migration_job() -> None:
         step.get("run", "") for step in workflow["jobs"]["package-tests"]["steps"]
     )
     assert "coverage run --branch --source=aselenium" in commands
+    assert "--junitxml=pytest-results.xml" in commands
+    assert "report_pytest_failures.py pytest-results.xml" in commands
     assert "pip_audit --skip-editable" in commands
     assert "check_example_contracts.py" in commands
     assert "check_coverage.py" in commands
     assert any(item.get("dependencies") == "minimum" for item in matrix["include"])
+    diagnostic_step = next(
+        step
+        for step in workflow["jobs"]["package-tests"]["steps"]
+        if step.get("name") == "Report failing tests in annotations"
+    )
+    assert diagnostic_step["if"] == "failure()"
 
 
 def test_native_ci_requires_installed_wheel_and_all_browser_stages() -> None:
