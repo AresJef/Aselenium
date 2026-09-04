@@ -8,6 +8,7 @@ No SQLite transaction is held while extracting an archive.
 from __future__ import annotations
 
 import copy
+import errno
 import hashlib
 import json
 import logging
@@ -21,7 +22,6 @@ import uuid
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from math import isfinite
-from os.path import expanduser
 from pathlib import Path
 from typing import (
     TYPE_CHECKING,
@@ -33,6 +33,7 @@ from typing import (
 import psutil
 
 from aselenium import errors
+from aselenium._paths import PathInput, directory_path, parse_path
 from aselenium.manager._filesystem import checked_path, filesystem_operation
 from aselenium.manager.version import ChromiumVersion, GeckoVersion, Version
 
@@ -57,12 +58,34 @@ else:
     import fcntl
 
 
+def _is_lock_contention(cause: OSError) -> bool:
+    """Return whether an OS lock failure represents temporary contention.
+
+    Args:
+        cause: Failure raised by the platform's nonblocking file-lock API.
+
+    Returns:
+        True for POSIX and Windows lock-contention error codes.
+    """
+    return (
+        isinstance(cause, (BlockingIOError, PermissionError))
+        or cause.errno
+        in {
+            errno.EACCES,
+            errno.EAGAIN,
+            errno.EBUSY,
+            errno.EDEADLK,
+        }
+        or getattr(cause, "winerror", None) in {32, 33}
+    )
+
+
 @contextmanager
-def artifact_lock(root: str | Path, key: str, timeout: float = 30) -> Iterator[None]:
+def artifact_lock(root: Path, key: str, timeout: float = 30) -> Iterator[None]:
     """Kernel-released process lock; never unlink a lock another waiter opened.
 
     Args:
-        root: Anchored root directory of the managed filesystem operation.
+        root: Absolute, validated cache directory retained by the file manager.
         key: Lookup key used by the current operation.
         timeout: Finite nonnegative wait budget in seconds. Zero attempts the lock once.
 
@@ -85,10 +108,14 @@ def artifact_lock(root: str | Path, key: str, timeout: float = 30) -> Iterator[N
     try:
         if len(key) != 64 or any(c not in "0123456789abcdef" for c in key):
             raise ValueError("Invalid artifact key")
-        path = checked_path(root, Path(root) / (key + ".lock"))
+        path = checked_path(root, root / (key + ".lock"))
     except ValueError as cause:
         raise errors.DriverManagerError("Unsafe artifact lock path") from cause
-    with open(path, "a+b") as handle:
+    handle = filesystem_operation(lambda: path.open("a+b"), "Open cache artifact lock")
+    with handle:
+        # ``msvcrt.locking`` coordinates a byte range rather than the whole
+        # file. Materialize byte zero before asking the Windows CRT to lock it,
+        # and explicitly seek before every acquisition attempt below.
         handle.seek(0, 2)
         if handle.tell() == 0:
             handle.write(b"\0")
@@ -102,36 +129,63 @@ def artifact_lock(root: str | Path, key: str, timeout: float = 30) -> Iterator[N
                 else:
                     fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
                 break
-            except (BlockingIOError, PermissionError):
+            except OSError as cause:
+                if not _is_lock_contention(cause):
+                    raise errors.DriverManagerError(
+                        "Unable to acquire cache artifact lock"
+                    ) from cause
                 if time.monotonic() >= deadline:
                     raise errors.DriverManagerError(
                         "Timed out acquiring cache artifact lock"
-                    )
+                    ) from cause
                 time.sleep(0.05)
+        body_error: BaseException | None = None
         try:
             yield
+        except BaseException as cause:
+            body_error = cause
+            raise
         finally:
-            if sys.platform == "win32":
-                handle.seek(0)
-                msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
-            else:
-                fcntl.flock(handle, fcntl.LOCK_UN)
+            try:
+                if sys.platform == "win32":
+                    handle.seek(0)
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    fcntl.flock(handle, fcntl.LOCK_UN)
+            except OSError as cause:
+                message = "Unable to release cache artifact lock"
+                if body_error is not None:
+                    LOG.error(
+                        "%s while propagating %s",
+                        message,
+                        type(body_error).__name__,
+                        exc_info=True,
+                    )
+                else:
+                    raise errors.DriverManagerError(message) from cause
 
 
-def digest(path: str | Path) -> str:
+def digest(path: Path) -> str:
     """Calculate the SHA-256 of a file using bounded-size reads.
 
     Args:
-        path: Filesystem path to inspect or operate on.
+        path: Absolute, validated file whose contents are hashed.
 
     Returns:
         Lowercase hexadecimal SHA-256 digest of the file contents.
 
     Example:
-        >>> checksum = digest(Path("chromedriver"))
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> with TemporaryDirectory() as temporary:
+        ...     executable = Path(temporary) / "chromedriver"
+        ...     _ = executable.write_bytes(b"driver")
+        ...     checksum = digest(executable)
+        >>> len(checksum)
+        64
     """
     value = hashlib.sha256()
-    with open(path, "rb") as stream:
+    with path.open("rb") as stream:
         for chunk in iter(lambda: stream.read(1024 * 1024), b""):
             value.update(chunk)
     return value.hexdigest()
@@ -143,34 +197,40 @@ class FileManager:
     product = "generic"
     version_class: type[Version] = ChromiumVersion
 
-    def __init__(self, base_dir: str | Path | None = None) -> None:
+    def __init__(self, base_dir: PathInput | None = None) -> None:
         """Initialize the instance with the supplied configuration.
 
         Args:
             base_dir: Existing cache parent directory; None selects the current user home.
         """
-        base = (
-            Path(expanduser("~") if base_dir is None else os.fspath(base_dir))
-            .expanduser()
-            .resolve()
-        )
-        if not base.is_dir():
-            raise errors.DriverManagerError("Cache base must be an existing directory")
-        self._base_dir = str(base)
+        try:
+            base = (
+                directory_path(Path.home()).resolve(strict=True)
+                if base_dir is None
+                else directory_path(base_dir).resolve(strict=True)
+            )
+        except (
+            errors.AseleniumDirectoryNotFoundError,
+            errors.AseleniumInvalidPathError,
+            OSError,
+            RuntimeError,
+        ) as cause:
+            raise errors.DriverManagerError(
+                "Cache base must be an existing directory"
+            ) from cause
+        self._base_dir: Path = base
         try:
             cache_root = checked_path(base, base / ".aselenium")
         except ValueError as cause:
             raise errors.DriverManagerError("Unsafe cache root") from cause
         cache_root.mkdir(mode=0o700, exist_ok=True)
-        self._directory = str(checked_path(cache_root, cache_root / "v2"))
-        Path(self._directory).mkdir(mode=0o700, exist_ok=True)
+        self._directory: Path = checked_path(cache_root, cache_root / "v2")
+        self._directory.mkdir(mode=0o700, exist_ok=True)
         self.platform = (
             {"Darwin": "mac", "Windows": "win"}.get(platform.system(), "linux"),
             platform.machine().lower(),
         )
-        self._database = str(
-            self._managed_path(Path(self._directory) / "index.sqlite3")
-        )
+        self._database: Path = self._managed_path(self._directory / "index.sqlite3")
         schema_key = hashlib.sha256(b"aselenium-v2-schema").hexdigest()
         with artifact_lock(self._directory, schema_key), self._db() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -228,7 +288,9 @@ class FileManager:
         try:
             self._managed_path(self._database)
             for suffix in ("-journal", "-wal", "-shm"):
-                self._managed_path(self._database + suffix)
+                self._managed_path(
+                    self._database.with_name(self._database.name + suffix)
+                )
             db = sqlite3.connect(self._database, timeout=5)
             db.row_factory = sqlite3.Row
             with db:
@@ -241,11 +303,11 @@ class FileManager:
             if db is not None:
                 db.close()
 
-    def _managed_path(self, path: str | Path) -> Path:
+    def _managed_path(self, path: Path) -> Path:
         """Validate a cache-owned path without following link or reparse ancestors.
 
         Args:
-            path: Filesystem path to inspect or operate on.
+            path: Absolute path already derived from this manager's cache root.
 
         Returns:
             An absolute, validated path under the anchored cache root.
@@ -255,11 +317,11 @@ class FileManager:
         except (OSError, ValueError) as cause:
             raise errors.DriverManagerError("Unsafe cache path") from cause
 
-    def _delete_folder(self, folder: str | Path) -> None:
+    def _delete_folder(self, folder: Path) -> None:
         """Delete one validated cache artifact directory with bounded retries.
 
         Args:
-            folder: Managed directory to operate on.
+            folder: Absolute artifact directory already derived from the cache root.
         """
         path = self._managed_path(folder)
         if path.exists():
@@ -315,7 +377,7 @@ class FileManager:
         ).hexdigest()
         if row["key"] != expected:
             raise errors.DriverManagerError("Invalid cache artifact identity")
-        folder = self._managed_path(Path(self._directory) / row["key"])
+        folder = self._managed_path(self._directory / row["key"])
         try:
             path = checked_path(folder, folder / row["executable"])
         except ValueError as cause:
@@ -332,7 +394,7 @@ class FileManager:
             A cache entry with an executable location and parsed Version.
         """
         return {
-            "location": str(Path(self._directory) / row["key"] / row["executable"]),
+            "location": str(self._directory / row["key"] / row["executable"]),
             "version": self.version_class(row["version"]),
         }
 
@@ -395,7 +457,7 @@ class FileManager:
         Returns:
             Recovered artifact metadata, or None if no valid publication can be recovered.
         """
-        folder = self._managed_path(Path(self._directory) / key)
+        folder = self._managed_path(self._directory / key)
         if not folder.is_dir():
             return None
         with artifact_lock(self._directory, key):
@@ -422,7 +484,7 @@ class FileManager:
             Number of validated orphan publications reindexed.
         """
         count = 0
-        for folder in Path(self._directory).iterdir():
+        for folder in self._directory.iterdir():
             if len(folder.name) == 64 and all(
                 c in "0123456789abcdef" for c in folder.name
             ):
@@ -438,7 +500,7 @@ class FileManager:
             Number of marked, abandoned staging directories removed.
         """
         count = 0
-        for folder in Path(self._directory).glob(".aselenium-stage-*"):
+        for folder in self._directory.glob(".aselenium-stage-*"):
             try:
                 folder = self._managed_path(folder)
                 marker = self._managed_path(folder / "ownership.json")
@@ -534,7 +596,7 @@ class FileManager:
         """
         self._validate_cache_limit(limit)
         key = self._key(kind, version)
-        folder = self._managed_path(Path(self._directory) / key)
+        folder = self._managed_path(self._directory / key)
         with artifact_lock(self._directory, key):
             if folder.exists():
                 marker = self._managed_path(folder / "artifact.json")
@@ -560,7 +622,7 @@ class FileManager:
                     created=time.time(),
                 )
 
-                def before_publish(staging: Path, executable: str) -> None:
+                def before_publish(staging: Path, executable: Path) -> None:
                     """Write and flush the recovery manifest before the artifact directory is published.
 
                     Args:
@@ -568,17 +630,15 @@ class FileManager:
                         executable: Validated executable path inside the staging directory.
                     """
                     row.update(
-                        executable=str(Path(executable).relative_to(staging)),
+                        executable=str(executable.relative_to(staging)),
                         sha256=digest(executable),
                     )
-                    with open(Path(staging) / "artifact.json", "x") as stream:
+                    with (staging / "artifact.json").open("x") as stream:
                         json.dump(row, stream)
                         stream.flush()
                         os.fsync(stream.fileno())
 
-                archive.unpack(
-                    str(folder), _before_publish=before_publish, _owner_key=key
-                )
+                archive.unpack(folder, _before_publish=before_publish, _owner_key=key)
             self._publish(row)
         self.prune(kind, limit, keep=key)
         return self._result(row)
@@ -627,7 +687,7 @@ class FileManager:
         with artifact_lock(self._directory, key), self._db() as db:
             db.execute("UPDATE artifacts SET pinned=? WHERE key=?", (int(pinned), key))
 
-    def lease(self, location: str) -> str | None:
+    def lease(self, location: PathInput) -> str | None:
         """Protect an indexed artifact while its owning process/session is alive.
 
         Args:
@@ -636,10 +696,15 @@ class FileManager:
         Returns:
             A lease token, or None if the location is outside this cache.
         """
-        path = Path(location)
+        path = parse_path(location)
         try:
-            key = path.relative_to(self._directory).parts[0]
+            relative = path.relative_to(self._directory)
         except ValueError:
+            return None
+        if not relative.parts or ".." in relative.parts:
+            return None
+        key = relative.parts[0]
+        if len(key) != 64 or any(c not in "0123456789abcdef" for c in key):
             return None
         with artifact_lock(self._directory, key), self._db() as db:
             row = db.execute("SELECT * FROM artifacts WHERE key=?", (key,)).fetchone()
@@ -732,7 +797,7 @@ class FileManager:
                             )
                     if active:
                         continue
-                    self._delete_folder(Path(self._directory) / row["key"])
+                    self._delete_folder(self._directory / row["key"])
                     db.execute("DELETE FROM artifacts WHERE key=?", (row["key"],))
             except (errors.DriverManagerError, OSError):
                 LOG.warning("Cache eviction deferred", exc_info=False)

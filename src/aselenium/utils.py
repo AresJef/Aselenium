@@ -22,19 +22,24 @@ from __future__ import annotations
 
 from collections.abc import ItemsView, Iterator, KeysView, ValuesView
 from math import ceil, floor
-from os import PathLike, fspath
-from os.path import dirname, expanduser, isdir, isfile
-from pathlib import Path
 from platform import system
 from plistlib import load
 from typing import (
     Any,
     TypeVar,
+    cast,
 )
 
 from orjson import loads
 
 from aselenium import errors
+from aselenium._paths import (
+    PathInput,
+    directory_path,
+    file_path,
+    parse_path,
+    save_file_path,
+)
 
 __all__ = ["KeyboardKeys", "MouseButtons"]
 R = TypeVar("R", bound="Rectangle")
@@ -552,7 +557,7 @@ def process_keys(*keys: object) -> list[str]:
 
 
 # Utils: file -------------------------------------------------------------------------------------
-def is_path_dir(path: str | Any) -> bool:
+def is_path_dir(path: object) -> bool:
     """Check if a path exists and is a directory.
 
     Args:
@@ -562,12 +567,12 @@ def is_path_dir(path: str | Any) -> bool:
         True if a path exists and is a directory; otherwise False.
     """
     try:
-        return isdir(path)
-    except Exception:
+        return parse_path(cast(PathInput, path)).is_dir()
+    except (errors.AseleniumInvalidPathError, OSError):
         return False
 
 
-def is_path_file(path: str | Any) -> bool:
+def is_path_file(path: object) -> bool:
     """Check if a path exists and is a file.
 
     Args:
@@ -577,12 +582,12 @@ def is_path_file(path: str | Any) -> bool:
         True if a path exists and is a file; otherwise False.
     """
     try:
-        return isfile(path)
-    except Exception:
+        return parse_path(cast(PathInput, path)).is_file()
+    except (errors.AseleniumInvalidPathError, OSError):
         return False
 
 
-def is_file_dir_exists(file: str | Any) -> bool:
+def is_file_dir_exists(file: object) -> bool:
     """Check if the file's directory exists.
 
     Args:
@@ -592,12 +597,12 @@ def is_file_dir_exists(file: str | Any) -> bool:
         True if the file's directory exists; otherwise False.
     """
     try:
-        return isdir(dirname(file))
-    except Exception:
+        return parse_path(cast(PathInput, file)).parent.is_dir()
+    except (errors.AseleniumInvalidPathError, OSError):
         return False
 
 
-def _absolute_path(path: str | PathLike[str]) -> str:
+def _absolute_path(path: PathInput) -> str:
     """Expand a nonempty text path without resolving filesystem aliases.
 
     Args:
@@ -613,18 +618,10 @@ def _absolute_path(path: str | PathLike[str]) -> str:
         errors.AseleniumInvalidPathError: The path is empty, contains a null
             character, is not string-valued, or cannot be made absolute.
     """
-    try:
-        value = fspath(path)
-        if not isinstance(value, str) or not value or "\x00" in value:
-            raise ValueError("Expected a nonempty text path without null characters")
-        return str(Path(expanduser(value)).absolute())
-    except Exception as err:
-        raise errors.AseleniumInvalidPathError(
-            "Filesystem path {} {} is not valid.".format(repr(path), type(path))
-        ) from err
+    return str(parse_path(path))
 
 
-def validate_dir(path: str | PathLike[str]) -> str:
+def validate_dir(path: PathInput) -> str:
     """Validate an existing directory and return its absolute path.
 
     Args:
@@ -647,15 +644,10 @@ def validate_dir(path: str | PathLike[str]) -> str:
         >>> Path(validate_dir(".")).is_absolute()
         True
     """
-    path = _absolute_path(path)
-    if not is_path_dir(path):
-        raise errors.AseleniumDirectoryNotFoundError(
-            "Directory '{}' does not exist.".format(path)
-        )
-    return path
+    return str(directory_path(path))
 
 
-def validate_file(path: str | PathLike[str]) -> str:
+def validate_file(path: PathInput) -> str:
     """Validate an existing regular file and return its absolute path.
 
     Args:
@@ -673,15 +665,10 @@ def validate_file(path: str | PathLike[str]) -> str:
         errors.AseleniumFileNotFoundError: The path does not identify an existing
             regular file. Symbolic links to existing regular files are valid.
     """
-    path = _absolute_path(path)
-    if not is_path_file(path):
-        raise errors.AseleniumFileNotFoundError(
-            "File '{}' does not exist.".format(path)
-        )
-    return path
+    return str(file_path(path))
 
 
-def validate_save_file_path(path: str | PathLike[str], file_ext: str) -> str:
+def validate_save_file_path(path: PathInput, file_ext: str) -> str:
     """Validate a file destination and append its required suffix when absent.
 
     Args:
@@ -710,22 +697,7 @@ def validate_save_file_path(path: str | PathLike[str], file_ext: str) -> str:
         >>> Path(destination).is_absolute() and destination.endswith("capture.png")
         True
     """
-    path = _absolute_path(path)
-    if is_path_dir(path):
-        raise errors.AseleniumInvalidPathError(
-            "Output path '{}' identifies a directory, not a file.".format(path)
-        )
-    if not is_file_dir_exists(path):
-        raise errors.AseleniumDirectoryNotFoundError(
-            "File directory '{}' does not exist.".format(path)
-        )
-    if not path.endswith(file_ext):
-        path += file_ext
-    if is_path_dir(path):
-        raise errors.AseleniumInvalidPathError(
-            "Output path '{}' identifies a directory, not a file.".format(path)
-        )
-    return path
+    return str(save_file_path(path, file_ext))
 
 
 # Utils: dict -------------------------------------------------------------------------------------
@@ -767,7 +739,7 @@ def prettify_dict(dic: dict[str, Any], lead: str = "  ") -> str:
 
 
 # Utils: plist ------------------------------------------------------------------------------------
-def load_plist_file(plist_file: str) -> dict[str, Any]:
+def load_plist_file(plist_file: PathInput) -> dict[str, Any]:
     """Load a local plist file.
 
     Args:
@@ -776,12 +748,12 @@ def load_plist_file(plist_file: str) -> dict[str, Any]:
     Returns:
         A local plist file.
     """
-    with open(plist_file, "rb") as file:
+    with parse_path(plist_file).open("rb") as file:
         return load(file)
 
 
 # Utils: json -------------------------------------------------------------------------------------
-def load_json_file(json_file: str) -> dict[str, Any]:
+def load_json_file(json_file: PathInput) -> dict[str, Any]:
     """Load a local json file.
 
     Args:
@@ -790,5 +762,5 @@ def load_json_file(json_file: str) -> dict[str, Any]:
     Returns:
         A local json file.
     """
-    with open(json_file, "r", encoding="utf-8") as file:
+    with parse_path(json_file).open("r", encoding="utf-8") as file:
         return loads(file.read())

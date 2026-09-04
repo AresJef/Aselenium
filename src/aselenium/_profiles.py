@@ -9,11 +9,12 @@ from typing import (
 )
 
 from aselenium import errors
+from aselenium._paths import parse_path
 
 if TYPE_CHECKING:
     from aselenium.options import BaseOptions
 
-_OWNERS: dict[str, object] = {}
+_OWNERS: dict[Path, object] = {}
 _LOCK = RLock()
 
 
@@ -31,7 +32,9 @@ def claim_profile(options: BaseOptions, owner: object) -> None:
             paths.append(arg.split("=", 1)[1])
         elif arg == "--user-data-dir" and index + 1 < len(args):
             paths.append(args[index + 1])
-    paths = [str(Path(path).expanduser().resolve()) for path in paths]
+    # Resolve only at this ownership boundary so aliases to the same shared
+    # profile cannot bypass the process-local reservation.
+    paths = [parse_path(path).resolve() for path in paths]
     with _LOCK:
         if any(path in _OWNERS and _OWNERS[path] is not owner for path in paths):
             raise errors.InvalidProfileError(

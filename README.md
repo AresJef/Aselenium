@@ -176,7 +176,7 @@ from aselenium import Chrome
 async def main():
     cache = Path("./browser-cache")
     cache.mkdir(parents=True, exist_ok=True)
-    driver = Chrome(directory=str(cache))
+    driver = Chrome(directory=cache)
     driver.options.add_arguments("--headless=new")
     driver.options.set_timeouts(implicit=0, pageLoad=20, script=5)
     driver.options.session_timeout = 30
@@ -239,7 +239,7 @@ from aselenium import Chrome
 async def google_main():
     cache = Path("./browser-cache")
     cache.mkdir(parents=True, exist_ok=True)
-    driver = Chrome(directory=str(cache))
+    driver = Chrome(directory=cache)
     try:
         driver.options.set_timeouts(implicit=0, pageLoad=30, script=5)
         driver.options.session_timeout = 40
@@ -287,6 +287,13 @@ An important convention: some properties perform browser requests and must be
 awaited (`await session.title`, `await element.text`). Local metadata and
 configuration are synchronous (`session.id`, `driver.options`, `element.id`).
 
+All public filesystem arguments accept either a string or a string-valued
+`os.PathLike` object, including `pathlib.Path`. Aselenium expands `~`, anchors
+relative paths once at the API boundary, validates the resulting path, and keeps
+it as a `Path` throughout the internal workflow. You do not need to call `str()`
+or `resolve()` first; preserving the `Path` also avoids platform-specific parsing
+differences on Windows.
+
 ### Driver management
 
 Each facade owns a manager, available as `driver.manager`. You can also use a
@@ -297,10 +304,10 @@ from pathlib import Path
 from aselenium import ChromeDriverManager
 
 
-async def provision_chrome(cache_directory: str, *, offline: bool = False):
-    directory = Path(cache_directory).expanduser().resolve()
+async def provision_chrome(cache_directory: str | Path, *, offline: bool = False):
+    directory = Path(cache_directory).expanduser()
     directory.mkdir(parents=True, exist_ok=True)
-    manager = ChromeDriverManager(directory=str(directory))
+    manager = ChromeDriverManager(directory=directory)
     result = await manager.install_result(
         version="build",
         policy="offline" if offline else "compatible-build",
@@ -467,10 +474,12 @@ def configure_chrome(driver: Chrome):
     options.strict_file_interactability = True
     options.session_timeout = 30
     options.set_timeouts(implicit=0, pageLoad=20, script=5)
-    options.set_preferences(**{
-        "credentials_enable_service": False,
-        "profile.password_manager_enabled": False,
-    })
+    options.set_preferences(
+        **{
+            "credentials_enable_service": False,
+            "profile.password_manager_enabled": False,
+        }
+    )
     options.add_experimental_options(excludeSwitches=["enable-logging"])
 ```
 
@@ -609,9 +618,7 @@ from aselenium import Session
 
 async def wait_for_input(session: Session):
     await session.set_timeouts(implicit=0, pageLoad=20, script=5)
-    field = await session.wait_for(
-        lambda: session.find_element("#name"), timeout=5
-    )
+    field = await session.wait_for(lambda: session.find_element("#name"), timeout=5)
     if not field:
         raise TimeoutError("#name did not appear within five seconds")
     if not await field.wait_until("enabled", timeout=2):
@@ -687,7 +694,7 @@ from pathlib import Path
 from aselenium import Session
 
 
-async def fill_form(session: Session, upload_path: str):
+async def fill_form(session: Session, upload_path: str | Path):
     # This recipe uses the form IDs in src/demo_assets/index.html.
     field = await session.find_1st_element("#name", "input[name='name']")
     if field is None:
@@ -702,7 +709,7 @@ async def fill_form(session: Session, upload_path: str):
     upload = await session.find_element("#upload")
     if upload is None:
         raise LookupError("File input not found")
-    await upload.upload(str(Path(upload_path).expanduser().resolve()))
+    await upload.upload(Path(upload_path))
     await field.submit()  # Awaited submission of the enclosing form.
 ```
 
@@ -835,9 +842,7 @@ from aselenium import Session
 
 
 async def answer_prompt(session: Session):
-    await session.execute_script(
-        "setTimeout(() => prompt('Your name?', ''), 100)"
-    )
+    await session.execute_script("setTimeout(() => prompt('Your name?', ''), 100)")
     alert = await session.get_alert(timeout=5)
     if alert is None:
         raise TimeoutError("Prompt did not appear")
@@ -862,10 +867,14 @@ from aselenium import Session
 
 async def round_trip_cookie(session: Session):
     # Assumes the session is already on your HTTP(S) page.
-    await session.add_cookie({
-        "name": "demo-preference", "value": "compact", "path": "/",
-        "sameSite": "Lax",
-    })
+    await session.add_cookie(
+        {
+            "name": "demo-preference",
+            "value": "compact",
+            "path": "/",
+            "sameSite": "Lax",
+        }
+    )
     try:
         cookie = await session.get_cookie("demo-preference")
         return None if cookie is None else cookie["value"]
@@ -979,12 +988,14 @@ from pathlib import Path
 from aselenium import Session
 
 
-async def capture_page(session: Session, output_directory: str, *, pdf: bool = False):
-    output = Path(output_directory).expanduser().resolve()
+async def capture_page(
+    session: Session, output_directory: str | Path, *, pdf: bool = False
+):
+    output = Path(output_directory).expanduser()
     await asyncio.to_thread(output.mkdir, parents=True, exist_ok=True)
-    if not await session.save_screenshot(str(output / "page.png")):
+    if not await session.save_screenshot(output / "page.png"):
         raise RuntimeError("Screenshot was not saved")
-    if pdf and not await session.save_page(str(output / "page.pdf"), background=True):
+    if pdf and not await session.save_page(output / "page.pdf", background=True):
         raise RuntimeError("PDF was not saved or printing is unsupported")
 ```
 
@@ -1076,7 +1087,8 @@ async def chromium_diagnostics(session: ChromeSession | ChromiumSession | EdgeSe
         original = await session.network
         try:
             await session.set_network(
-                offline=False, latency=25,
+                offline=False,
+                latency=25,
                 download_throughput=1024 * 1024,
                 upload_throughput=512 * 1024,
             )
@@ -1113,9 +1125,9 @@ from pathlib import Path
 from aselenium import FirefoxSession
 
 
-async def use_temporary_addon(session: FirefoxSession, addon_path: str):
+async def use_temporary_addon(session: FirefoxSession, addon_path: str | Path):
     # Use a trusted .xpi file or an unpacked extension directory.
-    path = str(Path(addon_path).expanduser().resolve())
+    path = Path(addon_path)
     addons = await session.install_addons(path, temporary=True)
     try:
         return [addon.id for addon in addons]

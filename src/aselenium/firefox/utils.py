@@ -22,9 +22,6 @@ from __future__ import annotations
 
 from base64 import b64encode
 from io import BytesIO
-from os import walk as walk_path
-from os.path import join as join_path
-from os.path import relpath
 from typing import (
     Any,
 )
@@ -33,7 +30,8 @@ from zipfile import ZIP_DEFLATED, ZipFile, is_zipfile
 from orjson import loads
 
 from aselenium import errors
-from aselenium.utils import CustomDict, is_path_dir, is_path_file, validate_dir
+from aselenium._paths import PathInput, directory_path, parse_path
+from aselenium.utils import CustomDict
 
 
 # Utils: addon ------------------------------------------------------------------------------------
@@ -108,17 +106,34 @@ class FirefoxAddon(CustomDict):
         return FirefoxAddon(**self._dict)
 
 
-def extract_firefox_addon_details(path: str) -> FirefoxAddon:
+def extract_firefox_addon_details(path: PathInput) -> FirefoxAddon:
     """Extract the details of a Firefox addon.
 
     Args:
-        path: The absolute path to the addon file (//.xpi) or folder.
+        path: Existing packed ``.xpi`` file or unpacked add-on directory,
+            supplied as text or a string-valued path-like object. Relative paths
+            and ``~`` are accepted.
 
     Returns:
-        The details of the addon.
+        Validated add-on name, version, and optional Gecko identifier.
+
+    Raises:
+        errors.InvalidExtensionError: The path is missing, the archive or
+            manifest cannot be read, or ``manifest.json`` is not a supported
+            WebExtension manifest.
 
     Example:
-        >>> details = extract_firefox_addon_details("/path/to/extension.xpi")
+        >>> import json
+        >>> from pathlib import Path
+        >>> from tempfile import TemporaryDirectory
+        >>> from aselenium.firefox.utils import extract_firefox_addon_details
+        >>> with TemporaryDirectory() as temporary:
+        ...     addon = Path(temporary)
+        ...     manifest = {"manifest_version": 3, "name": "Demo", "version": "1.0"}
+        ...     _ = (addon / "manifest.json").write_text(json.dumps(manifest))
+        ...     details = extract_firefox_addon_details(addon)
+        >>> (details.name, details.version)
+        ('Demo', '1.0')
     """
 
     def parse_manifest_json(content: str | bytes) -> FirefoxAddon:
@@ -161,17 +176,21 @@ def extract_firefox_addon_details(path: str) -> FirefoxAddon:
 
     # Extract add-on details
     try:
-        if is_path_file(path) and is_zipfile(path):
-            with ZipFile(path, "r") as zip:
+        # The central parser reuses an absolute ``Path`` unchanged, so callers
+        # get one public conversion without duplicating parsing in this workflow.
+        addon_path = parse_path(path)
+        if addon_path.is_file() and is_zipfile(addon_path):
+            with ZipFile(addon_path, "r") as zip:
                 return parse_manifest_json(zip.read("manifest.json"))
-        elif is_path_dir(path):
-            with open(join_path(path, "manifest.json"), "r", encoding="utf-8") as file:
-                return parse_manifest_json(file.read())
+        elif addon_path.is_dir():
+            return parse_manifest_json(
+                (addon_path / "manifest.json").read_text(encoding="utf-8")
+            )
         else:
             raise errors.InvalidExtensionError(
                 "Invalid Firefox add-on path: {}. Must either be a .xpi "
                 "add-on file or a folder containing the unpacked add-on "
-                "data.".format(repr(path))
+                "data.".format(repr(addon_path))
             )
     except errors.InvalidExtensionError:
         raise
@@ -181,7 +200,7 @@ def extract_firefox_addon_details(path: str) -> FirefoxAddon:
         ) from err
 
 
-def encode_dir_to_firefox_wire_protocol(directory: str) -> str:
+def encode_dir_to_firefox_wire_protocol(directory: PathInput) -> str:
     """Encode a directory as a base64 ZIP with paths relative to its root.
 
     Args:
@@ -192,14 +211,18 @@ def encode_dir_to_firefox_wire_protocol(directory: str) -> str:
         The ZIP bytes encoded as base64 text for Firefox's profile/add-on protocol.
 
     Raises:
-        AseleniumInvalidPathError: If the path is invalid or the directory is missing.
+        errors.AseleniumInvalidPathError: The input cannot be parsed safely.
+        errors.AseleniumDirectoryNotFoundError: The path is not an existing directory.
         OSError: If a contained file cannot be read.
     """
-    directory = validate_dir(directory)
+    root = directory_path(directory)
     fp = BytesIO()
     with ZipFile(fp, "w", ZIP_DEFLATED) as zip:
-        for base, _, files in walk_path(directory):
-            for fyle in files:
-                filename = join_path(base, fyle)
-                zip.write(filename, relpath(filename, directory))
+        members = sorted(
+            (path for path in root.rglob("*") if path.is_file()),
+            key=lambda path: path.relative_to(root).as_posix(),
+        )
+        for filename in members:
+            # ZIP member names always use POSIX separators, including on Windows.
+            zip.write(filename, filename.relative_to(root).as_posix())
     return b64encode(fp.getvalue()).decode("utf-8")

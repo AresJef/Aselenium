@@ -25,6 +25,7 @@ from typing import (
     Any,
 )
 
+from aselenium._paths import PathInput
 from aselenium.chromium.options import ChromiumOptions
 from aselenium.chromium.service import ChromiumService
 from aselenium.chromium.session import ChromiumSession
@@ -58,7 +59,7 @@ class Chromium(ChromiumBaseWebDriver):
 
     def __init__(
         self,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -117,7 +118,7 @@ class Chromium(ChromiumBaseWebDriver):
     def acquire(
         self,
         version: ChromiumVersion | str = "build",
-        binary: str | None = None,
+        binary: PathInput | None = None,
     ) -> ChromiumSessionContext:
         """Acquire a new Chromium session.
 

@@ -26,6 +26,7 @@ from typing import (
     Literal,
 )
 
+from aselenium._paths import PathInput
 from aselenium.chrome.options import ChromeOptions
 from aselenium.chrome.service import ChromeService
 from aselenium.chrome.session import ChromeSession
@@ -59,7 +60,7 @@ class Chrome(ChromiumBaseWebDriver):
 
     def __init__(
         self,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -119,7 +120,7 @@ class Chrome(ChromiumBaseWebDriver):
         self,
         version: ChromiumVersion | str = "build",
         channel: Literal["stable", "beta", "dev", "cft"] = "stable",
-        binary: str | None = None,
+        binary: PathInput | None = None,
     ) -> ChromeSessionContext:
         """Create a single-use context for a new Chrome session.
 

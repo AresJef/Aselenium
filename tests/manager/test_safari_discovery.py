@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import plistlib
+from os import PathLike
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
@@ -27,6 +28,36 @@ MALFORMED_PLISTS = [
         id="malformed-xml",
     ),
 ]
+
+
+class _CountingTextPath(PathLike[str]):
+    """Expose a text path while recording filesystem-boundary conversion."""
+
+    def __init__(self, path: Path) -> None:
+        """Store the represented path.
+
+        Args:
+            path: Concrete filesystem path returned by ``__fspath__``.
+        """
+        self.path = path
+        self.calls = 0
+
+    def __fspath__(self) -> str:
+        """Return the represented path and record the conversion.
+
+        Returns:
+            Text path accepted by the package path boundary.
+        """
+        self.calls += 1
+        return str(self.path)
+
+    def __str__(self) -> str:
+        """Prove path handling never depends on an arbitrary text conversion.
+
+        Raises:
+            AssertionError: Always; valid path-like values must use ``__fspath__``.
+        """
+        raise AssertionError("PathLike.__str__ must not be used for path parsing")
 
 
 @pytest.mark.parametrize("method", ["_parse_browser_version", "_parse_driver_version"])
@@ -118,7 +149,7 @@ def synthetic_safari_platform(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
     monkeypatch.setattr(drivers, "machine", lambda: "arm64")
     default_driver = tmp_path / "synthetic-system" / "safaridriver"
     monkeypatch.setattr(
-        drivers.SafariDriverManager, "_MAC_DRIVER_DEFAULT_PATH", str(default_driver)
+        drivers.SafariDriverManager, "_MAC_DRIVER_DEFAULT_PATH", default_driver
     )
     return default_driver
 
@@ -215,7 +246,7 @@ def test_safari_version_uses_own_bundle_when_parent_contains_contents_macos(
     browser, _ = make_bundle(tmp_path / "Contents" / "MacOS" / "outer directory")
     manager = drivers.SafariDriverManager(directory=str(tmp_path))
 
-    assert manager._detect_browser_version(str(browser)).version == "17.4.1"
+    assert manager._detect_browser_version(browser).version == "17.4.1"
 
 
 def test_safari_prefers_version_plist_when_both_metadata_files_exist(
@@ -232,7 +263,7 @@ def test_safari_prefers_version_plist_when_both_metadata_files_exist(
     )
     manager = drivers.SafariDriverManager(directory=str(tmp_path))
 
-    assert manager._detect_browser_version(str(browser)).version == "17.4.1"
+    assert manager._detect_browser_version(browser).version == "17.4.1"
 
 
 def test_safari_missing_metadata_preserves_info_plist_failure_cause(
@@ -248,7 +279,7 @@ def test_safari_missing_metadata_preserves_info_plist_failure_cause(
     manager = drivers.SafariDriverManager(directory=str(tmp_path))
 
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as caught:
-        manager._detect_browser_version(str(browser))
+        manager._detect_browser_version(browser)
 
     assert isinstance(caught.value.__cause__, FileNotFoundError)
     assert caught.value.__cause__.filename == str(browser.parent.parent / "Info.plist")
@@ -274,7 +305,7 @@ def test_safari_malformed_version_plist_does_not_hide_error_with_info_fallback(
     manager = drivers.SafariDriverManager(directory=str(tmp_path))
 
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as caught:
-        manager._detect_browser_version(str(browser))
+        manager._detect_browser_version(browser)
 
     assert isinstance(caught.value.__cause__, cause_type)
 
@@ -301,7 +332,7 @@ def test_safari_invalid_version_metadata_preserves_original_cause(
     manager = drivers.SafariDriverManager(directory=str(tmp_path))
 
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as caught:
-        manager._detect_browser_version(str(browser))
+        manager._detect_browser_version(browser)
 
     assert isinstance(caught.value.__cause__, cause_type)
 
@@ -331,10 +362,10 @@ def test_safari_permission_error_does_not_trigger_info_fallback(
     manager = drivers.SafariDriverManager(directory=str(tmp_path))
 
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as caught:
-        manager._detect_browser_version(str(browser))
+        manager._detect_browser_version(browser)
 
     assert isinstance(caught.value.__cause__, PermissionError)
-    assert attempted == [str(browser.parent.parent / "version.plist")]
+    assert attempted == [browser.parent.parent / "version.plist"]
 
 
 @pytest.mark.asyncio
@@ -426,6 +457,47 @@ def test_safari_explicit_driver_rejects_directory_with_correct_name(
         manager._parse_target_driver(str(driver))
 
 
+def test_safari_explicit_driver_is_stored_as_validated_path(tmp_path: Path) -> None:
+    """Keep an explicit Safari driver as a Path until the public result boundary.
+
+    Args:
+        tmp_path: Isolated directory containing the synthetic driver.
+    """
+    driver = tmp_path / "safaridriver"
+    driver.write_bytes(b"synthetic driver")
+    manager = drivers.SafariDriverManager(directory=tmp_path)
+
+    manager._parse_target_driver(driver)
+
+    assert manager._target_driver == driver
+    assert isinstance(manager._target_driver, Path)
+
+
+@pytest.mark.asyncio
+async def test_safari_result_request_uses_single_parsed_custom_pathlikes(
+    tmp_path: Path,
+) -> None:
+    """Publish validated browser and driver overrides in the result request.
+
+    Args:
+        tmp_path: Isolated directory containing the synthetic Safari bundle.
+    """
+    browser, driver = make_bundle(tmp_path)
+    supplied_browser = _CountingTextPath(browser)
+    supplied_driver = _CountingTextPath(driver)
+    manager = drivers.SafariDriverManager(directory=tmp_path)
+
+    result = await manager.install_result(
+        channel="dev", binary=supplied_browser, driver=supplied_driver
+    )
+
+    assert supplied_browser.calls == 1
+    assert supplied_driver.calls == 1
+    assert result.request.binary == str(browser)
+    assert result.request.driver == str(driver)
+    assert manager.last_result == result
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize("channel", ["beta", "unknown"])
 async def test_safari_rejects_unsupported_channel_even_with_explicit_paths(
@@ -495,30 +567,26 @@ def test_safari_driver_discovery_finds_nested_bundle_executable(tmp_path: Path) 
     manager = drivers.SafariDriverManager(directory=str(tmp_path))
     manager._channel = "dev"
     manager._browser_location = str(browser)
-    manager._target_binary = str(browser)
+    manager._target_binary = browser
 
-    assert manager._detect_driver_location() == str(driver)
+    assert manager._detect_driver_location(browser) == driver
 
 
-def test_safari_driver_discovery_revalidates_walk_results(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_safari_driver_discovery_ignores_matching_directory(
+    tmp_path: Path,
 ) -> None:
-    """Verify safari driver discovery revalidates walk results.
+    """Ignore a matching directory encountered during recursive discovery.
 
     Args:
         tmp_path: Isolated temporary directory supplied by pytest.
-        monkeypatch: Pytest fixture for reversible environment, attribute, and path patches.
     """
     browser, _ = make_bundle(tmp_path, with_driver=False)
-    stale_folder = browser.parent.parent / "Resources"
-    stale_folder.mkdir()
-    monkeypatch.setattr(
-        drivers, "walk_path", lambda root: [(str(stale_folder), [], ["safaridriver"])]
-    )
+    stale_driver = browser.parent.parent / "Resources" / "safaridriver"
+    stale_driver.mkdir(parents=True)
     manager = drivers.SafariDriverManager(directory=str(tmp_path))
     manager._channel = "dev"
     manager._browser_location = str(browser)
-    manager._target_binary = str(browser)
+    manager._target_binary = browser
 
     with pytest.raises(errors.DriverExecutableNotDetectedError):
-        manager._detect_driver_location()
+        manager._detect_driver_location(browser)

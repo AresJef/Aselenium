@@ -51,7 +51,7 @@ convention = "google"
 
 [tool.mypy]
 python_version = "3.10"
-files = ["src/aselenium/_async.py", "src/aselenium/_wait.py", "src/aselenium/_profiles.py", "src/aselenium/_output.py", "src/aselenium/valuewrap.py", "src/aselenium/manager/_cache.py", "src/aselenium/manager/_http.py", "src/aselenium/manager/_installation.py", "src/aselenium/manager/_filesystem.py", "src/aselenium/manager/version.py", "src/aselenium/firefox/utils.py", "src/aselenium/connection.py", "src/aselenium/errors.py", "src/aselenium/webdriver.py", "src/aselenium/actions.py", "src/aselenium/alert.py", "src/aselenium/utils.py", "src/aselenium/manager/file.py", "src/aselenium/element.py"]
+files = ["src/aselenium/_async.py", "src/aselenium/_wait.py", "src/aselenium/_paths.py", "src/aselenium/_profiles.py", "src/aselenium/_output.py", "src/aselenium/valuewrap.py", "src/aselenium/manager/_cache.py", "src/aselenium/manager/_http.py", "src/aselenium/manager/_installation.py", "src/aselenium/manager/_filesystem.py", "src/aselenium/manager/version.py", "src/aselenium/firefox/utils.py", "src/aselenium/connection.py", "src/aselenium/errors.py", "src/aselenium/webdriver.py", "src/aselenium/actions.py", "src/aselenium/alert.py", "src/aselenium/utils.py", "src/aselenium/manager/file.py", "src/aselenium/element.py"]
 follow_imports = "silent"
 ignore_missing_imports = true
 check_untyped_defs = true

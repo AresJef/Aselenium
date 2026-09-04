@@ -44,10 +44,10 @@ def make_driver(args: argparse.Namespace) -> WebDriver:
     """
     if args.browser == "safari":
         return Safari()  # Safari has no download/cache constructor parameters.
-    cache = args.cache_dir.expanduser().resolve()
+    cache = args.cache_dir.expanduser()
     cache.mkdir(parents=True, exist_ok=True)
     return BROWSERS[args.browser](
-        directory=str(cache),
+        directory=cache,
         max_cache_size=None,
         request_timeout=20,
         download_timeout=90,

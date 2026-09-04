@@ -25,7 +25,6 @@ import logging
 import os
 import stat
 from collections.abc import Callable
-from os import chmod, makedirs
 from pathlib import Path
 from shutil import copyfileobj, rmtree
 from tarfile import ReadError
@@ -39,6 +38,7 @@ from zipfile import ZipFile
 import psutil
 
 from aselenium import errors
+from aselenium._paths import PathInput, parse_path
 from aselenium.manager._cache import (
     ChromeFileManager as ChromeFileManager,
 )
@@ -132,23 +132,25 @@ class File:
     # Unpack ------------------------------------------------------------------------------
     def unpack(
         self,
-        directory: str,
+        directory: PathInput,
         *,
-        _before_publish: Callable[[Path, str], None] | None = None,
+        _before_publish: Callable[[Path, Path], None] | None = None,
         _owner_key: str | None = None,
     ) -> str:
         """Unpack the file.
 
         Args:
-            directory: The directory to unpack the files.
+            directory: Destination supplied as text or a string-valued path-like object.
             _before_publish: Optional hook called with the staging directory and executable before rename.
             _owner_key: Artifact ownership key recorded for safe abandoned-staging recovery.
 
         Returns:
             The path to the target executable of the unpacked files.
         """
-        destination = Path(directory).absolute()
-        staging = None
+        # ``parse_path`` is a zero-conversion fast path for an already-owned,
+        # absolute ``Path`` and the single validation boundary for public input.
+        destination = parse_path(directory)
+        staging: Path | None = None
         try:
             # The caller selects the parent; never follow a link at the entry
             # itself and never overwrite an existing entry, even if incomplete.
@@ -160,12 +162,12 @@ class File:
                 )
             staging = Path(
                 filesystem_operation(
-                    lambda: mkdtemp(prefix=".aselenium-stage-", dir=str(parent)),
+                    lambda: mkdtemp(prefix=".aselenium-stage-", dir=parent),
                     "Create private extraction staging directory",
                 )
             )
             if _owner_key is not None:
-                with open(staging / "ownership.json", "x") as marker:
+                with (staging / "ownership.json").open("x") as marker:
                     json.dump(
                         {
                             "key": _owner_key,
@@ -174,8 +176,8 @@ class File:
                         },
                         marker,
                     )
-            download_file = self._save_file(str(staging))
-            folder = str(staging / "extracted")
+            download_file = self._save_file(staging)
+            folder = staging / "extracted"
             if self._filetype == "zip":
                 members = self._extract_zip_file(download_file, folder)
             elif self._filetype == "tar.gz":
@@ -187,7 +189,7 @@ class File:
                 raise ValueError(
                     "Downloaded archive does not contain the expected executable"
                 )
-            relative = Path(executable).relative_to(staging)
+            relative = executable.relative_to(staging)
             publication = staging
             # The extracted tree is authoritative; do not retain a second
             # compressed copy of every driver/browser in the cache.
@@ -227,7 +229,7 @@ class File:
                     def cleanup() -> None:
                         """Remove only the failed extraction staging directory owned by this call."""
                         checked_path(staging.parent, staging)
-                        rmtree(str(staging))
+                        rmtree(staging)
 
                     filesystem_operation(
                         cleanup, "Remove failed extraction staging %s" % staging
@@ -235,14 +237,14 @@ class File:
                 except (errors.DriverManagerError, OSError, ValueError) as cause:
                     _LOGGER.warning("Extraction staging retained: %s", cause)
 
-    def _save_file(self, directory: str) -> str:
+    def _save_file(self, directory: Path) -> Path:
         """Save the downloaded content into a file.
 
         Args:
-            directory: The directory to save the file.
+            directory: Absolute private directory owned by this extraction workflow.
 
         Returns:
-            The absolute path to the saved file.
+            Absolute path to the saved file.
         """
         content = self._content
         if content is None:
@@ -250,31 +252,33 @@ class File:
                 "Downloaded content has already been consumed"
             )
         try:
-            root = Path(directory).absolute()
+            root = directory
+            if not root.is_absolute() or ".." in root.parts:
+                raise ValueError("Download directory must be an absolute owned path")
             name = member_path(self._name + "." + self.filetype)
             if len(name.parts) != 1:
                 raise ValueError("Downloaded filename must be a basename")
 
-            def save() -> str:
+            def save() -> Path:
                 """Write the downloaded archive to an exclusively created staging file.
 
                 Returns:
-                    The save string.
+                    Absolute path to the saved archive.
                 """
                 if is_link(root):
                     raise ValueError("Download directory cannot be a link")
-                makedirs(root, mode=0o700, exist_ok=True)
+                root.mkdir(mode=0o700, parents=True, exist_ok=True)
                 file_path = checked_path(root, root / str(name))
                 created = False
                 try:
-                    with open(file_path, "xb") as file:
+                    with file_path.open("xb") as file:
                         created = True
                         if isinstance(content, Download):
                             content.stream.seek(0)
                             copyfileobj(content.stream, file, 1024 * 1024)
                         else:
                             file.write(content)
-                    return str(file_path)
+                    return file_path
                 except OSError as cause:
                     # Only remove a file created by this attempt. Never remove
                     # a pre-existing destination after an exclusive-open error.
@@ -303,7 +307,7 @@ class File:
                 self._content.close()
             self._content = None
 
-    def _extract_zip_file(self, file_path: str, unzip_dir: str) -> list[str]:
+    def _extract_zip_file(self, file_path: Path, unzip_dir: Path) -> list[str]:
         """Extracts a zip file. Returns a list of the extracted file names.
 
         Args:
@@ -345,7 +349,7 @@ class File:
                 )
             ) from err
 
-    def _extract_tar_file(self, file_path: str, unzip_dir: str) -> list[str]:
+    def _extract_tar_file(self, file_path: Path, unzip_dir: Path) -> list[str]:
         """Extracts a tar file. Returns a list of the extracted file names.
 
         Args:
@@ -397,15 +401,15 @@ class File:
                 )
             ) from err
 
-    def _find_target_executable(self, base_dir: str, files: list[str]) -> str | None:
+    def _find_target_executable(self, base_dir: Path, files: list[str]) -> Path | None:
         """Find the target executable from the extracted files. Return `None` if not found.
 
         Args:
-            base_dir: Existing cache parent directory; None selects the current user home.
-            files: Files used by this operation.
+            base_dir: Absolute private archive-extraction directory.
+            files: Validated archive member names produced by the extraction writer.
 
         Returns:
-            The target executable from the extracted files. return `none` if not found. None indicates that no value is available.
+            Absolute path to the target executable, or None when it is absent.
         """
         if self._os_name == "win":
             match_name = self._WIN_EXECUTABLE_NAME
@@ -413,13 +417,19 @@ class File:
             match_name = self._MAC_EXECUTABLE_NAME
         else:
             match_name = self._LINUX_EXECUTABLE_NAME
-        root = Path(base_dir).resolve(strict=True)
+        root = checked_path(base_dir.parent, base_dir)
+        if not root.is_dir():
+            raise errors.InvalidDownloadFileError(
+                "Archive extraction directory does not exist"
+            )
         matches = []
         for file in files:
             relative = member_path(file)
+            if relative.name != match_name:
+                continue
             path = root.joinpath(*relative.parts).resolve(strict=False)
             path.relative_to(root)
-            if relative.name == match_name and path.is_file():
+            if path.is_file():
                 matches.append(path)
         matches = list(dict.fromkeys(matches))
         if not matches:
@@ -431,10 +441,10 @@ class File:
         target = checked_path(root, matches[0])
         if self._os_name != "win":
             filesystem_operation(
-                lambda: chmod(target, target.stat().st_mode | stat.S_IXUSR),
+                lambda: target.chmod(target.stat().st_mode | stat.S_IXUSR),
                 "Make validated driver executable %s" % target,
             )
-        return str(target)
+        return target
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:

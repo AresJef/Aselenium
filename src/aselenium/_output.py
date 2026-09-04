@@ -9,14 +9,14 @@ from pathlib import Path
 from aselenium._async import run_blocking
 
 
-def _write_atomic(path: str, data: bytes) -> None:
+def _write_atomic(path: Path, data: bytes) -> None:
     """Write bytes to a sibling temporary file and atomically replace the destination.
 
     Args:
         path: Filesystem path to inspect or operate on.
         data: Complete PNG, PDF, or other binary payload to publish.
     """
-    destination = Path(path)
+    destination = path
     # Replaces the output directory entry; never writes through an output link.
     staging = None
     try:
@@ -36,7 +36,7 @@ def _write_atomic(path: str, data: bytes) -> None:
             staging.unlink(missing_ok=True)
 
 
-async def save_bytes(path: str, data: bytes) -> bool:
+async def save_bytes(path: Path, data: bytes) -> bool:
     """Atomically save binary data without abandoning an in-flight write.
 
     Args:

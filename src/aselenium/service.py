@@ -39,7 +39,7 @@ from psutil import NoSuchProcess, Process
 
 from aselenium import errors
 from aselenium._async import finish_owned, run_blocking
-from aselenium.utils import validate_file
+from aselenium._paths import PathInput, file_path
 
 if TYPE_CHECKING:
     from aselenium.manager.version import ChromiumVersion, Version
@@ -58,7 +58,7 @@ class BaseService:
     def __init__(
         self,
         driver_version: Version,
-        driver_location: str,
+        driver_location: PathInput,
         timeout: int | float = 10,
         *args: Any,
         **kwargs: Any,
@@ -76,7 +76,7 @@ class BaseService:
         """
         # Driver
         try:
-            self._driver_location = validate_file(driver_location)
+            self._driver_location = file_path(driver_location)
         except Exception as err:
             raise errors.ServiceExecutableNotFoundError(
                 "`<{}>`\nService webdriver executable not found at: {}".format(
@@ -119,7 +119,7 @@ class BaseService:
         Returns:
             The location for the webdriver executable.
         """
-        return self._driver_location
+        return str(self._driver_location)
 
     # Timeout -----------------------------------------------------------------------------
     @property
@@ -321,7 +321,7 @@ class BaseService:
             if options.get("shell"):
                 raise errors.ServiceProcessError("Service commands cannot use a shell")
             process = Popen(
-                [self._driver_location, *self.port_args, *self._args], **options
+                [str(self._driver_location), *self.port_args, *self._args], **options
             )
             self._popen = process
             self._process = Process(process.pid)

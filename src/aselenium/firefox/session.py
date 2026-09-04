@@ -30,6 +30,7 @@ from zipfile import is_zipfile
 from aselenium import errors
 from aselenium._async import run_blocking
 from aselenium._output import save_bytes
+from aselenium._paths import PathInput, parse_path, save_file_path
 from aselenium.command import Command
 from aselenium.firefox.utils import (
     FirefoxAddon,
@@ -37,7 +38,6 @@ from aselenium.firefox.utils import (
     extract_firefox_addon_details,
 )
 from aselenium.session import Session
-from aselenium.utils import is_path_dir, is_path_file, validate_save_file_path
 
 if TYPE_CHECKING:
     from aselenium.firefox.options import FirefoxOptions
@@ -127,7 +127,7 @@ class FirefoxSession(Session):
                 )
             ) from err
 
-    async def save_full_screenshot(self, path: str) -> bool:
+    async def save_full_screenshot(self, path: PathInput) -> bool:
         """Take & save the FULL document screenshot of the active page window into a local PNG file.
 
         Args:
@@ -141,7 +141,7 @@ class FirefoxSession(Session):
         """
         # Validate screenshot path
         try:
-            path = validate_save_file_path(path, ".png")
+            destination = save_file_path(path, ".png")
         except Exception as err:
             raise errors.InvalidArgumentError(
                 "<{}>\nSave full screenshot 'path' error: {}".format(
@@ -157,7 +157,7 @@ class FirefoxSession(Session):
             if not data:
                 return False
             # . save screenshot
-            return await save_bytes(path, data)
+            return await save_bytes(destination, data)
         finally:
             del data
 
@@ -254,7 +254,7 @@ class FirefoxSession(Session):
 
     async def install_addons(
         self,
-        *paths: str,
+        *paths: PathInput,
         temporary: bool = False,
     ) -> list[FirefoxAddon]:
         r"""Install Firefox add-ons.
@@ -282,7 +282,7 @@ class FirefoxSession(Session):
             ... )
         """
 
-        def encode_addon(path: str) -> str:
+        def encode_addon(path: Path) -> str:
             # . unpacked add-on folder
             """Read and base64-encode the validated local Firefox add-on archive.
 
@@ -292,12 +292,11 @@ class FirefoxSession(Session):
             Returns:
                 The base64-encoded archive string sent to GeckoDriver.
             """
-            if is_path_dir(path):
+            if path.is_dir():
                 return encode_dir_to_firefox_wire_protocol(path)
             # . packed add-on file
-            elif is_path_file(path) and is_zipfile(path):
-                with open(path, "rb") as file:
-                    return self._encode_base64(file.read(), "utf-8")
+            elif path.is_file() and is_zipfile(path):
+                return self._encode_base64(path.read_bytes(), "utf-8")
             # . invalid add-on
             else:
                 raise errors.InvalidExtensionError(
@@ -311,8 +310,8 @@ class FirefoxSession(Session):
         for path in paths:
             # . Validate add-on path
             try:
-                path = str(Path(path).expanduser().absolute())
-                if not (is_path_dir(path) or is_path_file(path)):
+                addon_path = parse_path(path)
+                if not (addon_path.is_dir() or addon_path.is_file()):
                     raise errors.InvalidExtensionError("Add-on path does not exist")
             except Exception as err:
                 raise errors.InvalidExtensionError(
@@ -322,7 +321,7 @@ class FirefoxSession(Session):
                 ) from err
             # . extract add-on details
             try:
-                details = await run_blocking(extract_firefox_addon_details, path)
+                details = await run_blocking(extract_firefox_addon_details, addon_path)
             except Exception as err:
                 raise errors.InvalidExtensionError(
                     f"<{self.__class__.__name__}>\n{err}"
@@ -331,13 +330,13 @@ class FirefoxSession(Session):
                 continue
             # . encode add-on data
             try:
-                addon = await run_blocking(encode_addon, path)
+                addon = await run_blocking(encode_addon, addon_path)
             except errors.InvalidExtensionError:
                 raise
             except Exception as err:
                 raise errors.InvalidExtensionError(
                     "<{}>\nFailed to encode add-on: {}\nError: {}".format(
-                        self.__class__.__name__, repr(path), err
+                        self.__class__.__name__, repr(addon_path), err
                     )
                 ) from err
             # . install add-on
@@ -350,7 +349,7 @@ class FirefoxSession(Session):
             except Exception as err:
                 raise errors.InvalidExtensionError(
                     "<{}>\nFailed to install add-on: {}\nError: {}".format(
-                        self.__class__.__name__, repr(path), err
+                        self.__class__.__name__, repr(addon_path), err
                     )
                 )
             # . parse add-on ID

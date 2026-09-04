@@ -21,21 +21,20 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from os import listdir
-from os.path import join as join_path
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
 )
 
 from aselenium import errors
+from aselenium._paths import PathInput
 from aselenium.firefox.utils import (
     FirefoxAddon,
     encode_dir_to_firefox_wire_protocol,
     extract_firefox_addon_details,
 )
 from aselenium.options import BaseOptions, Profile
-from aselenium.utils import is_path_dir
 
 if TYPE_CHECKING:
     from aselenium.manager.version import FirefoxVersion
@@ -47,7 +46,7 @@ __all__ = ["FirefoxProfile", "FirefoxOptions"]
 class FirefoxProfile(Profile):
     """Represent the user profile for Firefox."""
 
-    def __init__(self, directory: str) -> None:
+    def __init__(self, directory: PathInput) -> None:
         r"""Initialize the instance with the supplied configuration.
 
         Explanation
@@ -69,8 +68,12 @@ class FirefoxProfile(Profile):
         super().__init__(directory, None)
         # Extensions
         self._extension_details: dict[str, FirefoxAddon] = {}
-        self._extensions_dir = join_path(self._temp_profile_dir, "extensions")
-        if is_path_dir(self._extensions_dir):
+        if self._temp_profile_dir is None:
+            raise errors.InvalidProfileError(
+                "Temporary Firefox profile was not created"
+            )
+        self._extensions_dir: Path = self._temp_profile_dir / "extensions"
+        if self._extensions_dir.is_dir():
             self._load_user_extensions()
         # Profile Encode
         self._encode: str | None = None
@@ -83,7 +86,7 @@ class FirefoxProfile(Profile):
         Returns:
             The directory of the original profile.
         """
-        return self._profile_dir
+        return str(self._profile_dir)
 
     @property
     def directory_temp(self) -> str:
@@ -92,7 +95,7 @@ class FirefoxProfile(Profile):
         Returns:
             The directory of the temporary profile.
         """
-        return self._temp_profile_dir
+        return str(self._temp_profile_dir)
 
     @property
     def encode(self) -> str:
@@ -128,11 +131,9 @@ class FirefoxProfile(Profile):
 
     def _load_user_extensions(self) -> None:
         """Load the user extension details from the profile."""
-        for file in listdir(self._extensions_dir):
+        for path in self._extensions_dir.iterdir():
             try:
-                details = extract_firefox_addon_details(
-                    join_path(self._extensions_dir, file)
-                )
+                details = extract_firefox_addon_details(path)
                 self._extension_details[details.id] = details
             except errors.InvalidExtensionError:
                 pass
@@ -238,7 +239,7 @@ class FirefoxOptions(BaseOptions):
         """
         return self._profile
 
-    def set_profile(self, directory: str) -> FirefoxProfile:
+    def set_profile(self, directory: PathInput) -> FirefoxProfile:
         r"""Set the user profile for Firefox.
 
         Explanation

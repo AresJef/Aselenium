@@ -25,6 +25,7 @@ from typing import (
     Any,
 )
 
+from aselenium._paths import PathInput
 from aselenium.service import BaseService
 
 if TYPE_CHECKING:
@@ -40,7 +41,7 @@ class FirefoxService(BaseService):
     def __init__(
         self,
         driver_version: GeckoVersion,
-        driver_location: str,
+        driver_location: PathInput,
         timeout: int | float = 10,
         *args: Any,
         **kwargs: Any,

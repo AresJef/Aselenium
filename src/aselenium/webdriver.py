@@ -31,6 +31,7 @@ from typing import (
 
 from aselenium import errors
 from aselenium._async import finish_owned, run_blocking
+from aselenium._paths import PathInput
 from aselenium._profiles import claim_profile, release_profile
 from aselenium.options import BaseOptions, ChromiumBaseOptions
 
@@ -233,7 +234,7 @@ class WebDriver:
         service_cls: type[BaseService],
         options_cls: type[BaseOptions],
         session_context_cls: type[SessionContext],
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,

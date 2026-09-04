@@ -79,24 +79,22 @@ def is_link(path: Path) -> bool:
     )
 
 
-def checked_path(
-    root: str | Path, value: str | Path, *, allow_root: bool = False
-) -> Path:
+def checked_path(root: Path, value: Path, *, allow_root: bool = False) -> Path:
     """Require a lexical descendant with no existing link/reparse ancestors.
 
     Args:
-        root: Anchored root directory of the managed filesystem operation.
-        value: Value to inspect, normalize, or assign as described above.
+        root: Absolute ``Path`` anchoring the managed filesystem operation.
+        value: Absolute ``Path`` expected to remain beneath ``root``.
         allow_root: Whether the anchored root itself is accepted as the checked path.
 
     Returns:
         The absolute path after containment and link/reparse checks succeed.
     """
-    root = Path(root).absolute()
-    path = Path(value).absolute()
-    if ".." in path.parts:
-        raise ValueError("Parent traversal is not allowed: %s" % path)
-    relative = path.relative_to(root)
+    if not root.is_absolute() or not value.is_absolute():
+        raise ValueError("Managed filesystem paths must be absolute")
+    if ".." in root.parts or ".." in value.parts:
+        raise ValueError("Parent traversal is not allowed: %s" % value)
+    relative = value.relative_to(root)
     if not relative.parts and not allow_root:
         raise ValueError("The managed root itself is not an entry: %s" % root)
     current = root
@@ -107,11 +105,11 @@ def checked_path(
         if is_link(current):
             raise ValueError("Managed path contains a link/reparse point: %s" % current)
     # Also catch replacement of a parent of the anchored root with a link.
-    if path.resolve(strict=False) != path:
+    if value.resolve(strict=False) != value:
         raise ValueError(
-            "Managed path no longer resolves to its anchored location: %s" % path
+            "Managed path no longer resolves to its anchored location: %s" % value
         )
-    return path
+    return value
 
 
 def member_path(name: str) -> PurePosixPath:
@@ -145,13 +143,13 @@ def member_path(name: str) -> PurePosixPath:
 class ArchiveWriter:
     """Write into a new private extraction directory with finite expansion limits."""
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: Path) -> None:
         """Initialize the instance with the supplied configuration.
 
         Args:
-            root: Anchored root directory of the managed filesystem operation.
+            root: Absolute private extraction directory that does not yet exist.
         """
-        self.root = Path(root).absolute()
+        self.root = root
         checked_path(self.root.parent.resolve(strict=True), self.root)
         self.root.mkdir(mode=0o700, parents=False, exist_ok=False)
         self.names: list[str] = []

@@ -97,11 +97,11 @@ def cache_samples(
     """
     base = root / str(size)
     base.mkdir()
-    manager = ChromeFileManager(str(base))
+    manager = ChromeFileManager(base)
     for patch in range(size):
         version = "120.0.6099.%d" % patch
         key = manager._key("driver", version)
-        folder = Path(manager._directory) / key
+        folder = manager._directory / key
         folder.mkdir()
         location = folder / "chromedriver.fixture"
         location.write_bytes(b"not an executable; benchmark fixture only\\n")
@@ -141,7 +141,7 @@ def cache_samples(
             db.execute("SELECT count(*) FROM artifacts").fetchone()
         reads.append((time.perf_counter() - start) * 1000)
     results["sqlite_open_query_ms"] = summarize(reads)
-    results["metadata_bytes"] = Path(manager._database).stat().st_size
+    results["metadata_bytes"] = manager._database.stat().st_size
     return {"entries": size, **results}
 
 

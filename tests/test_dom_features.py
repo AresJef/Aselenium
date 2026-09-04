@@ -372,7 +372,7 @@ async def test_element_send_and_upload(element: Element, tmp_path: Path) -> None
     first, second = tmp_path / "first.txt", tmp_path / "second.txt"
     first.touch()
     second.touch()
-    await element.upload(str(first), str(second), pause=0)
+    await element.upload(first, second, pause=0)
     assert element._conn.execute.await_args.kwargs["body"] == {
         "text": str(first) + "\n" + str(second)
     }

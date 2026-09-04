@@ -40,6 +40,7 @@ from uuid import uuid4
 from aselenium import errors, javascript
 from aselenium._async import finish_owned, run_blocking
 from aselenium._output import save_bytes
+from aselenium._paths import PathInput, save_file_path
 from aselenium._wait import first_match, poll
 from aselenium.actions import Actions
 from aselenium.alert import Alert
@@ -49,7 +50,7 @@ from aselenium.element import ELEMENT_KEY, Element
 from aselenium.errors import ErrorCode
 from aselenium.options import BaseOptions, ChromiumBaseOptions, Timeouts
 from aselenium.settings import Constraint, DefaultNetworkConditions
-from aselenium.utils import CustomDict, Rectangle, validate_save_file_path
+from aselenium.utils import CustomDict, Rectangle
 from aselenium.valuewrap import warp_tuple
 
 if TYPE_CHECKING:
@@ -971,7 +972,8 @@ class Session:
         Returns:
             The webdriver binary location of the session.
         """
-        return self._service._driver_location
+        # Services retain a Path internally; sessions preserve the public text API.
+        return str(self._service._driver_location)
 
     @property
     def connection(self) -> Connection:
@@ -1626,7 +1628,7 @@ class Session:
                 )
             ) from err
 
-    async def save_screenshot(self, path: str) -> bool:
+    async def save_screenshot(self, path: PathInput) -> bool:
         """Take & save the screenshot of the active page window into a local PNG file.
 
         Args:
@@ -1640,7 +1642,7 @@ class Session:
         """
         # Validate screenshot path
         try:
-            path = validate_save_file_path(path, ".png")
+            destination = save_file_path(path, ".png")
         except Exception as err:
             raise errors.InvalidArgumentError(
                 "<{}>\nSave screenshot 'path' error: {}".format(
@@ -1656,7 +1658,7 @@ class Session:
             if not data:
                 return False
             # . save screenshot
-            return await save_bytes(path, data)
+            return await save_bytes(destination, data)
         finally:
             del data
 
@@ -1849,7 +1851,7 @@ class Session:
 
     async def save_page(
         self,
-        path: str,
+        path: PathInput,
         orientation: Literal["portrait", "landscape"] | None = None,
         scale: int | float | None = None,
         background: bool | None = None,
@@ -1886,7 +1888,7 @@ class Session:
         """
         # Validate pdf path
         try:
-            path = validate_save_file_path(path, ".pdf")
+            destination = save_file_path(path, ".pdf")
         except Exception as err:
             raise errors.InvalidArgumentError(
                 "<{}>\nSave page 'path' error: {}".format(self.__class__.__name__, err)
@@ -1912,7 +1914,7 @@ class Session:
             if not data:
                 return False
             # . save pdf
-            return await save_bytes(path, data)
+            return await save_bytes(destination, data)
         finally:
             del data
 

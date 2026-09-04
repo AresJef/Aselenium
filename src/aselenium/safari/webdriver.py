@@ -26,6 +26,7 @@ from typing import (
     Literal,
 )
 
+from aselenium._paths import PathInput
 from aselenium.manager.driver import SafariDriverManager
 from aselenium.safari.options import SafariOptions
 from aselenium.safari.service import SafariService
@@ -115,8 +116,8 @@ class Safari(WebDriver):
     def acquire(
         self,
         channel: SafariVersion | Literal["stable", "dev"] = "stable",
-        driver: str | None = None,
-        binary: str | None = None,
+        driver: PathInput | None = None,
+        binary: PathInput | None = None,
     ) -> SafariSessionContext:
         """Acquire a new Safari session.
 

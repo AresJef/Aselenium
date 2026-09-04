@@ -11,7 +11,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from aselenium import errors, utils
+from aselenium import errors
+from aselenium._paths import parse_path
 from aselenium.chrome.options import ChromeOptions
 from aselenium.element import Element
 from aselenium.firefox.options import FirefoxOptions
@@ -29,6 +30,7 @@ class TextPath:
             value: Path text, including empty or whitespace-only inputs.
         """
         self.value = value
+        self.calls = 0
 
     def __fspath__(self) -> str:
         """Return the original path text for filesystem protocol consumers.
@@ -36,6 +38,7 @@ class TextPath:
         Returns:
             The unmodified string provided to this path object.
         """
+        self.calls += 1
         return self.value
 
 
@@ -149,7 +152,9 @@ async def test_output_callers_accept_relative_pathlikes_and_preserve_names(
         "pdf": output_session.save_page,
         "firefox-full": output_session.save_full_screenshot,
     }[caller]
-    assert await save(TextPath(name)) is True
+    supplied = TextPath(name)
+    assert await save(supplied) is True
+    assert supplied.calls == 1
     suffix = ".pdf" if caller == "pdf" else ".png"
     assert (tmp_path / (name + suffix)).read_bytes() == data
     assert output_session._conn.execute.await_count == 1
@@ -157,22 +162,17 @@ async def test_output_callers_accept_relative_pathlikes_and_preserve_names(
 
 @pytest.mark.parametrize("caller", ["element", "screenshot", "pdf", "firefox-full"])
 @pytest.mark.asyncio
-async def test_space_only_output_name_obeys_native_directory_semantics(
+async def test_space_only_output_name_obeys_canonical_path_semantics(
     output_session: FirefoxSession,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     caller: str,
 ) -> None:
-    """Treat a space-only component according to the host filesystem safely.
-
-    Windows aliases a component containing only spaces to its parent directory,
-    while POSIX filesystems generally permit it as a distinct filename. A directory
-    alias must be rejected before browser I/O instead of being changed into a sibling
-    file by suffix addition.
+    """Apply native directory semantics to the canonical parsed output path.
 
     Args:
         output_session: Real session supplying base64 binary output.
-        tmp_path: Isolated working directory receiving any supported output.
+        tmp_path: Isolated working directory receiving the output.
         monkeypatch: Fixture restoring the working directory after the test.
         caller: Public binary-output entry point under test.
     """
@@ -187,7 +187,7 @@ async def test_space_only_output_name_obeys_native_directory_semantics(
         "firefox-full": output_session.save_full_screenshot,
     }[caller]
 
-    if Path(name).is_dir():
+    if parse_path(TextPath(name)).is_dir():
         output_session._conn.execute.side_effect = AssertionError(
             "Directory alias reached browser transport"
         )
@@ -262,8 +262,10 @@ def test_input_validators_expand_home_and_preserve_symlink_names(
         monkeypatch: Fixture restoring the controlled home-expansion dependency.
         kind: Whether the symlink refers to a regular file or directory.
     """
+    home = tmp_path / "home"
+    home.mkdir()
     target = tmp_path / "target"
-    alias = tmp_path / "alias"
+    alias = home / "alias"
     if kind == "file":
         target.touch()
         validate = validate_file
@@ -272,19 +274,8 @@ def test_input_validators_expand_home_and_preserve_symlink_names(
         validate = validate_dir
     alias.symlink_to(target, target_is_directory=kind == "directory")
 
-    def expand_home(path: str) -> str:
-        """Map the tested home-relative alias without changing process environment.
-
-        Args:
-            path: Original text passed to the standard-library expansion boundary.
-
-        Returns:
-            Absolute fixture alias as if supplied by user-home expansion.
-        """
-        assert path == "~/alias"
-        return str(alias)
-
-    monkeypatch.setattr(utils, "expanduser", expand_home)
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
     result = validate("~/alias")
     assert result == str(alias)
     assert Path(result).samefile(target)
@@ -373,12 +364,16 @@ async def test_relative_upload_and_browser_binary_are_stored_as_absolute_paths(
     monkeypatch.chdir(tmp_path)
     target = tmp_path / "fixture"
     target.touch()
-    await Element("upload", output_session).upload("fixture")
+    upload_path = TextPath("fixture")
+    await Element("upload", output_session).upload(upload_path)
+    assert upload_path.calls == 1
     assert output_session._conn.execute.await_args.kwargs["body"] == {
         "text": str(target)
     }
     options = ChromeOptions()
-    options.browser_location = "fixture"
+    browser_path = TextPath("fixture")
+    options.browser_location = browser_path
+    assert browser_path.calls == 1
     assert options.browser_location == str(target)
 
 

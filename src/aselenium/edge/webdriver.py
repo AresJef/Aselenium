@@ -26,6 +26,7 @@ from typing import (
     Literal,
 )
 
+from aselenium._paths import PathInput
 from aselenium.edge.options import EdgeOptions
 from aselenium.edge.service import EdgeService
 from aselenium.edge.session import EdgeSession
@@ -59,7 +60,7 @@ class Edge(ChromiumBaseWebDriver):
 
     def __init__(
         self,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -119,7 +120,7 @@ class Edge(ChromiumBaseWebDriver):
         self,
         version: ChromiumVersion | str = "build",
         channel: Literal["stable", "beta", "dev"] = "stable",
-        binary: str | None = None,
+        binary: PathInput | None = None,
     ) -> EdgeSessionContext:
         """Acquire a new Edge session.
 

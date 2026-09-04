@@ -25,6 +25,7 @@ from typing import (
     Any,
 )
 
+from aselenium._paths import PathInput
 from aselenium.firefox.options import FirefoxOptions
 from aselenium.firefox.service import FirefoxService
 from aselenium.firefox.session import FirefoxSession
@@ -58,7 +59,7 @@ class Firefox(WebDriver):
 
     def __init__(
         self,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -117,7 +118,7 @@ class Firefox(WebDriver):
     def acquire(
         self,
         version: GeckoVersion | str = "latest",
-        binary: str | None = None,
+        binary: PathInput | None = None,
     ) -> FirefoxSessionContext:
         """Acquire a new Firefox session.
 

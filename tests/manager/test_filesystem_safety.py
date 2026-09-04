@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import os
 import sqlite3
+from collections.abc import Callable
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -65,6 +66,39 @@ def archive(
     return file_class("win", "https://offline.invalid/driver.zip", buffer.getvalue())
 
 
+def patch_archive_open(
+    monkeypatch: pytest.MonkeyPatch,
+    target: Path,
+    replacement: Callable[..., Any],
+) -> None:
+    """Intercept only the exclusive open for one expected archive destination.
+
+    Args:
+        monkeypatch: Pytest fixture for reversible attribute patches.
+        target: Exact downloaded-archive path whose open should be intercepted.
+        replacement: Callable used in place of ``Path.open`` for that one write.
+    """
+    original = Path.open
+
+    def guarded(path: Path, mode: str = "r", *args: Any, **kwargs: Any) -> Any:
+        """Delegate every open except the selected exclusive archive write.
+
+        Args:
+            path: File being opened.
+            mode: File mode requested by the caller.
+            *args: Additional positional arguments accepted by ``Path.open``.
+            **kwargs: Additional keyword arguments accepted by ``Path.open``.
+
+        Returns:
+            File object or test double produced by the selected implementation.
+        """
+        if path == target and mode == "xb":
+            return replacement(path, mode, *args, **kwargs)
+        return original(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "open", guarded)
+
+
 @pytest.mark.parametrize("operation", ["read", "write", "delete", "archive"])
 @pytest.mark.parametrize(
     "code",
@@ -113,8 +147,10 @@ def test_filesystem_failures_have_classified_finite_attempts(
         monkeypatch.setattr(cache_module.shutil, "rmtree", fail)
         action = lambda: manager._delete_folder(folder)
     else:
-        monkeypatch.setattr(files, "open", fail, raising=False)
-        action = lambda: archive()._save_file(str(tmp_path / "download"))
+        patch_archive_open(
+            monkeypatch, tmp_path / "download" / "chromedriver.zip", fail
+        )
+        action = lambda: archive()._save_file(tmp_path / "download")
     with pytest.raises(errors.DriverManagerError) as failure:
         action()
     assert failure.value.__cause__ is cause
@@ -182,8 +218,12 @@ def test_transient_failure_can_recover_within_budget(
         manager._delete_folder(folder)
         assert not folder.exists()
     else:
-        monkeypatch.setattr(files, "open", flaky(open), raising=False)
-        assert Path(archive()._save_file(str(tmp_path / "download"))).is_file()
+        patch_archive_open(
+            monkeypatch,
+            tmp_path / "download" / "chromedriver.zip",
+            flaky(Path.open),
+        )
+        assert archive()._save_file(tmp_path / "download").is_file()
     assert len(attempts) == 3
     assert record_backoff == [0.05, 0.1]
 
@@ -525,7 +565,7 @@ def test_download_save_refuses_to_overwrite_existing_file(tmp_path: Path) -> Non
     destination = tmp_path / "chromedriver.zip"
     destination.write_bytes(b"previous download")
     with pytest.raises(errors.DriverManagerError):
-        archive()._save_file(str(tmp_path))
+        archive()._save_file(tmp_path)
     assert destination.read_bytes() == b"previous download"
 
 
@@ -576,9 +616,9 @@ def test_download_permission_error_cannot_remove_preexisting_file(
         """
         raise PermissionError(errno.EACCES, "synthetic denial before open")
 
-    monkeypatch.setattr(files, "open", fail, raising=False)
+    patch_archive_open(monkeypatch, destination, fail)
     with pytest.raises(errors.DriverManagerError):
-        archive()._save_file(str(tmp_path))
+        archive()._save_file(tmp_path)
     assert destination.read_bytes() == b"preserve"
 
 
@@ -633,9 +673,23 @@ def test_partial_archive_write_is_removed_before_transient_retry(
             self.stream.write(content[:2])
             raise cause
 
-    monkeypatch.setattr(files, "open", PartialWriter, raising=False)
+    def partial_open(path: Path, mode: str, *args: Any, **kwargs: Any) -> PartialWriter:
+        """Create the partial-writer double through the ``Path.open`` seam.
+
+        Args:
+            path: Archive destination opened by the implementation.
+            mode: File mode requested by the implementation.
+            *args: Additional positional arguments accepted by ``Path.open``.
+            **kwargs: Additional keyword arguments accepted by ``Path.open``.
+
+        Returns:
+            Writer that persists a prefix before raising the synthetic failure.
+        """
+        return PartialWriter(path, mode)
+
+    patch_archive_open(monkeypatch, tmp_path / "chromedriver.zip", partial_open)
     with pytest.raises(errors.DriverManagerError) as failure:
-        archive()._save_file(str(tmp_path))
+        archive()._save_file(tmp_path)
     assert failure.value.__cause__ is cause
     assert len(attempts) == 3
     assert not (tmp_path / "chromedriver.zip").exists()
@@ -782,10 +836,24 @@ def test_partial_archive_cleanup_preserves_write_failure(
         """
         raise PermissionError(errno.EACCES, "synthetic cleanup failure")
 
-    monkeypatch.setattr(files, "open", PartialWriter, raising=False)
+    def partial_open(path: Path, mode: str, *args: Any, **kwargs: Any) -> PartialWriter:
+        """Create the partial-writer double through the ``Path.open`` seam.
+
+        Args:
+            path: Archive destination opened by the implementation.
+            mode: File mode requested by the implementation.
+            *args: Additional positional arguments accepted by ``Path.open``.
+            **kwargs: Additional keyword arguments accepted by ``Path.open``.
+
+        Returns:
+            Writer that persists a prefix before raising the synthetic failure.
+        """
+        return PartialWriter(path, mode)
+
+    patch_archive_open(monkeypatch, tmp_path / "chromedriver.zip", partial_open)
     monkeypatch.setattr(Path, "unlink", fail_cleanup)
     with pytest.raises(errors.DriverManagerError) as failure:
-        archive()._save_file(str(tmp_path))
+        archive()._save_file(tmp_path)
     assert failure.value.__cause__ is cause
     assert (tmp_path / "chromedriver.zip").read_bytes()
     assert "Partial downloaded archive retained" in caplog.text

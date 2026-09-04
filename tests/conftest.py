@@ -17,7 +17,6 @@ import aiohttp
 import pytest
 
 from aselenium import service as service_module
-from aselenium.manager import _cache as cache_module
 from aselenium.manager import driver as driver_module
 
 _SOCKET_CONNECT = socket.socket.connect
@@ -36,7 +35,8 @@ def isolated_manager_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> N
         monkeypatch: Pytest fixture for reversible environment, attribute, and path patches.
         tmp_path: Isolated temporary directory supplied by pytest.
     """
-    monkeypatch.setattr(cache_module, "expanduser", lambda path: str(tmp_path))
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setenv("USERPROFILE", str(tmp_path))
     monkeypatch.setattr(driver_module.FirefoxDriverManager, "_GECKODRIVER_TABLE", None)
     monkeypatch.setattr(
         driver_module.FirefoxDriverManager, "_GECKODRIVER_MAX_VERSION", None

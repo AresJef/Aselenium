@@ -23,8 +23,6 @@ from __future__ import annotations
 from base64 import b64encode
 from copy import deepcopy
 from math import isfinite
-from os import chmod
-from os.path import join as join_path
 from pathlib import Path
 from platform import system
 from shutil import copytree, ignore_patterns, rmtree
@@ -36,10 +34,10 @@ from typing import (
 )
 
 from aselenium import errors
+from aselenium._paths import PathInput, directory_path, file_path
 from aselenium.manager._filesystem import checked_path, filesystem_operation
 from aselenium.manager.version import ChromiumVersion, Version
 from aselenium.settings import Constraint, DefaultTimeouts
-from aselenium.utils import is_path_dir, validate_dir, validate_file
 
 O = TypeVar("O", bound="BaseOptions")
 
@@ -783,7 +781,7 @@ class Timeouts:
 class Profile:
     """Represent the user profile for a browser."""
 
-    def __init__(self, directory: str, profile_folder: str | None = None) -> None:
+    def __init__(self, directory: PathInput, profile_folder: str | None = None) -> None:
         """Initialize the instance with the supplied configuration.
 
         Explanation
@@ -800,12 +798,13 @@ class Profile:
         """
         # Profile directory
         self._profile_folder: str | None = profile_folder
-        self._profile_dir: str = None
-        self._temp_directory: str = None
+        self._profile_dir: Path | None = None
+        self._temp_directory: Path | None = None
+        self._owned_temp_directory: Path | None = None
         self._temp_profile_folder: str = "TEMP_PROFILE"
-        self._temp_profile_dir: str = None
+        self._temp_profile_dir: Path | None = None
         try:
-            self._directory = validate_dir(directory)
+            self._directory = directory_path(directory)
         except Exception as err:
             raise errors.InvalidProfileError(
                 "<{}>\nProfile 'directory' error: {}".format(
@@ -825,7 +824,7 @@ class Profile:
         # Determine profile directory
         if self._profile_folder is not None:
             try:
-                self._profile_dir = join_path(self._directory, self._profile_folder)
+                self._profile_dir = self._directory / self._profile_folder
             except Exception as err:
                 raise errors.InvalidProfileError(
                     "<{}> Invalid profile folder: {} {}.".format(
@@ -834,7 +833,7 @@ class Profile:
                         type(self._profile_folder),
                     )
                 ) from err
-            if not is_path_dir(self._profile_dir):
+            if not self._profile_dir.is_dir():
                 raise errors.InvalidProfileError(
                     "<{}> Invalid profile directory: {} {}.".format(
                         self.__class__.__name__,
@@ -847,17 +846,17 @@ class Profile:
 
         # Clone profile to temporary directory
         try:
-            self._temp_directory = str(Path(mkdtemp(prefix="aselenium-")).resolve())
+            self._temp_directory = Path(mkdtemp(prefix="aselenium-")).resolve()
             self._owned_temp_directory = self._temp_directory
-            self._temp_profile_dir = join_path(
-                self._temp_directory, self._temp_profile_folder
-            )
+            self._temp_profile_dir = self._temp_directory / self._temp_profile_folder
+            if self._profile_dir is None:
+                raise errors.InvalidProfileError("Profile directory was not selected")
             copytree(
                 self._profile_dir,
                 self._temp_profile_dir,
                 ignore=ignore_patterns("parent.lock", "lock", ".parentlock"),
             )
-            chmod(self._temp_profile_dir, 0o755)
+            self._temp_profile_dir.chmod(0o755)
         except Exception as err:
             self._delete_temp_profile()
             raise errors.InvalidProfileError(
@@ -873,7 +872,7 @@ class Profile:
             return None  # exit
 
         # Delete temporary profile
-        path = Path(self._temp_directory)
+        path = self._temp_directory
         if self._temp_directory != getattr(self, "_owned_temp_directory", None):
             raise errors.InvalidProfileError(
                 "Refusing to remove an unowned temporary profile"
@@ -939,7 +938,7 @@ class Profile:
 class ChromiumProfile(Profile):
     """Represent the user profile for Chromium based browser. Such as: Edge, Chrome, Chromium, etc."""
 
-    def __init__(self, directory: str, profile_folder: str) -> None:
+    def __init__(self, directory: PathInput, profile_folder: str) -> None:
         r"""Initialize the instance with the supplied configuration.
 
         Explanation
@@ -986,16 +985,18 @@ class ChromiumProfile(Profile):
         Returns:
             The main directory of the original profile.
         """
-        return self._directory
+        return str(self._directory)
 
     @property
-    def directory_temp(self) -> str:
+    def directory_temp(self) -> str | None:
         """Return the main directory of the temporary profile.
 
         Returns:
             The main directory of the temporary profile.
         """
-        return self._temp_directory
+        if self._temp_directory is None:
+            return None
+        return str(self._temp_directory)
 
     @property
     def profile_folder(self) -> str:
@@ -1059,11 +1060,19 @@ class BaseOptions:
         profile = getattr(self, "_profile", None)
         if profile is not None:
             if isinstance(profile, ChromiumProfile):
+                if profile._temp_directory is None:
+                    raise errors.InvalidProfileError(
+                        "Cannot snapshot a profile whose temporary clone is closed"
+                    )
                 result.set_profile(
                     profile._temp_directory, profile._temp_profile_folder
                 )
             else:
-                result.set_profile(profile.directory_temp)
+                if profile._temp_profile_dir is None:
+                    raise errors.InvalidProfileError(
+                        "Cannot snapshot a profile whose temporary clone is closed"
+                    )
+                result.set_profile(profile._temp_profile_dir)
         result._caps_changed()
         return result
 
@@ -1366,7 +1375,7 @@ class BaseOptions:
         return self._experimental_options.get("binary")
 
     @browser_location.setter
-    def browser_location(self, value: str | None) -> None:
+    def browser_location(self, value: PathInput | None) -> None:
         # Same binary location
         """Set the browser location.
 
@@ -1383,14 +1392,15 @@ class BaseOptions:
 
         # Set binary location
         try:
-            value = validate_file(value)
+            location = file_path(value)
         except Exception as err:
             raise errors.InvalidOptionsError(
                 "<{}>\nOptions 'browser_location' error: {}".format(
                     self.__class__.__name__, err
                 )
             ) from err
-        self.add_experimental_options(binary=value)
+        # WebDriver capabilities are JSON, so paths cross this boundary as text.
+        self.add_experimental_options(binary=str(location))
 
     # Caps: platform name -----------------------------------------------------------------
     @property
@@ -2038,7 +2048,7 @@ class ChromiumBaseOptions(BaseOptions):
         """
         return self._profile
 
-    def set_profile(self, directory: str, profile: str) -> ChromiumProfile:
+    def set_profile(self, directory: PathInput, profile: str) -> ChromiumProfile:
         r"""Set the user profile for the Chromium based browser. Such as: Edge, Chrome, Chromium, etc.
 
         Explanation
@@ -2119,7 +2129,7 @@ class ChromiumBaseOptions(BaseOptions):
         """
         return self._extensions.copy()
 
-    def add_extensions(self, *paths: str) -> None:
+    def add_extensions(self, *paths: PathInput) -> None:
         r"""Add extensions to the browser (through local file).
 
         Args:
@@ -2136,7 +2146,7 @@ class ChromiumBaseOptions(BaseOptions):
         for path in paths:
             # . validate ext path
             try:
-                path = validate_file(path)
+                extension_path = file_path(path)
             except Exception as err:
                 raise errors.InvalidExtensionError(
                     "<{}>\nExtension 'path' error: {}".format(
@@ -2145,12 +2155,11 @@ class ChromiumBaseOptions(BaseOptions):
                 ) from err
             # . load ext data
             try:
-                with open(path, "rb") as f:
-                    data = b64encode(f.read()).decode("utf-8")
+                data = b64encode(extension_path.read_bytes()).decode("utf-8")
             except Exception as err:
                 raise errors.InvalidExtensionError(
                     "<{}>\nFailed to encode extension at: {}\nError: {}".format(
-                        self.__class__.__name__, repr(path), err
+                        self.__class__.__name__, repr(extension_path), err
                     )
                 ) from err
             # . add ext data

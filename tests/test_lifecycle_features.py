@@ -53,9 +53,10 @@ def test_base_service_public_state_and_abstract_port_arguments(
         executable: Existing inert driver-path fixture.
     """
     version = ChromiumVersion("120.0.1.2")
-    service = BaseService(version, str(executable), timeout=2.5)
+    service = BaseService(version, executable, timeout=2.5)
     assert service.driver_version is version
     assert service.driver_location == str(executable)
+    assert service._driver_location == executable
     assert service.timeout == 2.5
     assert service.process is None
     assert service.session is None

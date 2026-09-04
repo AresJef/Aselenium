@@ -162,6 +162,27 @@ def test_windows_probe_encodes_a_literal_noninteractive_script(
     assert kwargs["shell"] is False
 
 
+def test_windows_probe_classifies_invalid_system_root(
+    tmp_path: Path, probe: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Map an unusable external Windows root to the browser-location error.
+
+    Args:
+        tmp_path: Existing cache parent used by the manager.
+        probe: Recording process double that must not be invoked.
+        monkeypatch: Pytest fixture replacing the process environment mapping.
+    """
+    manager = drivers.ChromeDriverManager(directory=tmp_path)
+    manager._DriverManager__os_name = "win"
+    monkeypatch.setattr(drivers, "environ", {"SystemRoot": "invalid\x00root"})
+
+    with pytest.raises(errors.BrowserBinaryNotDetectedError) as caught:
+        manager._detect_browser_version(tmp_path / "chrome.exe")
+
+    assert isinstance(caught.value.__cause__, errors.AseleniumInvalidPathError)
+    assert probe.calls == []
+
+
 @pytest.mark.parametrize("wait_failure", [False, True])
 def test_probe_timeout_kills_and_bounds_reaping_without_second_pipe_read(
     tmp_path: Path, probe: Any, wait_failure: Any

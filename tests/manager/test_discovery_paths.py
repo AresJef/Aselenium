@@ -20,6 +20,36 @@ _MANAGERS = [
 ]
 
 
+class _CountingTextPath(os.PathLike[str]):
+    """Expose a text path while recording filesystem-boundary conversion."""
+
+    def __init__(self, path: Path) -> None:
+        """Store the represented path.
+
+        Args:
+            path: Concrete filesystem path returned by ``__fspath__``.
+        """
+        self.path = path
+        self.calls = 0
+
+    def __fspath__(self) -> str:
+        """Return the represented path and record the conversion.
+
+        Returns:
+            Text path accepted by the package path boundary.
+        """
+        self.calls += 1
+        return str(self.path)
+
+    def __str__(self) -> str:
+        """Prove path handling never depends on an arbitrary text conversion.
+
+        Raises:
+            AssertionError: Always; valid path-like values must use ``__fspath__``.
+        """
+        raise AssertionError("PathLike.__str__ must not be used for path parsing")
+
+
 def _manager(
     tmp_path: Path,
     manager_class: Any = drivers.ChromeDriverManager,
@@ -96,27 +126,14 @@ def test_explicit_binary_path_is_normalized_without_changing_literal_name(
         supplied = browser.relative_to(tmp_path)
     else:
         supplied = "~/" + browser.name
-
-        def expand_synthetic_home(path: Any) -> Any:
-            """Expand synthetic home.
-
-            Args:
-                path: Fixture or parametrized path input for this regression.
-
-            Returns:
-                Fixture value or simulated response used by the regression.
-            """
-            if path.startswith("~/"):
-                return str(browser.parent / path[2:])
-            return path
-
-        monkeypatch.setattr(drivers, "expanduser", expand_synthetic_home)
+        monkeypatch.setenv("HOME", str(browser.parent))
+        monkeypatch.setenv("USERPROFILE", str(browser.parent))
 
     manager._parse_target_binary(supplied)
 
-    assert manager._target_binary == str(browser)
-    assert isinstance(manager._target_binary, str)
-    assert os.path.isabs(manager._target_binary)
+    assert manager._target_binary == browser
+    assert isinstance(manager._target_binary, Path)
+    assert manager._target_binary.is_absolute()
 
 
 def test_explicit_binary_preserves_leading_and_trailing_filename_spaces(
@@ -133,7 +150,7 @@ def test_explicit_binary_preserves_leading_and_trailing_filename_spaces(
 
     manager._parse_target_binary(browser)
 
-    assert manager._target_binary == str(browser)
+    assert manager._target_binary == browser
 
 
 @pytest.mark.parametrize("path_kind", ["absolute", "relative"])
@@ -173,8 +190,8 @@ def test_absolute_binary_normalization_preserves_symlink_parent_traversal(
 
     manager._parse_target_binary(supplied)
 
-    assert os.path.isabs(manager._target_binary)
-    assert os.path.samefile(manager._target_binary, intended), (
+    assert manager._target_binary.is_absolute()
+    assert manager._target_binary.samefile(intended), (
         "Making a browser path absolute must not silently select a different file."
     )
 
@@ -192,8 +209,8 @@ def test_binary_normalization_keeps_lexical_symlink_location(tmp_path: Path) -> 
 
     manager._parse_target_binary(launcher)
 
-    assert manager._target_binary == str(launcher)
-    assert os.path.samefile(manager._target_binary, browser)
+    assert manager._target_binary == launcher
+    assert manager._target_binary.samefile(browser)
 
 
 class _BytesPath:
@@ -281,18 +298,17 @@ def test_environment_roots_omit_empty_entries_and_deduplicate(
         os_name: Fixture or parametrized os name input for this regression.
     """
     manager = _manager(tmp_path, os_name=os_name)
-    prefix = "C:\\synthetic" if os_name == "win" else "/synthetic"
-    roots = [f"{prefix}/{name}" for name in ("first", "second", "third")]
-    separator = ";" if os_name == "win" else ":"
-    monkeypatch.setattr(drivers, "pathsep", separator)
-    monkeypatch.setattr(manager, "_absolute_location", lambda path: path)
-    environment = {"PATH": separator.join([roots[0], "", roots[1], roots[0], ""])}
+    roots = [tmp_path / name for name in ("first", "second", "third")]
+    separator = os.pathsep
+    environment = {
+        "PATH": separator.join([str(roots[0]), "", str(roots[1]), str(roots[0]), ""])
+    }
     expected = {roots[0], roots[1]}
     if os_name == "win":
         environment.update(
             {
-                "PROGRAMFILES": roots[1],
-                "LOCALAPPDATA": roots[2],
+                "PROGRAMFILES": str(roots[1]),
+                "LOCALAPPDATA": str(roots[2]),
                 "PROGRAMFILES(X86)": "",
             }
         )
@@ -301,7 +317,7 @@ def test_environment_roots_omit_empty_entries_and_deduplicate(
 
     assert set(manager._environ_paths) == expected
     assert len(manager._environ_paths) == len(expected)
-    assert "" not in manager._environ_paths
+    assert Path.cwd() not in manager._environ_paths
 
 
 @pytest.mark.parametrize("os_name", ["linux", "mac", "win"])
@@ -318,6 +334,25 @@ def test_missing_environment_paths_are_safe(
     manager = _manager(tmp_path, os_name=os_name)
     monkeypatch.setattr(drivers, "environ", {})
     assert manager._environ_paths == []
+
+
+@pytest.mark.parametrize("os_name", ["linux", "mac", "win"])
+def test_malformed_environment_root_does_not_abort_discovery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, os_name: Any
+) -> None:
+    """Skip one invalid external search root while retaining valid entries.
+
+    Args:
+        tmp_path: Isolated directory containing the valid search root.
+        monkeypatch: Pytest fixture replacing the process environment mapping.
+        os_name: Simulated operating-system family.
+    """
+    manager = _manager(tmp_path, os_name=os_name)
+    valid = tmp_path / "valid-root"
+    environment = {"PATH": os.pathsep.join(["invalid\x00root", str(valid)])}
+    monkeypatch.setattr(drivers, "environ", environment)
+
+    assert manager._environ_paths == [valid]
 
 
 @pytest.mark.parametrize("manager_class", _MANAGERS)
@@ -353,7 +388,7 @@ def test_linux_discovery_normalizes_which_result_without_shell(
 
     monkeypatch.setattr(drivers, "which", fake_which)
 
-    assert manager._detect_browser_location() == str(browser)
+    assert manager._detect_browser_location() == browser
     assert calls
     assert calls[0][1] == str(browser.parent)
 
@@ -395,7 +430,7 @@ def test_linux_discovery_integrates_real_which_without_executing_file(
     monkeypatch.setattr(drivers, "environ", {"PATH": str(candidate.parent)})
 
     # Real shutil.which checks permissions; it does not execute the candidate.
-    assert manager._find_linux_browser_location(candidate.name) == str(candidate)
+    assert manager._find_linux_browser_location(candidate.name) == candidate
 
     candidate.chmod(0o600)
     assert manager._find_linux_browser_location(candidate.name) is None
@@ -447,7 +482,7 @@ def test_windows_discovery_includes_vendor_installation_root_from_path(
     monkeypatch.setattr(drivers, "environ", {"PATH": str(installation_root)})
 
     relative = str(browser.relative_to(installation_root))
-    assert manager._find_win_browser_location(relative) == str(browser)
+    assert manager._find_win_browser_location(relative) == browser
 
 
 @pytest.mark.asyncio
@@ -529,8 +564,78 @@ async def test_explicit_path_installation_passes_normalized_literal_path_to_fake
     installed = await manager.install(selector, binary=browser.relative_to(tmp_path))
 
     assert installed == "synthetic cached driver"
-    assert checked == [str(browser)]
+    assert checked == [browser]
     assert manager.browser_location == str(browser)
+
+
+@pytest.mark.asyncio
+async def test_result_request_uses_single_parsed_custom_pathlike(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Publish a custom ``PathLike`` as its validated browser path.
+
+    Args:
+        tmp_path: Isolated temporary directory supplied by pytest.
+        monkeypatch: Pytest fixture for reversible dependency substitution.
+    """
+    manager = _manager(tmp_path)
+    browser = _browser(tmp_path / "browsers")
+    supplied = _CountingTextPath(browser)
+    monkeypatch.setattr(
+        manager,
+        "_detect_browser_version",
+        lambda _path: ChromiumVersion("120.0.6099.71"),
+    )
+    monkeypatch.setattr(
+        manager, "_match_driver_executable", lambda *_args: "synthetic cached driver"
+    )
+
+    result = await manager.install_result("build", binary=supplied)
+
+    assert supplied.calls == 1
+    assert result.request.binary == str(browser)
+    assert manager.last_result == result
+
+
+@pytest.mark.asyncio
+async def test_cft_result_preserves_ignored_pathlike_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Do not relabel an ignored CfT override as the provisioned browser.
+
+    Args:
+        tmp_path: Isolated directory containing synthetic result locations.
+        monkeypatch: Pytest fixture for reversible dependency substitution.
+    """
+    manager = _manager(tmp_path)
+    requested = _CountingTextPath(tmp_path / "ignored browser override")
+    driver = tmp_path / "cached chromedriver"
+    provisioned_browser = tmp_path / "cached Chrome for Testing"
+    version = ChromiumVersion("120.0.6099.71")
+
+    def match(*_args: Any) -> str:
+        """Publish one complete synthetic cached CfT pair.
+
+        Returns:
+            Driver location used by the cache-hit installation path.
+        """
+        manager._driver_version = version
+        manager._driver_location = str(driver)
+        manager._browser_version = version
+        manager._browser_location = str(provisioned_browser)
+        return str(driver)
+
+    monkeypatch.setattr(manager, "_match_cft_driver_and_binary", match)
+
+    result = await manager.install_result(
+        version, channel="cft", binary=requested, policy="compatible-build"
+    )
+
+    assert requested.calls == 1
+    assert result.request.binary == str(requested.path)
+    assert result.browser_location == str(provisioned_browser)
+    assert result.request.binary != result.browser_location
+    assert manager.last_result == result
 
 
 @pytest.mark.parametrize("manager_class", _MANAGERS)

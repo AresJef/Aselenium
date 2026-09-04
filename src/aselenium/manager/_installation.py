@@ -6,10 +6,10 @@ import asyncio
 import hashlib
 from collections.abc import Callable, Coroutine
 from contextlib import AsyncExitStack
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import wraps
 from inspect import signature
-from pathlib import Path
+from os import fspath
 from threading import RLock
 from typing import (
     TYPE_CHECKING,
@@ -167,7 +167,7 @@ def installation_lock(manager: DriverManager) -> asyncio.Lock:
     """
     loop = asyncio.get_running_loop()
     cache = manager._file_manager
-    key = str(Path(cache._directory).resolve()) if cache is not None else manager._name
+    key = str(cache._directory) if cache is not None else manager._name
     with _REGISTRY_LOCK:
         locks = _LOCKS.setdefault(loop, WeakValueDictionary())
         lock = locks.get(key)
@@ -238,13 +238,13 @@ def isolated_install(
         values = bound.arguments
 
         def frozen_value(name: str) -> str | None:
-            """Convert a bound installation argument to an immutable string snapshot.
+            """Freeze one non-path installation selector as immutable text.
 
             Args:
                 name: Name identifying the requested item.
 
             Returns:
-                Convert a bound installation argument to an immutable string snapshot. None indicates that no value is available.
+                Text form of the selector, or None when the argument is absent.
             """
             value = values.get(name)
             return None if value is None else str(value)
@@ -271,8 +271,11 @@ def isolated_install(
             self._name,
             selector,
             values.get("channel", "stable"),
-            frozen_value("binary"),
-            frozen_value("driver"),
+            # Path overrides are frozen only after the core manager has parsed
+            # them. This avoids consulting a custom PathLike's ``__str__`` and
+            # guarantees one filesystem-protocol conversion per public input.
+            None,
+            None,
             self._os_name,
             self._os_arch,
             self._os_is_arm,
@@ -285,6 +288,40 @@ def isolated_install(
             location = await method(self, *args, **kwargs)
             if request.validate_compatibility:
                 self._validate_installed_pair()
+
+            def path_snapshot(argument: str, state: str) -> str | None:
+                """Freeze one explicit path from its already-validated state.
+
+                Args:
+                    argument: Bound public argument name.
+                    state: Request-local manager field containing the parsed ``Path``.
+
+                Returns:
+                    Absolute text for a validated override, the original path-like
+                    text for an intentionally ignored override, or None when absent.
+                """
+                raw = values.get(argument)
+                if raw is None:
+                    return None
+                parsed = invocation.values.get(state)
+                if parsed is not None:
+                    return str(parsed)
+                try:
+                    text = fspath(raw)
+                except Exception:
+                    return str(raw)
+                return text if isinstance(text, str) else str(raw)
+
+            # Explicit overrides normally live in the request-local Path fields.
+            # A channel such as Chrome for Testing intentionally ignores ``binary``;
+            # retain that original input rather than replacing it with a resolved
+            # download location that was not requested by the caller.
+            request = replace(
+                request,
+                binary=path_snapshot("binary", "_target_binary"),
+                driver=path_snapshot("driver", "_target_driver"),
+            )
+            invocation.request = request
             # The public return is authoritative even for custom install hooks.
             self._driver_location = location
             result = InstallationResult(

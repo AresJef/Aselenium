@@ -41,7 +41,7 @@ async def smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         A mapping containing the smoke data.
     """
     facade = (Chrome if args.browser == "chrome" else Edge)(
-        directory=str(root), download_timeout=60
+        directory=root, download_timeout=60
     )
     facade.options.add_arguments(
         "--headless=new",
@@ -71,9 +71,9 @@ async def smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
             host = await session.find_element("#host")
             shadow_target = await (await host.shadow).find_element("#shadow")
             assert await shadow_target.unobscured
-            assert await session.save_screenshot(str(root / "capture.png"))
+            assert await session.save_screenshot(root / "capture.png")
             assert (root / "capture.png").read_bytes().startswith(b"\x89PNG")
-            assert await session.save_page(str(root / "page.pdf"))
+            assert await session.save_page(root / "page.pdf")
             assert (root / "page.pdf").read_bytes().startswith(b"%PDF")
             element = await session.find_1st_element("#missing", "#input")
             assert element is not None

@@ -346,7 +346,7 @@ async def test_step09_output_failure_preserves_previous_file(
         raise PermissionError("fixture")
 
     monkeypatch.setattr(_output.os, "replace", fail)
-    assert not await _output.save_bytes(str(path), b"replacement")
+    assert not await _output.save_bytes(path, b"replacement")
     assert path.read_bytes() == b"previous"
     assert list(tmp_path.iterdir()) == [path]
 
@@ -375,9 +375,7 @@ async def test_step09_output_write_does_not_block_event_loop(
         original(*args)
 
     monkeypatch.setattr(_output, "_write_atomic", slow)
-    task = asyncio.create_task(
-        _output.save_bytes(str(tmp_path / "capture.png"), b"fixture")
-    )
+    task = asyncio.create_task(_output.save_bytes(tmp_path / "capture.png", b"fixture"))
     try:
         for _ in range(100):
             if started.is_set():

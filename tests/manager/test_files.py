@@ -75,21 +75,30 @@ def fake_archive_chmod(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Any:
         Fixture value or simulated response used by the regression.
     """
     calls = []
-    original = files.chmod
+    original = Path.chmod
+    owned_root = tmp_path.resolve()
 
-    def chmod_without_subprocess(path: Any, mode: Any) -> None:
+    def chmod_without_subprocess(
+        path: Path, mode: int, *, follow_symlinks: bool = True
+    ) -> None:
         """Chmod without subprocess.
 
         Args:
-            path: Fixture or parametrized path input for this regression.
-            mode: Fixture or parametrized mode input for this regression.
+            path: Validated archive member whose permissions are changing.
+            mode: Permission bits applied to the archive member.
+            follow_symlinks: Whether to follow a symbolic-link target.
         """
-        target = Path(path).resolve()
-        target.relative_to(tmp_path.resolve())
-        original(path, mode)
-        calls.append(target)
+        target = path.resolve()
+        previous_mode = target.stat().st_mode
+        original(path, mode, follow_symlinks=follow_symlinks)
+        try:
+            target.relative_to(owned_root)
+        except ValueError:
+            return
+        if not previous_mode & stat.S_IXUSR and mode & stat.S_IXUSR:
+            calls.append(target)
 
-    monkeypatch.setattr(files, "chmod", chmod_without_subprocess)
+    monkeypatch.setattr(Path, "chmod", chmod_without_subprocess)
     return calls
 
 
@@ -440,7 +449,7 @@ def test_executable_selection_cannot_return_a_foreign_sibling_file(
 
     try:
         selected = archive._find_target_executable(
-            str(extracted), ["../outside-extraction/chromedriver.exe"]
+            extracted, ["../outside-extraction/chromedriver.exe"]
         )
     except (errors.InvalidDownloadFileError, ValueError):
         return
@@ -480,22 +489,32 @@ def test_persistent_download_write_error_has_a_finite_retry_budget(
     )
     attempts = 0
 
-    def fail_open(*args: Any, **kwargs: Any) -> None:
+    target = tmp_path / "download" / "chromedriver.zip"
+    original_open = Path.open
+
+    def fail_open(path: Path, mode: str = "r", *args: Any, **kwargs: Any) -> Any:
         """Fail open.
 
         Args:
+            path: File being opened by the implementation.
+            mode: File mode requested by the implementation.
             *args: Fixture or parametrized args input for this regression.
             **kwargs: Fixture or parametrized kwargs input for this regression.
+
+        Returns:
+            Original file object for opens outside the exact archive-write seam.
         """
+        if path != target or mode != "xb":
+            return original_open(path, mode, *args, **kwargs)
         nonlocal attempts
         attempts += 1
         if attempts > RETRY_LIMIT:
             raise RetryBudgetExhausted
         raise PermissionError("synthetic download write denial")
 
-    monkeypatch.setattr(files, "open", fail_open, raising=False)
+    monkeypatch.setattr(Path, "open", fail_open)
     try:
         with pytest.raises((OSError, errors.DriverManagerError)):
-            archive._save_file(str(tmp_path / "download"))
+            archive._save_file(tmp_path / "download")
     except RetryBudgetExhausted:
         raise AssertionError("download write exceeded three failed attempts") from None

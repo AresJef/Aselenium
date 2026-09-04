@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import plistlib
 from pathlib import Path
-from posixpath import join as posix_join
 from typing import Any
 
 import pytest
@@ -128,47 +127,31 @@ def test_windows_location_discovery_uses_synthetic_environment_path(
         tmp_path: Isolated temporary directory supplied by pytest.
     """
     manager = drivers.DriverManager("fixture", None, None, None)
-    manager._DriverManager__environ_paths = [str(tmp_path)]
+    manager._DriverManager__environ_paths = [tmp_path]
     browser = tmp_path / "Vendor" / "Browser" / "browser.exe"
     browser.parent.mkdir(parents=True)
     browser.write_bytes(b"synthetic browser")
 
     relative = str(browser.relative_to(tmp_path))
-    assert manager._find_win_browser_location(relative) == str(browser)
+    assert manager._find_win_browser_location(relative) == browser
 
 
-def test_mac_discovery_checks_default_then_synthetic_environment_path(
-    monkeypatch: pytest.MonkeyPatch,
+def test_mac_discovery_finds_synthetic_environment_path(
+    tmp_path: Path,
 ) -> None:
-    """Verify mac discovery checks default then synthetic environment path.
+    """Verify Mac discovery joins a relative bundle path to a Path root.
 
     Args:
-        monkeypatch: Pytest fixture for reversible environment, attribute, and path patches.
+        tmp_path: Isolated temporary directory supplied by pytest.
     """
     manager = drivers.DriverManager("fixture", None, None, None)
-    manager._DriverManager__environ_paths = ["/synthetic-environment"]
-    relative = "Fixture.app/Contents/MacOS/Fixture"
-    expected = posix_join("/synthetic-environment", relative)
-    checked = []
-
-    def is_fake_browser(path: Any) -> Any:
-        """Is fake browser.
-
-        Args:
-            path: Fixture or parametrized path input for this regression.
-
-        Returns:
-            Fixture value or simulated response used by the regression.
-        """
-        checked.append(path)
-        return path == expected
-
-    monkeypatch.setattr(drivers, "is_path_file", is_fake_browser)
-    monkeypatch.setattr(drivers, "join_path", posix_join)
-    monkeypatch.setattr(manager, "_absolute_location", lambda path: path)
+    manager._DriverManager__environ_paths = [tmp_path]
+    relative = f"{tmp_path.name} Fixture.app/Contents/MacOS/Fixture"
+    expected = tmp_path / relative
+    expected.parent.mkdir(parents=True)
+    expected.touch()
 
     assert manager._find_mac_browser_location(relative) == expected
-    assert checked == [posix_join("/Applications", relative), expected]
 
 
 @pytest.mark.parametrize("plist_name", ["version.plist", "Info.plist"])
@@ -197,7 +180,7 @@ def test_safari_version_discovery_reads_real_synthetic_plist(
     )
     manager = drivers.SafariDriverManager(directory=str(tmp_path))
 
-    assert manager._detect_browser_version(str(executable)).version == "17.4.1"
+    assert manager._detect_browser_version(executable).version == "17.4.1"
 
 
 def test_safari_driver_discovery_finds_executable_beside_browser(
@@ -218,4 +201,4 @@ def test_safari_driver_discovery_finds_executable_beside_browser(
     manager._channel = "dev"
     manager._browser_location = str(browser)
 
-    assert manager._detect_driver_location() == str(driver)
+    assert manager._detect_driver_location(browser) == driver

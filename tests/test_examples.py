@@ -514,7 +514,7 @@ async def test_google_quickstart_is_headed_homepage_only_and_owns_cleanup(
     else:
         await main()
         pause.assert_awaited_once_with(5)
-    constructor.assert_called_once_with(directory="browser-cache")
+    constructor.assert_called_once_with(directory=Path("browser-cache"))
     assert (tmp_path / "browser-cache").is_dir()
     driver.options.add_arguments.assert_not_called()
     driver.options.set_timeouts.assert_called_once_with(
@@ -554,7 +554,7 @@ async def test_manager_recipe_preserves_offline_policy_and_creates_cache(
     result = await function(str(cache), offline=True)
     assert cache.is_dir()
     assert result is manager.install_result.return_value
-    constructor.assert_called_once_with(directory=str(cache))
+    constructor.assert_called_once_with(directory=cache)
     manager.install_result.assert_awaited_once_with(
         version="build", policy="offline", validate_compatibility=True
     )
@@ -656,10 +656,8 @@ async def test_capture_recipe_checks_results_and_creates_output_parent(
     else:
         await examples["capture_page"](session, str(output), pdf=True)
     assert output.is_dir()
-    session.save_screenshot.assert_awaited_once_with(str(output / "page.png"))
-    session.save_page.assert_awaited_once_with(
-        str(output / "page.pdf"), background=True
-    )
+    session.save_screenshot.assert_awaited_once_with(output / "page.png")
+    session.save_page.assert_awaited_once_with(output / "page.pdf", background=True)
 
 
 @pytest.mark.asyncio

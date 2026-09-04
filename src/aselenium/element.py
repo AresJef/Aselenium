@@ -32,14 +32,13 @@ from urllib.parse import quote
 
 from aselenium import errors, javascript
 from aselenium._output import save_bytes
+from aselenium._paths import PathInput, file_path, save_file_path
 from aselenium._wait import first_match, poll
 from aselenium.command import Command
 from aselenium.shadow import SHADOWROOT_KEY, Shadow
 from aselenium.utils import (
     Rectangle,
     process_keys,
-    validate_file,
-    validate_save_file_path,
 )
 
 if TYPE_CHECKING:
@@ -304,7 +303,7 @@ class Element:
         )
         await self.pause(pause)
 
-    async def upload(self, *files: str, pause: int | float | None = None) -> None:
+    async def upload(self, *files: PathInput, pause: int | float | None = None) -> None:
         """Upload local files to the element.
 
         Args:
@@ -318,7 +317,7 @@ class Element:
         """
         # Validate
         try:
-            validated_files = [validate_file(file) for file in files]
+            validated_files = [file_path(file) for file in files]
         except Exception as err:
             raise errors.InvalidArgumentError(
                 "<{}>\nUpload 'file' error: {}".format(self.__class__.__name__, err)
@@ -326,7 +325,8 @@ class Element:
         # Upload
         await self.execute_command(
             Command.SEND_KEYS_TO_ELEMENT,
-            body={"text": "\n".join(validated_files)},
+            # WebDriver uploads are newline-delimited path strings.
+            body={"text": "\n".join(map(str, validated_files))},
         )
         # Pause
         await self.pause(pause)
@@ -976,7 +976,7 @@ class Element:
                 )
             ) from err
 
-    async def save_screenshot(self, path: str) -> bool:
+    async def save_screenshot(self, path: PathInput) -> bool:
         """Take & save the screenshot of the element into local PNG file.
 
         Args:
@@ -990,7 +990,7 @@ class Element:
         """
         # Validate save path
         try:
-            path = validate_save_file_path(path, ".png")
+            destination = save_file_path(path, ".png")
         except Exception as err:
             raise errors.InvalidArgumentError(
                 "<{}>\nSave screenshot 'path' error: {}".format(
@@ -1005,7 +1005,7 @@ class Element:
             if not data:
                 return False
             # Save screenshot
-            return await save_bytes(path, data)
+            return await save_bytes(destination, data)
         finally:
             del data
 

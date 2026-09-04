@@ -26,9 +26,6 @@ from contextvars import ContextVar
 from importlib import resources
 from math import isfinite
 from os import environ, fspath, pathsep
-from os import walk as walk_path
-from os.path import basename, dirname, expanduser, normcase
-from os.path import join as join_path
 from pathlib import Path
 from platform import architecture, machine, system
 from re import fullmatch
@@ -56,6 +53,7 @@ from orjson import loads
 
 from aselenium import errors
 from aselenium._async import run_blocking
+from aselenium._paths import PathInput, file_path, parse_path
 from aselenium.manager._http import request as vendor_request
 from aselenium.manager._installation import (
     InstallationRequest as InstallationRequest,
@@ -88,7 +86,7 @@ from aselenium.manager.version import (
     SafariVersion,
     Version,
 )
-from aselenium.utils import is_path_file, load_plist_file, validate_file
+from aselenium.utils import load_plist_file
 
 if TYPE_CHECKING:
     from asyncio import Lock
@@ -152,11 +150,11 @@ class DriverManager:
     _PROBE_TIMEOUT: float = 10.0
     _PROBE_KILL_TIMEOUT: float = 1.0
     """The lock to prevent multiple installation at the same time."""
-    _MAC_BINARY_PATHS: dict[str, list[str]] = None
+    _MAC_BINARY_PATHS: dict[str, list[str]] | None = None
     """The partial paths to the browser binary on MacOS."""
-    _WIN_BINARY_PATHS: dict[str, list[str]] = None
+    _WIN_BINARY_PATHS: dict[str, list[str]] | None = None
     """The partial paths to the browser binary on Windows."""
-    _LINUX_BINARY_PATHS: dict[str, list[str]] = None
+    _LINUX_BINARY_PATHS: dict[str, list[str]] | None = None
     """The partial paths to the browser binary on Linux."""
 
     def __init__(
@@ -165,7 +163,7 @@ class DriverManager:
         file_manager_cls: type[FileManager] | None,
         driver_file_cls: type[File] | None,
         binary_file_cls: type[File] | None,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -206,33 +204,33 @@ class DriverManager:
         self._last_result: InstallationResult | None = None
         self._name: str = name
         # Installation
-        self._channel: str = None
+        self._channel: str | None = None
         # File manager
         self.max_cache_size = max_cache_size
         if file_manager_cls is not None:
             self._file_manager: FileManager = file_manager_cls(directory)
         else:
-            self._file_manager: FileManager = None
-        self._driver_file_cls: type[File] = driver_file_cls
-        self._binary_file_cls: type[File] = binary_file_cls
+            self._file_manager: FileManager | None = None
+        self._driver_file_cls: type[File] | None = driver_file_cls
+        self._binary_file_cls: type[File] | None = binary_file_cls
         # Request
         self.requests_timeout = request_timeout
         self.download_timeout = download_timeout
         self.proxy = proxy
         # Target
         self._target_version: Version | None = None
-        self._target_binary: str | None = None
+        self._target_binary: Path | None = None
         # Driver
-        self._driver_version: Version = None
-        self._driver_location: str = None
+        self._driver_version: Version | None = None
+        self._driver_location: str | None = None
         # Browser
-        self._browser_version: Version = None
-        self._browser_location: str = None
+        self._browser_version: Version | None = None
+        self._browser_location: str | None = None
         # Platform
-        self.__os_name: str = None
-        self.__os_arch: str = None
-        self.__os_is_arm: bool = None
-        self.__environ_paths: list[str] = None
+        self.__os_name: str | None = None
+        self.__os_arch: str | None = None
+        self.__os_is_arm: bool | None = None
+        self.__environ_paths: list[Path] | None = None
 
     # Installation ------------------------------------------------------------------------
     @property
@@ -666,7 +664,7 @@ class DriverManager:
             "implemented in subclass: <{}>.".format(self.__class__.__name__)
         )
 
-    def _parse_target_binary(self, binary: Any) -> None:
+    def _parse_target_binary(self, binary: PathInput | None) -> None:
         """Parse the target browser binary for the installation.
 
         Args:
@@ -681,7 +679,7 @@ class DriverManager:
             self._raise_invalid_browser_location_error(binary, cause=err)
 
     @staticmethod
-    def _normalize_file_location(path: Any) -> str:
+    def _normalize_file_location(path: PathInput) -> Path:
         """Validate an explicit string/PathLike path without changing its filename.
 
         Make the path absolute before it is saved for later installation work.
@@ -692,24 +690,9 @@ class DriverManager:
             path: Filesystem path to inspect or operate on.
 
         Returns:
-            An explicit string/pathlike path without changing its filename.
+            Absolute path to the existing file without resolving symbolic links.
         """
-        path = fspath(path)
-        if not isinstance(path, str) or not path:
-            raise ValueError("Expected a non-empty string or string-valued PathLike")
-        return DriverManager._absolute_location(validate_file(expanduser(path)))
-
-    @staticmethod
-    def _absolute_location(path: str) -> str:
-        """Make a location absolute without collapsing symlink-sensitive '..'.
-
-        Args:
-            path: Filesystem path to inspect or operate on.
-
-        Returns:
-            An absolute path string without resolving symlinks.
-        """
-        return str(Path(path).absolute())
+        return file_path(path)
 
     # Driver ------------------------------------------------------------------------------
     @property
@@ -823,7 +806,7 @@ class DriverManager:
             self._raise_installation_error("browser_version")
         return self._browser_version
 
-    def _detect_browser_version(self, browser_location: str) -> Version:
+    def _detect_browser_version(self, browser_location: PathInput) -> Version:
         """Detect the version of the browser.
 
         Args:
@@ -833,24 +816,27 @@ class DriverManager:
             The Version value produced by this operation.
         """
         try:
+            location = fspath(browser_location)
+            if not isinstance(location, str):
+                raise TypeError("Browser probe paths must be string-valued")
             if self._os_name == OSType.WIN:
                 # A fixed executable and an encoded script avoid cmd.exe parsing.
                 # Single-quoted PowerShell literals escape apostrophes by doubling
                 # them; -LiteralPath also disables wildcard interpretation.
-                literal = browser_location.replace("'", "''")
+                literal = location.replace("'", "''")
                 script = (
                     "$ErrorActionPreference='Stop'; (Get-Item -LiteralPath '%s').VersionInfo.FileVersion"
                     % literal
                 )
-                powershell = join_path(
-                    environ.get("SystemRoot", r"C:\Windows"),
-                    "System32",
-                    "WindowsPowerShell",
-                    "v1.0",
-                    "powershell.exe",
+                powershell = (
+                    parse_path(environ.get("SystemRoot", r"C:\Windows"))
+                    / "System32"
+                    / "WindowsPowerShell"
+                    / "v1.0"
+                    / "powershell.exe"
                 )
                 cmd = [
-                    powershell,
+                    str(powershell),
                     "-NoLogo",
                     "-NoProfile",
                     "-NonInteractive",
@@ -858,14 +844,16 @@ class DriverManager:
                     b64encode(script.encode("utf-16le")).decode("ascii"),
                 ]
             else:
-                cmd = [browser_location, "--version"]
+                cmd = [location, "--version"]
 
             res = self._read_from_cmd(cmd)
             return self._parse_browser_version(res)
         except (
             OSError,
+            TypeError,
             UnicodeError,
             SubprocessError,
+            errors.AseleniumInvalidPathError,
             errors.InvalidBrowserVersionError,
         ) as err:
             self._raise_invalid_browser_location_error(browser_location, cause=err)
@@ -907,11 +895,11 @@ class DriverManager:
         # Return driver location
         return self._browser_location
 
-    def _detect_browser_location(self) -> str:
+    def _detect_browser_location(self) -> Path:
         """Automatically detect the location of browser binary on the system.
 
         Returns:
-            The detect browser location string.
+            Absolute path to the detected browser executable.
         """
         paths = self._browser_paths_for_channel()
         if self._os_name == OSType.MAC:
@@ -924,7 +912,7 @@ class DriverManager:
         # Validate location
         if location is None:
             self._raise_invalid_browser_location_error(location)
-        return self._absolute_location(location)
+        return location
 
     def _browser_paths_for_channel(self) -> list[str]:
         """Validate platform/channel even when an explicit binary is supplied.
@@ -945,57 +933,59 @@ class DriverManager:
         except (KeyError, TypeError):
             self._raise_invalid_channel_error()
 
-    def _find_mac_browser_location(self, *paths: str) -> str | None:
+    def _find_mac_browser_location(self, *paths: str) -> Path | None:
         """Find the path to the browser binary on MacOS.
 
         Args:
             *paths: Paths used by this operation.
 
         Returns:
-            The path to the browser binary on macos. None indicates that no value is available.
+            Absolute browser path, or None when no candidate exists.
         """
         for path in paths:
             # Check default location
-            location = join_path("/Applications", path)
-            if is_path_file(location):
-                return self._absolute_location(location)
+            location = Path("/Applications") / path
+            if location.is_file():
+                return location
             # Check environ locations
             for env_path in self._environ_paths:
-                location = join_path(env_path, path)
-                if is_path_file(location):
-                    return self._absolute_location(location)
+                location = env_path / path
+                if location.is_file():
+                    return location
         return None
 
-    def _find_win_browser_location(self, *paths: str) -> str | None:
+    def _find_win_browser_location(self, *paths: str) -> Path | None:
         """Find the path to the browser binary on Windows.
 
         Args:
             *paths: Paths used by this operation.
 
         Returns:
-            The path to the browser binary on windows. None indicates that no value is available.
+            Absolute browser path, or None when no candidate exists.
         """
         for path in paths:
             for env_path in self._environ_paths:
-                location = join_path(env_path, path)
-                if is_path_file(location):
-                    return self._absolute_location(location)
+                location = env_path / path
+                if location.is_file():
+                    return location
         return None
 
-    def _find_linux_browser_location(self, *paths: str) -> str | None:
+    def _find_linux_browser_location(self, *paths: str) -> Path | None:
         """Find the path to the browser binary on Linux.
 
         Args:
             *paths: Paths used by this operation.
 
         Returns:
-            The path to the browser binary on linux. None indicates that no value is available.
+            Absolute browser path, or None when no executable candidate exists.
         """
-        search_path = pathsep.join(self._environ_paths)
+        search_path = pathsep.join(str(path) for path in self._environ_paths)
         for path in paths:
             location = which(path, path=search_path)
-            if location is not None and is_path_file(location):
-                return self._absolute_location(location)
+            if location is not None:
+                candidate = parse_path(location)
+                if candidate.is_file():
+                    return candidate
         return None
 
     async def _install_browser_binary(self, browser_version: Version) -> str:
@@ -1104,11 +1094,11 @@ class DriverManager:
         return self.__os_is_arm
 
     @property
-    def _environ_paths(self) -> list[str]:
+    def _environ_paths(self) -> list[Path]:
         """Return system environmental paths to find browser binary.
 
         Returns:
-            System environmental paths to find browser binary.
+            Deduplicated absolute search roots in environment order.
         """
         if self.__environ_paths is None:
             if self._os_name == OSType.WIN:
@@ -1128,17 +1118,21 @@ class DriverManager:
                 paths.extend(environ.get("PATH", "").split(pathsep))
             else:
                 paths = environ.get("PATH", "").split(pathsep)
-            normalized = []
-            seen = set()
+            normalized: list[Path] = []
+            seen: set[Path] = set()
             for path in paths:
                 # An empty PATH component must not become an implicit cwd search.
                 if not path:
                     continue
-                path = self._absolute_location(expanduser(path))
-                key = normcase(path)
-                if key not in seen:
-                    normalized.append(path)
-                    seen.add(key)
+                try:
+                    location = parse_path(path)
+                except errors.AseleniumInvalidPathError:
+                    # One malformed external environment entry must not prevent
+                    # discovery through the remaining valid search roots.
+                    continue
+                if location not in seen:
+                    normalized.append(location)
+                    seen.add(location)
             self.__environ_paths = normalized
         return self.__environ_paths
 
@@ -1459,7 +1453,7 @@ class ChromiumBaseDriverManager(DriverManager):
         file_manager_cls: type[FileManager],
         driver_file_cls: type[File] | None,
         binary_file_cls: type[File] | None,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -1490,12 +1484,12 @@ class ChromiumBaseDriverManager(DriverManager):
             proxy=proxy,
         )
         # Installation
-        self._chromelabs_arch: str = None
+        self._chromelabs_arch: str | None = None
         # Type hinting
         self._file_manager: ChromiumBaseFileManager
-        self._target_version: ChromiumVersion
-        self._driver_version: ChromiumVersion
-        self._browser_version: ChromiumVersion
+        self._target_version: ChromiumVersion | None
+        self._driver_version: ChromiumVersion | None
+        self._browser_version: ChromiumVersion | None
 
     # Installation ------------------------------------------------------------------------
     @isolated_install
@@ -1503,7 +1497,7 @@ class ChromiumBaseDriverManager(DriverManager):
         self,
         version: ChromiumVersion | str = "build",
         channel: Literal["stable", "beta", "dev"] = "stable",
-        binary: str | None = None,
+        binary: PathInput | None = None,
     ) -> str:
         """Install a webdriver.
 
@@ -1546,14 +1540,16 @@ class ChromiumBaseDriverManager(DriverManager):
             self._parse_target_binary(binary)
 
             # Detect browser location
-            if self._target_binary is None:
-                self._browser_location = self._detect_browser_location()
-            else:
-                self._browser_location = self._target_binary
+            browser_location = (
+                self._detect_browser_location()
+                if self._target_binary is None
+                else self._target_binary
+            )
+            self._browser_location = str(browser_location)
 
             # Detect browser version
             self._browser_version = await run_blocking(
-                self._detect_browser_version, self._browser_location
+                self._detect_browser_version, browser_location
             )
             self._validate_supported_version(self._browser_version, browser=True)
 
@@ -1866,7 +1862,7 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
 
     def __init__(
         self,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -1893,7 +1889,7 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
             proxy=proxy,
         )
         # Installation
-        self._azureedge_arch: str = None
+        self._azureedge_arch: str | None = None
 
     # Driver version ----------------------------------------------------------------------
     async def _request_driver_version(self, driver_version: Version) -> ChromiumVersion:
@@ -1998,7 +1994,7 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
 
     def __init__(
         self,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -2031,7 +2027,7 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
         self,
         version: ChromiumVersion | str = "build",
         channel: Literal["stable", "beta", "dev", "cft"] = "stable",
-        binary: str | None = None,
+        binary: PathInput | None = None,
     ) -> str:
         """Resolve and install a Chrome driver, optionally with Chrome for Testing.
 
@@ -2263,7 +2259,7 @@ class ChromiumDriverManager(ChromiumBaseDriverManager):
 
     def __init__(
         self,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -2294,7 +2290,7 @@ class ChromiumDriverManager(ChromiumBaseDriverManager):
     async def install(
         self,
         version: ChromiumVersion | str = "build",
-        binary: str | None = None,
+        binary: PathInput | None = None,
     ) -> str:
         """Install a webdriver.
 
@@ -2370,7 +2366,7 @@ class FirefoxDriverManager(DriverManager):
 
     def __init__(
         self,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -2400,9 +2396,9 @@ class FirefoxDriverManager(DriverManager):
         self.load_driver_compatibility_table()
         # Type hinting
         self._file_manager: FirefoxFileManager
-        self._target_version: GeckoVersion
-        self._driver_version: GeckoVersion
-        self._browser_version: FirefoxVersion
+        self._target_version: GeckoVersion | None
+        self._driver_version: GeckoVersion | None
+        self._browser_version: FirefoxVersion | None
 
     # Class methods -----------------------------------------------------------------------
     @classmethod
@@ -2464,7 +2460,7 @@ class FirefoxDriverManager(DriverManager):
     async def install(
         self,
         version: GeckoVersion | str = "latest",
-        binary: str | None = None,
+        binary: PathInput | None = None,
     ) -> str:
         """Install a geckodriver.
 
@@ -2507,14 +2503,16 @@ class FirefoxDriverManager(DriverManager):
             self._parse_target_binary(binary)
 
             # Detect browser location
-            if self._target_binary is None:
-                self._browser_location = self._detect_browser_location()
-            else:
-                self._browser_location = self._target_binary
+            browser_location = (
+                self._detect_browser_location()
+                if self._target_binary is None
+                else self._target_binary
+            )
+            self._browser_location = str(browser_location)
 
             # Detect browser version
             self._browser_version = await run_blocking(
-                self._detect_browser_version, self._browser_location
+                self._detect_browser_version, browser_location
             )
 
             # Install webdriver
@@ -2914,7 +2912,7 @@ class SafariDriverManager(DriverManager):
         ChannelType.DEV: ["Safari Technology Preview.app/Contents/MacOS/Safari Technology Preview"],
     }
     """The partial paths to the browser binary on MacOS."""
-    _MAC_DRIVER_DEFAULT_PATH: str = "/usr/bin/safaridriver"
+    _MAC_DRIVER_DEFAULT_PATH: Path = Path("/usr/bin/safaridriver")
     """The default path to the webdriver executable on MacOS."""
     _DRIVER_EXECUTABLE_NAME: str = "safaridriver"
     """The name of the webdriver executable."""
@@ -2922,7 +2920,7 @@ class SafariDriverManager(DriverManager):
 
     def __init__(
         self,
-        directory: str | None = None,
+        directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
@@ -2949,15 +2947,15 @@ class SafariDriverManager(DriverManager):
             proxy,
         )
         # Target
-        self._target_driver: str | None = None
+        self._target_driver: Path | None = None
 
     # Installation ------------------------------------------------------------------------
     @isolated_install
     async def install(
         self,
         channel: SafariVersion | Literal["stable", "dev"] = "stable",
-        driver: str | None = None,
-        binary: str | None = None,
+        driver: PathInput | None = None,
+        binary: PathInput | None = None,
     ) -> str:
         """Install a webdriver.
 
@@ -2998,28 +2996,32 @@ class SafariDriverManager(DriverManager):
             )
 
         try:
-            # Prase arguments
+            # Parse arguments
             self._channel = channel
             self._browser_paths_for_channel()
             self._parse_target_driver(driver)
             self._parse_target_binary(binary)
 
             # Detect browser location
-            if self._target_binary is None:
-                self._browser_location = self._detect_browser_location()
-            else:
-                self._browser_location = self._target_binary
+            browser_location = (
+                self._detect_browser_location()
+                if self._target_binary is None
+                else self._target_binary
+            )
+            self._browser_location = str(browser_location)
 
             # Detect browser version
             self._browser_version = await run_blocking(
-                self._detect_browser_version, self._browser_location
+                self._detect_browser_version, browser_location
             )
 
             # Detect driver location
-            if self._target_driver is None:
-                self._driver_location = self._detect_driver_location()
-            else:
-                self._driver_location = self._target_driver
+            driver_location = (
+                self._detect_driver_location(browser_location)
+                if self._target_driver is None
+                else self._target_driver
+            )
+            self._driver_location = str(driver_location)
             self._driver_version = self._browser_version
 
             # Return driver location
@@ -3030,8 +3032,8 @@ class SafariDriverManager(DriverManager):
             raise
 
     # Target ------------------------------------------------------------------------------
-    def _parse_target_driver(self, driver: Any) -> None:
-        """Prase the target webdriver executable for the installation.
+    def _parse_target_driver(self, driver: PathInput | None) -> None:
+        """Parse the target webdriver executable for the installation.
 
         Args:
             driver: Driver object or downloaded driver artifact required by this operation.
@@ -3040,12 +3042,12 @@ class SafariDriverManager(DriverManager):
             self._target_driver = None
             return None  # exit
         try:
-            driver: str = self._normalize_file_location(driver)
+            location = self._normalize_file_location(driver)
         except Exception:
             self._raise_invalid_driver_location_error(driver)
-        if basename(driver) != self._DRIVER_EXECUTABLE_NAME:
-            self._raise_invalid_driver_location_error(driver)
-        self._target_driver = driver
+        if location.name != self._DRIVER_EXECUTABLE_NAME:
+            self._raise_invalid_driver_location_error(location)
+        self._target_driver = location
 
     # Driver ------------------------------------------------------------------------------
     @property
@@ -3057,36 +3059,39 @@ class SafariDriverManager(DriverManager):
         """
         return super().driver_version
 
-    def _detect_driver_location(self) -> str:
+    def _detect_driver_location(self, browser_location: Path) -> Path:
         """Detect the driver location.
 
+        Args:
+            browser_location: Validated Safari executable path.
+
         Returns:
-            The detect driver location string.
+            Absolute path to the detected Safari driver executable.
         """
         # Stable channel - default location
-        if self._channel == ChannelType.STABLE and self._target_binary is None:
-            if is_path_file(self._MAC_DRIVER_DEFAULT_PATH):
-                return self._absolute_location(self._MAC_DRIVER_DEFAULT_PATH)
+        default_driver = self._MAC_DRIVER_DEFAULT_PATH
+        if (
+            self._channel == ChannelType.STABLE
+            and self._target_binary is None
+            and default_driver.is_file()
+        ):
+            return default_driver
 
         # Application contents - default location
-        base_folder = dirname(self._browser_location)
-        location = join_path(base_folder, self._DRIVER_EXECUTABLE_NAME)
-        if is_path_file(location):
-            return self._absolute_location(location)
+        base_folder = browser_location.parent
+        location = base_folder / self._DRIVER_EXECUTABLE_NAME
+        if location.is_file():
+            return location
 
         # Application contents - search
-        base_folder = dirname(base_folder)
-        for base_dir, _, files in walk_path(base_folder):
-            if self._DRIVER_EXECUTABLE_NAME in files:
-                location = join_path(base_dir, self._DRIVER_EXECUTABLE_NAME)
-                if is_path_file(location):
-                    return self._absolute_location(location)
+        base_folder = base_folder.parent
+        for location in base_folder.rglob(self._DRIVER_EXECUTABLE_NAME):
+            if location.is_file():
+                return location
 
         # Raise driver not found error
-        if self._target_binary is not None and is_path_file(
-            self._MAC_DRIVER_DEFAULT_PATH
-        ):
-            return self._absolute_location(self._MAC_DRIVER_DEFAULT_PATH)
+        if self._target_binary is not None and default_driver.is_file():
+            return default_driver
         self._raise_invalid_driver_location_error(None)
 
     # Browser -----------------------------------------------------------------------------
@@ -3099,7 +3104,7 @@ class SafariDriverManager(DriverManager):
         """
         return super().browser_version
 
-    def _detect_browser_version(self, browser_location: str) -> SafariVersion:
+    def _detect_browser_version(self, browser_location: PathInput) -> SafariVersion:
         """Detect the browser version.
 
         Args:
@@ -3110,14 +3115,17 @@ class SafariDriverManager(DriverManager):
         """
         try:
             # Application folder
-            content_dir = dirname(
-                dirname(self._normalize_file_location(browser_location))
+            location = (
+                browser_location
+                if isinstance(browser_location, Path)
+                else self._normalize_file_location(browser_location)
             )
+            content_dir = location.parent.parent
             # Load plist file
             try:
-                plist = load_plist_file(join_path(content_dir, "version.plist"))
+                plist = load_plist_file(content_dir / "version.plist")
             except FileNotFoundError:
-                plist = load_plist_file(join_path(content_dir, "Info.plist"))
+                plist = load_plist_file(content_dir / "Info.plist")
             # Return version
             return SafariVersion(plist["CFBundleShortVersionString"])
 

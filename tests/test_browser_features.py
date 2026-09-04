@@ -334,7 +334,7 @@ async def test_firefox_addon_install_and_uninstall(
         FirefoxSession,
         [{"value": "fixture@example.test"}, {"value": None}, {"value": None}],
     )
-    addons = await session.install_addons(str(path), temporary=True)
+    addons = await session.install_addons(path, temporary=True)
     assert len(addons) == 1
     assert (addons[0].id, addons[0].name, addons[0].version) == (
         "fixture@example.test",
@@ -676,7 +676,7 @@ def test_chromium_extensions_and_debugger_address(
     extension = tmp_path / "fixture.crx"
     extension.write_bytes(b"extension fixture bytes")
     options = options_class()
-    options.add_extensions(str(extension))
+    options.add_extensions(extension)
     options.add_extensions_base64(b64encode(extension.read_bytes()), "")
     assert options.extensions == [b64encode(extension.read_bytes()).decode("ascii")]
     options.extensions.clear()
@@ -803,9 +803,11 @@ def test_firefox_profile_cloning_encoding_extensions_and_cleanup(
     options = FirefoxOptions()
     snapshot: FirefoxOptions | None = None
     try:
-        profile = options.set_profile(str(source))
+        profile = options.set_profile(source)
         clone = Path(profile.directory_temp)
         assert profile.directory == str(source)
+        assert profile._profile_dir == source
+        assert isinstance(profile._temp_profile_dir, Path)
         assert clone != source
         assert not (clone / "parent.lock").exists()
         assert profile.extensions["fixture@example.test"].name == "Offline fixture"
@@ -847,9 +849,11 @@ def test_chromium_profile_arguments_and_replacement_cleanup(
     options = options_class()
     try:
         options.add_arguments("--headless=new")
-        first = options.set_profile(str(tmp_path), "Default")
+        first = options.set_profile(tmp_path, "Default")
         first_clone = Path(first.directory_temp)
         assert first.directory == str(tmp_path)
+        assert first._profile_dir == tmp_path / "Default"
+        assert isinstance(first._temp_profile_dir, Path)
         assert first.profile_folder == "Default"
         assert first.profile_folder_temp == "TEMP_PROFILE"
         assert "--profile-directory=TEMP_PROFILE" in options.arguments
@@ -980,7 +984,7 @@ def test_firefox_addon_details_without_id_and_copy(addon_directory: Path) -> Non
     manifest = loads(manifest_path.read_text(encoding="utf-8"))
     manifest.pop("browser_specific_settings")
     manifest_path.write_text(dumps(manifest), encoding="utf-8")
-    details = extract_firefox_addon_details(str(addon_directory))
+    details = extract_firefox_addon_details(addon_directory)
     assert isinstance(details, FirefoxAddon)
     assert details.id is None
     clone = details.copy()

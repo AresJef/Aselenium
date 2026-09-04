@@ -338,7 +338,7 @@ async def save_capture(session: Session, path: Path, report: dict[str, Any]) -> 
         path: Filesystem path to inspect or operate on.
         report: Mutable run report updated with outcomes and diagnostic artifacts.
     """
-    if not await session.save_screenshot(str(path)):
+    if not await session.save_screenshot(path):
         raise RuntimeError("Screenshot was not saved: " + path.name)
     header = await asyncio.to_thread(lambda: path.read_bytes()[:8])
     if header != b"\x89PNG\r\n\x1a\n":

@@ -375,9 +375,9 @@ def configure(
     if args.profile_demo:
         if args.browser in CHROMIUM:
             (profile_source / "Default").mkdir()
-            options.set_profile(str(profile_source), "Default")
+            options.set_profile(profile_source, "Default")
         else:
-            options.set_profile(str(profile_source))
+            options.set_profile(profile_source)
     return {
         "implicit_wait_seconds": 0,
         "session_timeout_seconds": 30,
@@ -476,7 +476,7 @@ async def elements(tour: Tour) -> dict[str, Any]:
     checkbox = await tour.element("#subscribe")
     await checkbox.click()
     check(await checkbox.selected, "checkbox selection")
-    await (await tour.element("#upload")).upload(str(ASSETS / "upload.txt"))
+    await (await tour.element("#upload")).upload(ASSETS / "upload.txt")
     check(
         await s.execute_script("return document.querySelector('#upload').files.length")
         == 1,
@@ -733,7 +733,7 @@ async def artifacts(tour: Tour) -> dict[str, Any]:
     """
     s = tour.session
     capture = tour.output / "page.png"
-    check(await s.save_screenshot(str(capture)), "PNG save returned false")
+    check(await s.save_screenshot(capture), "PNG save returned false")
     check(
         (await asyncio.to_thread(capture.read_bytes)).startswith(b"\x89PNG\r\n\x1a\n"),
         "PNG signature",
@@ -746,7 +746,7 @@ async def artifacts(tour: Tour) -> dict[str, Any]:
         )
     else:
         pdf = tour.output / "page.pdf"
-        check(await s.save_page(str(pdf)), "PDF save returned false")
+        check(await s.save_page(pdf), "PDF save returned false")
         check(
             (await asyncio.to_thread(pdf.read_bytes)).startswith(b"%PDF"),
             "PDF signature",
@@ -754,7 +754,7 @@ async def artifacts(tour: Tour) -> dict[str, Any]:
         files.append(pdf.name)
     if tour.browser == "firefox":
         full = tour.output / "full-page.png"
-        check(await s.save_full_screenshot(str(full)), "Firefox full-page screenshot")
+        check(await s.save_full_screenshot(full), "Firefox full-page screenshot")
         check(
             (await asyncio.to_thread(full.read_bytes)).startswith(b"\x89PNG"),
             "full-page PNG signature",
@@ -809,7 +809,7 @@ async def vendor(tour: Tour) -> dict[str, Any]:
         }
     if tour.browser == "firefox":
         check(await s.context == "content", "Firefox content context")
-        addons = await s.install_addons(str(ASSETS / "firefox-addon"), temporary=True)
+        addons = await s.install_addons(ASSETS / "firefox-addon", temporary=True)
         try:
             check(len(addons) == 1, "temporary add-on installation")
             await s.refresh()
