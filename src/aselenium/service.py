@@ -583,6 +583,10 @@ class BaseService:
 
     async def _stop_owned(self) -> None:
         """Finish teardown of the service-owned processes and HTTP session."""
+        # Never ask the driver to exit until every currently reachable descendant
+        # has been retained. A remote shutdown can otherwise detach late browser
+        # helpers before local process cleanup has a chance to discover them.
+        await run_blocking(self._capture_owned_children)
         try:
             await self._stop_session()
         finally:

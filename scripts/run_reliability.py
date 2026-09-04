@@ -549,7 +549,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 details = ""
             emit_workflow_error(
                 f"{args.browser} {name} reliability gate failed",
-                f"{type(cause).__name__}: {cause}\n{details}".strip(),
+                f"{details}\n{type(cause).__name__}: {cause}".strip(),
             )
         print(json.dumps({name: results[name]}), flush=True)
     passed = all(result["status"] == "passed" for result in results.values())

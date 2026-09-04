@@ -555,7 +555,14 @@ async def test_service_start_stop_and_failed_stop_ownership(
     monkeypatch.setattr(
         service,
         "_start_process",
-        lambda: setattr(service, "_process", SimpleNamespace(is_running=lambda: True)),
+        lambda: setattr(
+            service,
+            "_process",
+            SimpleNamespace(
+                is_running=lambda: True,
+                children=lambda recursive: [],
+            ),
+        ),
     )
     monkeypatch.setattr(
         service, "_start_session", lambda: setattr(service, "_session", client)

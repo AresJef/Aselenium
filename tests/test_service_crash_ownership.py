@@ -229,6 +229,106 @@ async def test_late_renderer_is_discovered_from_surviving_browser(
 
 
 @pytest.mark.asyncio
+async def test_late_renderer_is_captured_before_remote_quit_breaks_ancestry(
+    owned_service: ChromiumBaseService, owned_session: Session
+) -> None:
+    """Retain late browser descendants before the protocol closes their parents.
+
+    Args:
+        owned_service: Actual service with inert process boundaries.
+        owned_session: Actual session with an independently specified handshake.
+    """
+    driver = owned_service._process
+    browser = driver.descendants[0]
+    await owned_session.start()
+    renderer = OwnedProcess(40003)
+    browser.descendants.append(renderer)
+    connection = session_module.Connection.return_value
+
+    async def remote_quit(*args: object, **kwargs: object) -> dict[str, object]:
+        """Simulate a protocol quit that exits parents before local teardown.
+
+        Args:
+            *args: Positional command values supplied by the session.
+            **kwargs: Keyword command values supplied by the session.
+
+        Returns:
+            Successful W3C response after breaking the original ancestry.
+        """
+        driver.alive = False
+        browser.alive = False
+        return {"value": None}
+
+    connection.execute.side_effect = remote_quit
+
+    await owned_session.quit()
+
+    assert not renderer.alive
+    assert renderer.calls.count("terminate") == 1
+    assert owned_service._owned_children == []
+
+
+@pytest.mark.asyncio
+async def test_failed_pre_quit_snapshot_retries_before_service_shutdown(
+    owned_service: ChromiumBaseService,
+    owned_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Retry process discovery before any fallback driver shutdown request.
+
+    Args:
+        owned_service: Actual service with inert process boundaries.
+        owned_session: Actual session with an independently specified handshake.
+        monkeypatch: Fixture restoring the ordered teardown boundaries.
+    """
+    driver = owned_service._process
+    browser = driver.descendants[0]
+    await owned_session.start()
+    renderer = OwnedProcess(40003)
+    browser.descendants.append(renderer)
+    events: list[str] = []
+
+    async def failed_session_snapshot() -> None:
+        """Simulate a transient operating-system process-query failure.
+
+        Raises:
+            ServiceProcessError: Always, before the session-level remote quit.
+        """
+        events.append("session-snapshot-failed")
+        raise errors.ServiceProcessError("synthetic process inspection failure")
+
+    original_capture = owned_service._capture_owned_children
+
+    def service_snapshot() -> None:
+        """Record and perform the service's authoritative local snapshot."""
+        events.append("service-snapshot")
+        original_capture()
+
+    async def remote_shutdown() -> None:
+        """Model shutdown severing parent ancestry after the safe retry."""
+        events.append("remote-shutdown")
+        driver.alive = False
+        browser.alive = False
+
+    monkeypatch.setattr(
+        owned_service, "_capture_session_children", failed_session_snapshot
+    )
+    monkeypatch.setattr(owned_service, "_capture_owned_children", service_snapshot)
+    monkeypatch.setattr(owned_service, "_shutdown_remote", remote_shutdown)
+
+    await owned_session.quit()
+
+    assert events[:3] == [
+        "session-snapshot-failed",
+        "service-snapshot",
+        "remote-shutdown",
+    ]
+    assert not renderer.alive
+    assert renderer.calls.count("terminate") == 1
+    assert owned_service._owned_children == []
+
+
+@pytest.mark.asyncio
 async def test_failed_new_session_still_captures_created_browser(
     owned_service: ChromiumBaseService, owned_session: Session
 ) -> None:
@@ -245,7 +345,69 @@ async def test_failed_new_session_still_captures_created_browser(
     with pytest.raises(errors.InvalidSessionError):
         await owned_session.start()
     assert not browser.alive
-    assert driver.calls.count("children") == 2
+    assert driver.calls.count("children") >= 2
+    assert owned_service._owned_children == []
+
+
+@pytest.mark.asyncio
+async def test_handshake_failure_survives_failed_process_snapshot(
+    owned_service: ChromiumBaseService,
+    owned_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Preserve the primary transport failure when ownership inspection also fails.
+
+    Args:
+        owned_service: Actual service with inert process boundaries.
+        owned_session: Actual session with an independently specified handshake.
+        monkeypatch: Fixture restoring the simulated inspection boundary.
+    """
+    primary = errors.SessionClientError("primary handshake failure")
+    connection = session_module.Connection.return_value
+    connection.execute.side_effect = primary
+    capture = AsyncMock(
+        side_effect=errors.ServiceProcessError("secondary process inspection failure")
+    )
+    monkeypatch.setattr(owned_service, "_capture_session_children", capture)
+    monkeypatch.setattr(owned_service, "_shutdown_remote", AsyncMock())
+
+    with pytest.raises(errors.SessionClientError) as captured:
+        await owned_session.start()
+
+    assert captured.value is primary
+    assert capture.await_count == 2
+    assert owned_service._owned_children == []
+
+
+@pytest.mark.asyncio
+async def test_valid_handshake_id_is_retained_before_process_snapshot_failure(
+    owned_service: ChromiumBaseService,
+    owned_session: Session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Delete a valid remote session when its first ownership snapshot fails.
+
+    Args:
+        owned_service: Actual service with inert process boundaries.
+        owned_session: Actual session with an independently specified handshake.
+        monkeypatch: Fixture restoring the simulated inspection boundary.
+    """
+    inspection_failure = errors.ServiceProcessError(
+        "synthetic post-handshake inspection failure"
+    )
+    capture = AsyncMock(side_effect=[inspection_failure, None])
+    monkeypatch.setattr(owned_service, "_capture_session_children", capture)
+    connection = session_module.Connection.return_value
+
+    with pytest.raises(errors.ServiceProcessError) as captured:
+        await owned_session.start()
+
+    assert captured.value is inspection_failure
+    assert capture.await_count == 2
+    assert connection.execute.await_args_list[1].args[:2] == (
+        "/session/owned-session",
+        session_module.Command.QUIT,
+    )
     assert owned_service._owned_children == []
 
 
@@ -274,7 +436,7 @@ async def test_interrupted_handshake_captures_and_cleans_created_browser(
         await owned_session.start()
     assert captured.value is failure
     assert not browser.alive
-    assert driver.calls.count("children") == 2
+    assert driver.calls.count("children") >= 2
     assert owned_service._owned_children == []
 
 
@@ -299,7 +461,7 @@ async def test_lost_browser_root_does_not_hide_known_renderer_descendants(
     browser.alive = False
     await owned_session.quit()
     assert not renderer.alive and not worker.alive
-    assert renderer.calls.count("children") == 1
+    assert renderer.calls.count("children") >= 2
     assert owned_service._owned_children == []
 
 

@@ -48,6 +48,7 @@ from aselenium.command import Command
 from aselenium.connection import Connection
 from aselenium.element import ELEMENT_KEY, Element
 from aselenium.errors import ErrorCode
+from aselenium.logs import logger
 from aselenium.options import BaseOptions, ChromiumBaseOptions, Timeouts
 from aselenium.settings import Constraint, DefaultNetworkConditions
 from aselenium.utils import CustomDict, Rectangle
@@ -1115,12 +1116,24 @@ class Session:
         """Delete the remote session where possible and finish local service cleanup."""
         if self.__closed:
             return
-        if self._conn is not None and self._id is not None:
+        remote_shutdown_is_safe = True
+        capture_children = getattr(self._service, "_capture_session_children", None)
+        if capture_children is not None:
             try:
-                await self.execute_command(Command.QUIT, timeout=1)
+                # Capture renderers or helpers created after startup before the
+                # remote quit command can orphan them from the browser tree.
+                await capture_children()
             except Exception:
-                # Deletion is best effort, local owned service teardown is not.
-                pass
+                # The service performs another snapshot before its own shutdown
+                # request. Skip session deletion until that retry has succeeded.
+                remote_shutdown_is_safe = False
+        if self._conn is not None and self._id is not None:
+            if remote_shutdown_is_safe:
+                try:
+                    await self.execute_command(Command.QUIT, timeout=1)
+                except Exception:
+                    # Deletion is best effort, local owned service teardown is not.
+                    pass
         await self._service.stop()
         self._collect_garbage()
 
@@ -1180,16 +1193,26 @@ class Session:
                 "",
                 Command.NEW_SESSION,
                 body={"capabilities": {"alwaysMatch": capabilities}},
-                timeout=10,
+                timeout=self._session_timeout,
             )
-        finally:
+            # Retain the remote ID before ownership inspection can divert startup
+            # into cleanup, so a valid but locally unsafe session can be deleted.
+            self._id = parse_session_id(res)
+            self._base_url = "/session/" + quote(self._id, safe="")
+        except BaseException:
             # A driver can launch a browser even when its handshake fails. Capture
-            # those identities now, while their service ancestry is still known.
-            capture_children = getattr(self._service, "_capture_session_children", None)
-            if capture_children is not None:
-                await capture_children()
-        self._id = parse_session_id(res)
-        self._base_url = "/session/" + quote(self._id, safe="")
+            # those identities now without replacing the original transport,
+            # protocol, or cancellation failure if inspection also fails.
+            try:
+                await finish_owned(self._capture_service_children())
+            except BaseException:
+                logger.warning(
+                    "Unable to snapshot browser processes after a failed "
+                    "new-session handshake",
+                    exc_info=True,
+                )
+            raise
+        await self._capture_service_children()
 
         # Set default window of the session
         handle = await self._active_window_handle()
@@ -1200,6 +1223,12 @@ class Session:
                 )
             )
         return self._cache_window(handle, name)
+
+    async def _capture_service_children(self) -> None:
+        """Retain browser processes launched by the owned driver when supported."""
+        capture_children = getattr(self._service, "_capture_session_children", None)
+        if capture_children is not None:
+            await capture_children()
 
     # Navigate ----------------------------------------------------------------------------
     async def load(

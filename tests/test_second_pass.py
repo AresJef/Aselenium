@@ -81,6 +81,25 @@ async def test_step09_new_session_capability_encoding_runs_off_loop() -> None:
 
 
 @pytest.mark.asyncio
+async def test_new_session_honors_the_configured_command_timeout() -> None:
+    """Allow cold browser startup to use the caller's complete session deadline."""
+    options = ChromeOptions()
+    options.session_timeout = 47
+    service = SimpleNamespace(
+        _driver_version=None, _driver_location="fixture", url="fixture", running=True
+    )
+    session = Session(options, service)
+    session._conn = SimpleNamespace(
+        execute=AsyncMock(return_value={"value": {"sessionId": "fixture"}})
+    )
+    session._active_window_handle = AsyncMock(return_value="window")
+
+    await session._start_session()
+
+    assert session._conn.execute.await_args.kwargs["timeout"] == 47
+
+
+@pytest.mark.asyncio
 async def test_step05_failed_start_cannot_overwrite_resources_before_quit() -> None:
     """Verify step05 failed start cannot overwrite resources before quit."""
     original = SimpleNamespace(

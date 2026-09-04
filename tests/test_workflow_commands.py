@@ -44,8 +44,30 @@ def test_workflow_error_escapes_control_characters_and_preserves_failure_tail(
 
     output = capsys.readouterr().out
     assert output.startswith("::error::")
+    assert "Safari failed" in output
     assert "%25" in output
     assert "%0D%0A" in output
     assert "earlier diagnostic text truncated" in output
+    assert output.endswith("ROOT CAUSE\n")
+    assert len(output) <= WORKFLOW["ANNOTATION_LIMIT"] + len("::error::\n")
+
+
+def test_workflow_error_bounds_an_overlong_untrusted_label(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Keep hostile labels bounded without permitting a second workflow command.
+
+    Args:
+        monkeypatch: Reversibly enable the GitHub Actions environment marker.
+        capsys: Capture the generated workflow command.
+    """
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    label = "%\r\n::warning::injected" + "x" * 4_000
+
+    WORKFLOW["emit_workflow_error"](label, "ROOT CAUSE")
+
+    output = capsys.readouterr().out
+    assert output.startswith("::error::%25%0D%0A::warning::injected")
+    assert output.count("\n") == 1
     assert output.endswith("ROOT CAUSE\n")
     assert len(output) <= WORKFLOW["ANNOTATION_LIMIT"] + len("::error::\n")

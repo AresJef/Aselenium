@@ -92,3 +92,4 @@ htmlcov/
 /coverage-contexts.json
 /feature-coverage.json
 /feature-api-inventory.json
+/pytest-results.xml
