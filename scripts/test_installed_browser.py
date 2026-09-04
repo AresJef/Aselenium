@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from _owned_subprocess import OwnedProcessError, run_owned
+from _workflow_commands import emit_workflow_error
 
 ROOT = Path(__file__).resolve().parents[1]
 STAGES = {
@@ -266,4 +267,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except Exception as cause:
+        emit_workflow_error(
+            "Installed-browser acceptance failed",
+            f"{type(cause).__name__}: {cause}",
+        )
+        raise
