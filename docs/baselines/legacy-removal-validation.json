@@ -1,0 +1,111 @@
+{
+  "validation_date": "2026-09-04",
+  "scope": "Removal of obsolete runtime compatibility paths, source modules, demo assets, optional dependencies, and build artifacts; breaking-change documentation and current replacement API regression checks",
+  "package_version": "1.0.5",
+  "release_status": "Unpublished working-tree candidate; version unchanged; choose a new release version before publishing this breaking change",
+  "runtime": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "offline_test_python": "3.11.15",
+    "live_demo_python": "3.13.12"
+  },
+  "offline_checks": [
+    {
+      "command": "/private/tmp/aselenium-py311.wnNkJd/venv/bin/python -m pytest --asyncio-debug -q",
+      "result": "974 passed",
+      "includes": "Removed-API rejection, modern replacements, README examples, isolated source-wheel/sdist/sdist-wheel builds, archive contents and metadata, and installed-wheel imports outside the checkout"
+    },
+    {
+      "command": "/private/tmp/aselenium-py311.wnNkJd/venv/bin/python -m ruff check src tests scripts",
+      "result": "All checks passed"
+    },
+    {
+      "command": "/private/tmp/aselenium-py311.wnNkJd/venv/bin/python -m mypy",
+      "result": "Success: no issues found in 11 source files",
+      "scope": "Configured infrastructure modules, not strict typing of the entire package"
+    },
+    {
+      "command": "/private/tmp/aselenium-py311.wnNkJd/venv/bin/python -m pip check",
+      "result": "No broken requirements found"
+    },
+    {
+      "command": "git diff --check -- . ':(exclude).gitignore'",
+      "result": "Passed",
+      "boundary": "The unrelated pre-existing blank line at EOF in .gitignore was not changed"
+    }
+  ],
+  "live_runs": [
+    {
+      "browser": "chrome",
+      "browser_version": "152.0.7977.76",
+      "driver_version": "152.0.7977.82",
+      "command": ".venv/bin/python src/demo_local.py run --browser chrome --binary '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome' --cache-dir /private/tmp/aselenium-demo-validation.YyYti3/cache --output-dir /private/tmp/aselenium-legacy-removal.zdqbBy --timeout 120",
+      "status": "passed",
+      "exit_code": 0,
+      "passed_sections": 15,
+      "failed_sections": 0,
+      "skipped_sections": 0,
+      "report": "/private/tmp/aselenium-legacy-removal.zdqbBy/local-chrome-5e2qzyj3/report.json"
+    },
+    {
+      "browser": "edge",
+      "browser_version": "151.0.4129.93",
+      "driver_version": "151.0.4129.107",
+      "command": ".venv/bin/python src/demo_local.py run --browser edge --binary '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge' --cache-dir /private/tmp/aselenium-demo-validation.YyYti3/cache --output-dir /private/tmp/aselenium-legacy-removal.zdqbBy --timeout 120",
+      "status": "passed",
+      "exit_code": 0,
+      "passed_sections": 15,
+      "failed_sections": 0,
+      "skipped_sections": 0,
+      "report": "/private/tmp/aselenium-legacy-removal.zdqbBy/local-edge-y9o8h5vl/report.json"
+    }
+  ],
+  "live_run_boundary": "Headless, fresh temporary profiles, loopback HTML only, existing cached drivers, offline provisioning and session acquisition. Includes DOM attributes, in_viewport/unobscured waits, shadow roots, input, scripts, actions, captures, isolation and cancellation; no casting or proxy authentication test.",
+  "removed_implementation_files": [
+    "src/aselenium/manager/migration.py",
+    "src/aselenium/javascript/get_attribute.py",
+    "src/aselenium/javascript/is_viewable.py"
+  ],
+  "obsolete_files_no_longer_in_source": [
+    "src/demo.py (already absent before cleanup; remaining references and test removed)",
+    "setup.cfg (already absent before cleanup; setuptools may generate an egg-info-only file inside an sdist)",
+    "src/test_files/.gitignore",
+    "src/test_files/captcha-test.png",
+    "src/test_files/firefox_addon_foxyproxy_standard-7.5.1.xpi",
+    "src/test_files/firefox_addon_webmail_ad_blocker-5.15.1.xpi"
+  ],
+  "removed_features": [
+    "Feather import, legacy-cache optional extra, pandas/pyarrow optional dependencies and migration-only CI",
+    "Chrome/Chromium driver provisioning below version 115 and old storage/archive compatibility branches",
+    "Firefox install.rdf, applications manifest alias and FirefoxAddon.unpack",
+    "Element.visible/viewable/get_attribute and old visible/viewable wait condition names",
+    "JSON Wire numeric/error-envelope fallbacks, top-level new-session IDs and raw PNG responses",
+    "Route IDs and legacy send-key value arrays in JSON command bodies",
+    "Obsolete mobile/orientation/network/context, Chrome-app launch and execute_async command routes",
+    "FTP proxy option and positional Proxy constructor arguments",
+    "Obsolete IME/element exceptions, misspelled private HTTP helper and unused singleton registry"
+  ],
+  "preserved_boundaries": [
+    "Current SQLite v2 caches, integrity checks, recovery, leases and pins",
+    "All five browser facades, Python 3.10+, current install() and install_result() APIs",
+    "Independent Edge version resolution, Firefox recorded Gecko ranges and Safari system driver",
+    "Current WebAuthn and Selenium raw extension command routes",
+    "Current local and Google demo entry points and maintained demo_assets fixtures",
+    "Dated historical audit reports, with superseded banners where applicable, and original license notices"
+  ],
+  "recovery": {
+    "directory": "/private/tmp/aselenium-legacy-removal.zdqbBy",
+    "source_backup": "/private/tmp/aselenium-legacy-removal.zdqbBy/before-cleanup.tar.gz",
+    "obsolete_assets": "/private/tmp/aselenium-legacy-removal.zdqbBy/obsolete-test-files",
+    "old_build_directories_relocated": ["modernization-20260904", "original-12-step-review-20260904"],
+    "boundary": "Temporary storage may be cleaned by the operating system; no user cache, old Feather file, browser profile or installed dependency was deleted"
+  },
+  "not_live_validated_in_this_cleanup": [
+    "Full Python 3.13 test suite or other Python versions",
+    "Firefox, Safari, standalone Chromium or separate CfT browser bundles",
+    "Windows/Linux native browser behavior or remote CI execution",
+    "Vendor downloads or beta/dev channels",
+    "Google homepage or search behavior"
+  ],
+  "evidence_retention": "This compact record is retained in the checkout. Raw browser reports and captures are in temporary storage and may be removed by the operating system. Historical baseline records describe their original runs and are not current API documentation.",
+  "environment_boundary": "The user's .venv was used without modifying its dependencies. Development checks used the existing disposable Python 3.11 environment. Unrelated working-tree changes and src/quick_start.py were preserved. No commit, push or publication was performed."
+}

@@ -16,24 +16,40 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from aselenium.edge.options import EdgeOptions
-from aselenium.edge.service import EdgeService
+"""Aselenium session implementation and supporting types."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from aselenium.session import ChromiumBaseSession
+
+if TYPE_CHECKING:
+    from aselenium.edge.options import EdgeOptions
+    from aselenium.edge.service import EdgeService
 
 __all__ = ["EdgeSession"]
 
 
 # Edge Session ------------------------------------------------------------------------------------
 class EdgeSession(ChromiumBaseSession):
-    """Represents a session of the Edge browser."""
+    """Represent a session of the Edge browser."""
 
     # Basic -------------------------------------------------------------------------------
     @property
     def options(self) -> EdgeOptions:
-        """Access the Edge options `<EdgeOptions>`."""
+        """Return the Edge options.
+
+        Returns:
+            The browser options owned by this facade or session.
+        """
         return self._options
 
     @property
     def service(self) -> EdgeService:
-        """Access the Edge service `<EdgeService>`."""
+        """Return the Edge service.
+
+        Returns:
+            The driver service owned by the session.
+        """
         return self._service

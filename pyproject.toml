@@ -1,3 +1,75 @@
 [build-system]
-requires = ["setuptools>=68.0.0", "wheel>=0.41.0"]
+requires = ["setuptools>=77.0.3", "wheel>=0.41.0"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "aselenium"
+version = "2.0.0"
+description = "Asynchronous web browser automation for Python."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{name = "Jiefu Chen", email = "keppa1991@163.com"}]
+keywords = ["async", "asynchronous", "automation", "arsenic", "selenium"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Typing :: Typed",
+    "Operating System :: Unix",
+    "Operating System :: MacOS :: MacOS X",
+    "Operating System :: Microsoft :: Windows",
+]
+dependencies = ["aiohttp>=3.14.3", "psutil>=5.8.0", "orjson>=3.11.6"]
+
+[project.urls]
+Homepage = "https://github.com/AresJef/Aselenium"
+Documentation = "https://github.com/AresJef/Aselenium#readme"
+Issues = "https://github.com/AresJef/Aselenium/issues"
+Changelog = "https://github.com/AresJef/Aselenium/releases/tag/v2.0.0"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["aselenium*"]
+
+[tool.setuptools.package-data]
+aselenium = ["py.typed"]
+"aselenium.manager" = ["geckodriver/compatibility.json"]
+
+[tool.ruff.lint]
+select = ["E9", "F", "I", "D", "ANN"]
+# Protocol payloads, JavaScript values, extensible service kwargs, and test doubles
+# legitimately contain Any; missing annotations are still rejected.
+ignore = ["ANN401"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src/aselenium/_async.py", "src/aselenium/_wait.py", "src/aselenium/_profiles.py", "src/aselenium/_output.py", "src/aselenium/valuewrap.py", "src/aselenium/manager/_cache.py", "src/aselenium/manager/_http.py", "src/aselenium/manager/_installation.py", "src/aselenium/manager/_filesystem.py", "src/aselenium/manager/version.py", "src/aselenium/firefox/utils.py", "src/aselenium/connection.py", "src/aselenium/errors.py", "src/aselenium/webdriver.py", "src/aselenium/actions.py", "src/aselenium/alert.py", "src/aselenium/utils.py", "src/aselenium/manager/file.py", "src/aselenium/element.py"]
+follow_imports = "silent"
+ignore_missing_imports = true
+check_untyped_defs = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
+asyncio_default_fixture_loop_scope = "function"
+asyncio_default_test_loop_scope = "function"
+xfail_strict = true
+addopts = "-ra --strict-config --strict-markers"
+filterwarnings = [
+    "error::pytest.PytestUnraisableExceptionWarning",
+    "error::pytest.PytestUnhandledThreadExceptionWarning",
+    "error:coroutine .* was never awaited:RuntimeWarning",
+]
+markers = [
+    "loopback: uses real TCP only against an allowlisted disposable local server",
+    "regression: desired behavior currently blocked by a tracked defect",
+    "packaging: builds and inspects distributions in a disposable directory",
+]

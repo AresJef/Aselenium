@@ -1,0 +1,110 @@
+{
+  "date": "2026-09-04",
+  "test_runs": [
+    {
+      "python": "3.13.12",
+      "platform": "macOS 26.6.2 ARM64",
+      "passed": 636,
+      "warnings": 0,
+      "xfails": 0,
+      "asyncio_debug": true
+    },
+    {
+      "python": "3.11.15",
+      "platform": "macOS 26.6.2 ARM64",
+      "passed": 636,
+      "warnings": 0,
+      "xfails": 0,
+      "asyncio_debug": true
+    }
+  ],
+  "quality_gates": {
+    "mypy": "Passed, 9 infrastructure modules; not full-package strict typing",
+    "ruff": "Passed runtime-name checks across src, tests and scripts",
+    "pip_check": "Passed in both local interpreters",
+    "distribution": "Wheel, sdist, wheel rebuilt from sdist, isolated wheel imports with legacy dependency imports blocked",
+    "remote_ci": "Configured but not executed"
+  },
+  "live_smoke": [
+    {
+      "browser": "chrome",
+      "browser_version": "152.0.7977.76",
+      "driver_version": "152.0.7977.82",
+      "driver_identity": "ChromeDriver 152.0.7977.82 (d04cdb24d67b081f6cf80200ffc5233f44b61109-refs/branch-heads/7977@{#2322})",
+      "driver_sha256": "647a0d49aee655cfc0d0c0ead33a8758924ab79e83bfd5a47cc278a1e430095d",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "timings": [
+        {
+          "mode": "build",
+          "acquisition_seconds": 2.1656935830251314,
+          "work_seconds": 0.24837241700151935,
+          "including_teardown_seconds": 2.491176292009186
+        },
+        {
+          "mode": "offline",
+          "acquisition_seconds": 0.47708966594655067,
+          "work_seconds": 0.2150438340031542,
+          "including_teardown_seconds": 0.7698019999661483
+        }
+      ],
+      "fixture": "data URL only; private profiles; cache deleted on completion"
+    },
+    {
+      "browser": "edge",
+      "browser_version": "151.0.4129.93",
+      "driver_version": "151.0.4129.107",
+      "driver_identity": "Microsoft Edge WebDriver 151.0.4129.107 (419e77616b4ed7d0a544b85cb53ccd5b74d5f135)",
+      "driver_sha256": "53ef9a0aa5f55b7a2eed17bd0c1ae07431ecbcffc557f67da335d4919b7f8faa",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "timings": [
+        {
+          "mode": "build",
+          "acquisition_seconds": 6.198347833007574,
+          "work_seconds": 0.20577345800120384,
+          "including_teardown_seconds": 6.4825599159812555
+        },
+        {
+          "mode": "offline",
+          "acquisition_seconds": 0.5047669999767095,
+          "work_seconds": 0.23635266697965562,
+          "including_teardown_seconds": 0.8192159999744035
+        }
+      ],
+      "fixture": "data URL only; private profiles; cache deleted on completion"
+    }
+  ],
+  "download_memory": {
+    "python": "3.13.12",
+    "scope": "Generated chunks, no network; tracemalloc excludes OS file cache and native-library allocations; not RSS",
+    "samples": [
+      {
+        "download_bytes": 8388608,
+        "traced_peak_python_bytes": 623255,
+        "seconds": 0.00985091703478247
+      },
+      {
+        "download_bytes": 67108864,
+        "traced_peak_python_bytes": 533762,
+        "seconds": 0.05888049997156486
+      },
+      {
+        "download_bytes": 134217728,
+        "traced_peak_python_bytes": 533874,
+        "seconds": 0.11541550001129508
+      }
+    ]
+  },
+  "unverified": [
+    "Native Windows/Linux",
+    "Python 3.10/3.12/3.14 locally",
+    "Firefox native",
+    "Safari native",
+    "Separate Chromium and CfT browser bundle native runs",
+    "Shared/network filesystem caches",
+    "Hardware power-loss durability"
+  ]
+}

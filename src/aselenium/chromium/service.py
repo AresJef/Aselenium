@@ -16,6 +16,8 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+"""Aselenium service implementation and supporting types."""
+
 from aselenium.service import ChromiumBaseService
 
 __all__ = ["ChromiumService"]
@@ -23,4 +25,4 @@ __all__ = ["ChromiumService"]
 
 # Chromium Service --------------------------------------------------------------------------------
 class ChromiumService(ChromiumBaseService):
-    "Chromium Service"
+    """Chromium Service."""

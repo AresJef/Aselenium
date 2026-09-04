@@ -16,8 +16,8 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from aselenium.javascript.is_viewable import SCRIPT as ELEMENT_IS_VIEWABLE
-from aselenium.javascript.get_attribute import SCRIPT as GET_ELEMENT_ATTRIBUTE
+
+"""Public exports for the aselenium.javascript package."""
 
 __all__ = [
     "GET_PAGE_VIEWPORT",
@@ -33,10 +33,7 @@ __all__ = [
     "GET_ELEMENT_PROPERTIES",
     "GET_ELEMENT_CSS_PROPERTIES",
     "GET_ELEMENT_ATTRIBUTES",
-    "GET_ELEMENT_ATTRIBUTE",
     "ELEMENT_IS_VALID",
-    "ELEMENT_IS_VIEWABLE",
-    "ELEMENT_IS_VISIBLE",
     "ELEMENT_SCROLL_INTO_VIEW",
     "ELEMENT_SUBMIT_FORM",
 ]
@@ -98,10 +95,6 @@ for (var i = 0; i < elemt.attributes.length; ++i) {
 }
 return attrs;"""
 ELEMENT_IS_VALID: str = "return !!arguments[0];"
-ELEMENT_IS_VISIBLE: str = """
-var rect = arguments[0].getBoundingClientRect();
-var isVisible = (rect.top >= 0) && (rect.top <= window.innerHeight);
-return isVisible;"""
 ELEMENT_SCROLL_INTO_VIEW: str = "arguments[0].scrollIntoView(true);"
 ELEMENT_SUBMIT_FORM: str = """
 var form = arguments[0];

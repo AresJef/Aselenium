@@ -1,0 +1,2937 @@
+{
+  "recorded_at_utc": "2026-09-04T15:17:26.527365+00:00",
+  "scope": "Local production-readiness hardening review, not universal production certification",
+  "release": {
+    "version": "1.0.5",
+    "published": false,
+    "committed": false,
+    "user_venv_modified": false
+  },
+  "structural_audit": {
+    "files": 94,
+    "functions": 1561,
+    "classes": 238,
+    "examples": 178,
+    "issues": []
+  },
+  "python310_grammar_only": {
+    "status": "passed",
+    "files": 94
+  },
+  "test_runs": {
+    "python311_latest_runtime": {
+      "status": "passed",
+      "tests": 1332,
+      "seconds": 5.61,
+      "raw_log": "/private/tmp/aselenium-production-review.FGj6sT/pytest-py311-final.log"
+    },
+    "python313_latest_runtime": {
+      "status": "passed",
+      "tests": 1332,
+      "seconds": 8.62,
+      "raw_log": "/private/tmp/aselenium-production-review.FGj6sT/pytest-py313-final.log"
+    },
+    "python311_exact_runtime_minima": {
+      "status": "passed",
+      "tests": 1332,
+      "seconds": 6.45,
+      "raw_log": "/private/tmp/aselenium-production-review.FGj6sT/pytest-minimums-py311.log"
+    }
+  },
+  "runtime_minima": {
+    "aiohttp": "3.14.3",
+    "orjson": "3.11.6",
+    "psutil": "5.8.0"
+  },
+  "coverage": {
+    "scope": "offline Python 3.13 suite only, not live demos",
+    "totals": {
+      "covered_lines": 4758,
+      "num_statements": 7155,
+      "percent_covered": 63.01080057900011,
+      "percent_covered_display": "63",
+      "missing_lines": 2397,
+      "excluded_lines": 72,
+      "percent_statements_covered": 66.49895178197065,
+      "percent_statements_covered_display": "66",
+      "num_branches": 1826,
+      "num_partial_branches": 299,
+      "covered_branches": 901,
+      "missing_branches": 925,
+      "percent_branches_covered": 49.34282584884995,
+      "percent_branches_covered_display": "49"
+    },
+    "modules": {
+      "src/aselenium/__init__.py": {
+        "covered_lines": 17,
+        "num_statements": 17,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/_async.py": {
+        "covered_lines": 28,
+        "num_statements": 32,
+        "percent_covered": 86.84210526315789,
+        "percent_covered_display": "87",
+        "missing_lines": 4,
+        "excluded_lines": 0,
+        "percent_statements_covered": 87.5,
+        "percent_statements_covered_display": "88",
+        "num_branches": 6,
+        "num_partial_branches": 1,
+        "covered_branches": 5,
+        "missing_branches": 1,
+        "percent_branches_covered": 83.33333333333333,
+        "percent_branches_covered_display": "83"
+      },
+      "src/aselenium/_output.py": {
+        "covered_lines": 22,
+        "num_statements": 23,
+        "percent_covered": 92.0,
+        "percent_covered_display": "92",
+        "missing_lines": 1,
+        "excluded_lines": 0,
+        "percent_statements_covered": 95.65217391304348,
+        "percent_statements_covered_display": "96",
+        "num_branches": 2,
+        "num_partial_branches": 1,
+        "covered_branches": 1,
+        "missing_branches": 1,
+        "percent_branches_covered": 50.0,
+        "percent_branches_covered_display": "50"
+      },
+      "src/aselenium/_profiles.py": {
+        "covered_lines": 24,
+        "num_statements": 26,
+        "percent_covered": 85.0,
+        "percent_covered_display": "85",
+        "missing_lines": 2,
+        "excluded_lines": 2,
+        "percent_statements_covered": 92.3076923076923,
+        "percent_statements_covered_display": "92",
+        "num_branches": 14,
+        "num_partial_branches": 2,
+        "covered_branches": 10,
+        "missing_branches": 4,
+        "percent_branches_covered": 71.42857142857143,
+        "percent_branches_covered_display": "71"
+      },
+      "src/aselenium/_wait.py": {
+        "covered_lines": 47,
+        "num_statements": 53,
+        "percent_covered": 82.66666666666667,
+        "percent_covered_display": "83",
+        "missing_lines": 6,
+        "excluded_lines": 0,
+        "percent_statements_covered": 88.67924528301887,
+        "percent_statements_covered_display": "89",
+        "num_branches": 22,
+        "num_partial_branches": 7,
+        "covered_branches": 15,
+        "missing_branches": 7,
+        "percent_branches_covered": 68.18181818181819,
+        "percent_branches_covered_display": "68"
+      },
+      "src/aselenium/actions.py": {
+        "covered_lines": 138,
+        "num_statements": 199,
+        "percent_covered": 64.9402390438247,
+        "percent_covered_display": "65",
+        "missing_lines": 61,
+        "excluded_lines": 2,
+        "percent_statements_covered": 69.34673366834171,
+        "percent_statements_covered_display": "69",
+        "num_branches": 52,
+        "num_partial_branches": 9,
+        "covered_branches": 25,
+        "missing_branches": 27,
+        "percent_branches_covered": 48.07692307692308,
+        "percent_branches_covered_display": "48"
+      },
+      "src/aselenium/alert.py": {
+        "covered_lines": 17,
+        "num_statements": 45,
+        "percent_covered": 36.170212765957444,
+        "percent_covered_display": "36",
+        "missing_lines": 28,
+        "excluded_lines": 2,
+        "percent_statements_covered": 37.77777777777778,
+        "percent_statements_covered_display": "38",
+        "num_branches": 2,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 2,
+        "percent_branches_covered": 0.0,
+        "percent_branches_covered_display": "0"
+      },
+      "src/aselenium/chrome/__init__.py": {
+        "covered_lines": 5,
+        "num_statements": 5,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/chrome/options.py": {
+        "covered_lines": 7,
+        "num_statements": 7,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/chrome/service.py": {
+        "covered_lines": 3,
+        "num_statements": 3,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/chrome/session.py": {
+        "covered_lines": 9,
+        "num_statements": 11,
+        "percent_covered": 81.81818181818181,
+        "percent_covered_display": "82",
+        "missing_lines": 2,
+        "excluded_lines": 3,
+        "percent_statements_covered": 81.81818181818181,
+        "percent_statements_covered_display": "82",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/chrome/webdriver.py": {
+        "covered_lines": 21,
+        "num_statements": 23,
+        "percent_covered": 91.30434782608695,
+        "percent_covered_display": "91",
+        "missing_lines": 2,
+        "excluded_lines": 2,
+        "percent_statements_covered": 91.30434782608695,
+        "percent_statements_covered_display": "91",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/chromium/__init__.py": {
+        "covered_lines": 5,
+        "num_statements": 5,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/chromium/options.py": {
+        "covered_lines": 7,
+        "num_statements": 7,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/chromium/service.py": {
+        "covered_lines": 3,
+        "num_statements": 3,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/chromium/session.py": {
+        "covered_lines": 9,
+        "num_statements": 11,
+        "percent_covered": 81.81818181818181,
+        "percent_covered_display": "82",
+        "missing_lines": 2,
+        "excluded_lines": 3,
+        "percent_statements_covered": 81.81818181818181,
+        "percent_statements_covered_display": "82",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/chromium/webdriver.py": {
+        "covered_lines": 21,
+        "num_statements": 23,
+        "percent_covered": 91.30434782608695,
+        "percent_covered_display": "91",
+        "missing_lines": 2,
+        "excluded_lines": 2,
+        "percent_statements_covered": 91.30434782608695,
+        "percent_statements_covered_display": "91",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/command.py": {
+        "covered_lines": 90,
+        "num_statements": 90,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/connection.py": {
+        "covered_lines": 111,
+        "num_statements": 124,
+        "percent_covered": 88.96103896103897,
+        "percent_covered_display": "89",
+        "missing_lines": 13,
+        "excluded_lines": 0,
+        "percent_statements_covered": 89.51612903225806,
+        "percent_statements_covered_display": "90",
+        "num_branches": 30,
+        "num_partial_branches": 4,
+        "covered_branches": 26,
+        "missing_branches": 4,
+        "percent_branches_covered": 86.66666666666667,
+        "percent_branches_covered_display": "87"
+      },
+      "src/aselenium/edge/__init__.py": {
+        "covered_lines": 5,
+        "num_statements": 5,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/edge/options.py": {
+        "covered_lines": 20,
+        "num_statements": 25,
+        "percent_covered": 72.41379310344827,
+        "percent_covered_display": "72",
+        "missing_lines": 5,
+        "excluded_lines": 0,
+        "percent_statements_covered": 80.0,
+        "percent_statements_covered_display": "80",
+        "num_branches": 4,
+        "num_partial_branches": 1,
+        "covered_branches": 1,
+        "missing_branches": 3,
+        "percent_branches_covered": 25.0,
+        "percent_branches_covered_display": "25"
+      },
+      "src/aselenium/edge/service.py": {
+        "covered_lines": 3,
+        "num_statements": 3,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/edge/session.py": {
+        "covered_lines": 9,
+        "num_statements": 11,
+        "percent_covered": 81.81818181818181,
+        "percent_covered_display": "82",
+        "missing_lines": 2,
+        "excluded_lines": 3,
+        "percent_statements_covered": 81.81818181818181,
+        "percent_statements_covered_display": "82",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/edge/webdriver.py": {
+        "covered_lines": 21,
+        "num_statements": 23,
+        "percent_covered": 91.30434782608695,
+        "percent_covered_display": "91",
+        "missing_lines": 2,
+        "excluded_lines": 2,
+        "percent_statements_covered": 91.30434782608695,
+        "percent_statements_covered_display": "91",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/element.py": {
+        "covered_lines": 193,
+        "num_statements": 530,
+        "percent_covered": 35.40372670807454,
+        "percent_covered_display": "35",
+        "missing_lines": 337,
+        "excluded_lines": 4,
+        "percent_statements_covered": 36.41509433962264,
+        "percent_statements_covered_display": "36",
+        "num_branches": 114,
+        "num_partial_branches": 19,
+        "covered_branches": 35,
+        "missing_branches": 79,
+        "percent_branches_covered": 30.70175438596491,
+        "percent_branches_covered_display": "31"
+      },
+      "src/aselenium/errors.py": {
+        "covered_lines": 150,
+        "num_statements": 162,
+        "percent_covered": 86.84210526315789,
+        "percent_covered_display": "87",
+        "missing_lines": 12,
+        "excluded_lines": 0,
+        "percent_statements_covered": 92.5925925925926,
+        "percent_statements_covered_display": "93",
+        "num_branches": 28,
+        "num_partial_branches": 7,
+        "covered_branches": 15,
+        "missing_branches": 13,
+        "percent_branches_covered": 53.57142857142857,
+        "percent_branches_covered_display": "54"
+      },
+      "src/aselenium/firefox/__init__.py": {
+        "covered_lines": 5,
+        "num_statements": 5,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/firefox/options.py": {
+        "covered_lines": 65,
+        "num_statements": 86,
+        "percent_covered": 70.40816326530613,
+        "percent_covered_display": "70",
+        "missing_lines": 21,
+        "excluded_lines": 2,
+        "percent_statements_covered": 75.5813953488372,
+        "percent_statements_covered_display": "76",
+        "num_branches": 12,
+        "num_partial_branches": 4,
+        "covered_branches": 4,
+        "missing_branches": 8,
+        "percent_branches_covered": 33.333333333333336,
+        "percent_branches_covered_display": "33"
+      },
+      "src/aselenium/firefox/service.py": {
+        "covered_lines": 33,
+        "num_statements": 34,
+        "percent_covered": 92.5,
+        "percent_covered_display": "92",
+        "missing_lines": 1,
+        "excluded_lines": 2,
+        "percent_statements_covered": 97.05882352941177,
+        "percent_statements_covered_display": "97",
+        "num_branches": 6,
+        "num_partial_branches": 2,
+        "covered_branches": 4,
+        "missing_branches": 2,
+        "percent_branches_covered": 66.66666666666667,
+        "percent_branches_covered_display": "67"
+      },
+      "src/aselenium/firefox/session.py": {
+        "covered_lines": 33,
+        "num_statements": 123,
+        "percent_covered": 23.076923076923077,
+        "percent_covered_display": "23",
+        "missing_lines": 90,
+        "excluded_lines": 4,
+        "percent_statements_covered": 26.829268292682926,
+        "percent_statements_covered_display": "27",
+        "num_branches": 20,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 20,
+        "percent_branches_covered": 0.0,
+        "percent_branches_covered_display": "0"
+      },
+      "src/aselenium/firefox/utils.py": {
+        "covered_lines": 51,
+        "num_statements": 67,
+        "percent_covered": 72.41379310344827,
+        "percent_covered_display": "72",
+        "missing_lines": 16,
+        "excluded_lines": 0,
+        "percent_statements_covered": 76.11940298507463,
+        "percent_statements_covered_display": "76",
+        "num_branches": 20,
+        "num_partial_branches": 4,
+        "covered_branches": 12,
+        "missing_branches": 8,
+        "percent_branches_covered": 60.0,
+        "percent_branches_covered_display": "60"
+      },
+      "src/aselenium/firefox/webdriver.py": {
+        "covered_lines": 21,
+        "num_statements": 23,
+        "percent_covered": 91.30434782608695,
+        "percent_covered_display": "91",
+        "missing_lines": 2,
+        "excluded_lines": 2,
+        "percent_statements_covered": 91.30434782608695,
+        "percent_statements_covered_display": "91",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/javascript/__init__.py": {
+        "covered_lines": 17,
+        "num_statements": 17,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/logs.py": {
+        "covered_lines": 4,
+        "num_statements": 4,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/manager/__init__.py": {
+        "covered_lines": 3,
+        "num_statements": 3,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/manager/_cache.py": {
+        "covered_lines": 285,
+        "num_statements": 324,
+        "percent_covered": 85.14851485148515,
+        "percent_covered_display": "85",
+        "missing_lines": 39,
+        "excluded_lines": 2,
+        "percent_statements_covered": 87.96296296296296,
+        "percent_statements_covered_display": "88",
+        "num_branches": 80,
+        "num_partial_branches": 13,
+        "covered_branches": 59,
+        "missing_branches": 21,
+        "percent_branches_covered": 73.75,
+        "percent_branches_covered_display": "74"
+      },
+      "src/aselenium/manager/_filesystem.py": {
+        "covered_lines": 149,
+        "num_statements": 158,
+        "percent_covered": 92.56198347107438,
+        "percent_covered_display": "93",
+        "missing_lines": 9,
+        "excluded_lines": 0,
+        "percent_statements_covered": 94.30379746835443,
+        "percent_statements_covered_display": "94",
+        "num_branches": 84,
+        "num_partial_branches": 7,
+        "covered_branches": 75,
+        "missing_branches": 9,
+        "percent_branches_covered": 89.28571428571429,
+        "percent_branches_covered_display": "89"
+      },
+      "src/aselenium/manager/_http.py": {
+        "covered_lines": 142,
+        "num_statements": 158,
+        "percent_covered": 87.5,
+        "percent_covered_display": "88",
+        "missing_lines": 16,
+        "excluded_lines": 2,
+        "percent_statements_covered": 89.87341772151899,
+        "percent_statements_covered_display": "90",
+        "num_branches": 50,
+        "num_partial_branches": 8,
+        "covered_branches": 40,
+        "missing_branches": 10,
+        "percent_branches_covered": 80.0,
+        "percent_branches_covered_display": "80"
+      },
+      "src/aselenium/manager/_installation.py": {
+        "covered_lines": 138,
+        "num_statements": 159,
+        "percent_covered": 86.15384615384616,
+        "percent_covered_display": "86",
+        "missing_lines": 21,
+        "excluded_lines": 4,
+        "percent_statements_covered": 86.79245283018868,
+        "percent_statements_covered_display": "87",
+        "num_branches": 36,
+        "num_partial_branches": 2,
+        "covered_branches": 30,
+        "missing_branches": 6,
+        "percent_branches_covered": 83.33333333333333,
+        "percent_branches_covered_display": "83"
+      },
+      "src/aselenium/manager/driver.py": {
+        "covered_lines": 785,
+        "num_statements": 979,
+        "percent_covered": 76.48878576952823,
+        "percent_covered_display": "76",
+        "missing_lines": 194,
+        "excluded_lines": 2,
+        "percent_statements_covered": 80.1838610827375,
+        "percent_statements_covered_display": "80",
+        "num_branches": 314,
+        "num_partial_branches": 52,
+        "covered_branches": 204,
+        "missing_branches": 110,
+        "percent_branches_covered": 64.96815286624204,
+        "percent_branches_covered_display": "65"
+      },
+      "src/aselenium/manager/file.py": {
+        "covered_lines": 208,
+        "num_statements": 226,
+        "percent_covered": 88.59060402684564,
+        "percent_covered_display": "89",
+        "missing_lines": 18,
+        "excluded_lines": 0,
+        "percent_statements_covered": 92.03539823008849,
+        "percent_statements_covered_display": "92",
+        "num_branches": 72,
+        "num_partial_branches": 14,
+        "covered_branches": 56,
+        "missing_branches": 16,
+        "percent_branches_covered": 77.77777777777777,
+        "percent_branches_covered_display": "78"
+      },
+      "src/aselenium/manager/version.py": {
+        "covered_lines": 129,
+        "num_statements": 160,
+        "percent_covered": 72.81553398058253,
+        "percent_covered_display": "73",
+        "missing_lines": 31,
+        "excluded_lines": 0,
+        "percent_statements_covered": 80.625,
+        "percent_statements_covered_display": "81",
+        "num_branches": 46,
+        "num_partial_branches": 11,
+        "covered_branches": 21,
+        "missing_branches": 25,
+        "percent_branches_covered": 45.65217391304348,
+        "percent_branches_covered_display": "46"
+      },
+      "src/aselenium/options.py": {
+        "covered_lines": 487,
+        "num_statements": 666,
+        "percent_covered": 69.22196796338673,
+        "percent_covered_display": "69",
+        "missing_lines": 179,
+        "excluded_lines": 0,
+        "percent_statements_covered": 73.12312312312312,
+        "percent_statements_covered_display": "73",
+        "num_branches": 208,
+        "num_partial_branches": 52,
+        "covered_branches": 118,
+        "missing_branches": 90,
+        "percent_branches_covered": 56.73076923076923,
+        "percent_branches_covered_display": "57"
+      },
+      "src/aselenium/safari/__init__.py": {
+        "covered_lines": 5,
+        "num_statements": 5,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/safari/options.py": {
+        "covered_lines": 42,
+        "num_statements": 46,
+        "percent_covered": 92.3076923076923,
+        "percent_covered_display": "92",
+        "missing_lines": 4,
+        "excluded_lines": 0,
+        "percent_statements_covered": 91.30434782608695,
+        "percent_statements_covered_display": "91",
+        "num_branches": 6,
+        "num_partial_branches": 0,
+        "covered_branches": 6,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/safari/service.py": {
+        "covered_lines": 6,
+        "num_statements": 7,
+        "percent_covered": 85.71428571428571,
+        "percent_covered_display": "86",
+        "missing_lines": 1,
+        "excluded_lines": 0,
+        "percent_statements_covered": 85.71428571428571,
+        "percent_statements_covered_display": "86",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/safari/session.py": {
+        "covered_lines": 27,
+        "num_statements": 52,
+        "percent_covered": 51.92307692307692,
+        "percent_covered_display": "52",
+        "missing_lines": 25,
+        "excluded_lines": 5,
+        "percent_statements_covered": 51.92307692307692,
+        "percent_statements_covered_display": "52",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/safari/webdriver.py": {
+        "covered_lines": 22,
+        "num_statements": 28,
+        "percent_covered": 73.33333333333333,
+        "percent_covered_display": "73",
+        "missing_lines": 6,
+        "excluded_lines": 3,
+        "percent_statements_covered": 78.57142857142857,
+        "percent_statements_covered_display": "79",
+        "num_branches": 2,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 2,
+        "percent_branches_covered": 0.0,
+        "percent_branches_covered_display": "0"
+      },
+      "src/aselenium/service.py": {
+        "covered_lines": 171,
+        "num_statements": 273,
+        "percent_covered": 58.96656534954408,
+        "percent_covered_display": "59",
+        "missing_lines": 102,
+        "excluded_lines": 2,
+        "percent_statements_covered": 62.637362637362635,
+        "percent_statements_covered_display": "63",
+        "num_branches": 56,
+        "num_partial_branches": 11,
+        "covered_branches": 23,
+        "missing_branches": 33,
+        "percent_branches_covered": 41.07142857142857,
+        "percent_branches_covered_display": "41"
+      },
+      "src/aselenium/session.py": {
+        "covered_lines": 525,
+        "num_statements": 1454,
+        "percent_covered": 31.793770139634802,
+        "percent_covered_display": "32",
+        "missing_lines": 929,
+        "excluded_lines": 5,
+        "percent_statements_covered": 36.10729023383769,
+        "percent_statements_covered_display": "36",
+        "num_branches": 408,
+        "num_partial_branches": 41,
+        "covered_branches": 67,
+        "missing_branches": 341,
+        "percent_branches_covered": 16.42156862745098,
+        "percent_branches_covered_display": "16"
+      },
+      "src/aselenium/settings.py": {
+        "covered_lines": 18,
+        "num_statements": 18,
+        "percent_covered": 100.0,
+        "percent_covered_display": "100",
+        "missing_lines": 0,
+        "excluded_lines": 0,
+        "percent_statements_covered": 100.0,
+        "percent_statements_covered_display": "100",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/shadow.py": {
+        "covered_lines": 105,
+        "num_statements": 204,
+        "percent_covered": 46.09929078014184,
+        "percent_covered_display": "46",
+        "missing_lines": 99,
+        "excluded_lines": 5,
+        "percent_statements_covered": 51.470588235294116,
+        "percent_statements_covered_display": "51",
+        "num_branches": 78,
+        "num_partial_branches": 15,
+        "covered_branches": 25,
+        "missing_branches": 53,
+        "percent_branches_covered": 32.05128205128205,
+        "percent_branches_covered_display": "32"
+      },
+      "src/aselenium/utils.py": {
+        "covered_lines": 188,
+        "num_statements": 264,
+        "percent_covered": 68.27586206896552,
+        "percent_covered_display": "68",
+        "missing_lines": 76,
+        "excluded_lines": 0,
+        "percent_statements_covered": 71.21212121212122,
+        "percent_statements_covered_display": "71",
+        "num_branches": 26,
+        "num_partial_branches": 2,
+        "covered_branches": 10,
+        "missing_branches": 16,
+        "percent_branches_covered": 38.46153846153846,
+        "percent_branches_covered_display": "38"
+      },
+      "src/aselenium/valuewrap.py": {
+        "covered_lines": 14,
+        "num_statements": 21,
+        "percent_covered": 66.66666666666667,
+        "percent_covered_display": "67",
+        "missing_lines": 7,
+        "excluded_lines": 0,
+        "percent_statements_covered": 66.66666666666667,
+        "percent_statements_covered_display": "67",
+        "num_branches": 0,
+        "num_partial_branches": 0,
+        "covered_branches": 0,
+        "missing_branches": 0,
+        "percent_branches_covered": 100.0,
+        "percent_branches_covered_display": "100"
+      },
+      "src/aselenium/webdriver.py": {
+        "covered_lines": 95,
+        "num_statements": 125,
+        "percent_covered": 71.24183006535948,
+        "percent_covered_display": "71",
+        "missing_lines": 30,
+        "excluded_lines": 7,
+        "percent_statements_covered": 76.0,
+        "percent_statements_covered_display": "76",
+        "num_branches": 28,
+        "num_partial_branches": 10,
+        "covered_branches": 14,
+        "missing_branches": 14,
+        "percent_branches_covered": 50.0,
+        "percent_branches_covered_display": "50"
+      }
+    }
+  },
+  "typing": {
+    "configured_gate_modules": 19,
+    "configured_gate_status": "passed",
+    "whole_package_status": "not clean",
+    "whole_package_error_count": 282,
+    "whole_package_errors_by_file": {
+      "src/aselenium/shadow.py": 31,
+      "src/aselenium/service.py": 10,
+      "src/aselenium/options.py": 15,
+      "src/aselenium/safari/options.py": 1,
+      "src/aselenium/firefox/service.py": 3,
+      "src/aselenium/firefox/options.py": 3,
+      "src/aselenium/manager/driver.py": 67,
+      "src/aselenium/session.py": 98,
+      "src/aselenium/safari/session.py": 8,
+      "src/aselenium/firefox/session.py": 11,
+      "src/aselenium/edge/session.py": 2,
+      "src/aselenium/chromium/session.py": 2,
+      "src/aselenium/chrome/session.py": 2,
+      "src/aselenium/safari/webdriver.py": 11,
+      "src/aselenium/firefox/webdriver.py": 4,
+      "src/aselenium/edge/webdriver.py": 5,
+      "src/aselenium/chromium/webdriver.py": 4,
+      "src/aselenium/chrome/webdriver.py": 5
+    },
+    "strict_mode": false
+  },
+  "native_demos": [
+    {
+      "demo": "local-html",
+      "browser": "chrome",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "allow_download": false,
+      "selected_sections": [
+        "all"
+      ],
+      "output": "/private/tmp/aselenium-production-review.FGj6sT/local-chrome-tpxlt66b",
+      "sections": [
+        {
+          "section": "driver-management",
+          "details": {
+            "request": {
+              "product": "Chrome",
+              "version": "build",
+              "channel": "stable",
+              "binary": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "driver": null,
+              "os_name": "mac",
+              "architecture": "64",
+              "arm": true,
+              "policy": "offline",
+              "validate_compatibility": true
+            },
+            "driver_location": "/private/tmp/aselenium-demo-validation.YyYti3/cache/.aselenium/v2/3a9ffa8791062c23a77304d089e2361d58ac76043a3d1a7b7405c76b7cce2805/extracted/chromedriver-mac-arm64/chromedriver",
+            "driver_version": "152.0.7977.82",
+            "browser_location": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "browser_version": "152.0.7977.76",
+            "channel": "stable"
+          },
+          "status": "passed",
+          "seconds": 0.032
+        },
+        {
+          "section": "options",
+          "details": {
+            "implicit_wait_seconds": 0,
+            "session_timeout_seconds": 30,
+            "defensive_capabilities": true,
+            "proxy": "serialization only; not enabled",
+            "profile": "fresh browser profile"
+          },
+          "status": "passed",
+          "seconds": 0.0
+        },
+        {
+          "section": "navigation",
+          "details": {
+            "page_width": 1200,
+            "page_height": 757,
+            "source_characters": 173,
+            "timeouts_ms": {
+              "implicit": 0,
+              "pageLoad": 20000,
+              "script": 5000
+            }
+          },
+          "status": "passed",
+          "seconds": 0.103
+        },
+        {
+          "section": "elements",
+          "details": {
+            "form": "submitted locally",
+            "upload": "one fixture file selected; no network upload",
+            "visibility": "hidden, zero-size, offscreen, covered, and shadow cases checked"
+          },
+          "status": "passed",
+          "seconds": 0.148
+        },
+        {
+          "section": "waits",
+          "details": {
+            "explicit_wait": "truthy result returned; zero-timeout missing lookup is falsey",
+            "current_conditions": [
+              "in_viewport",
+              "unobscured"
+            ]
+          },
+          "status": "passed",
+          "seconds": 0.229
+        },
+        {
+          "section": "cookies",
+          "details": {
+            "origin": "http://127.0.0.1:60193",
+            "cookie_deleted": true
+          },
+          "status": "passed",
+          "seconds": 0.02
+        },
+        {
+          "section": "windows",
+          "details": {
+            "temporary_tab_closed": true
+          },
+          "status": "passed",
+          "seconds": 0.044
+        },
+        {
+          "section": "frames",
+          "details": {
+            "default_frame_restored": true
+          },
+          "status": "passed",
+          "seconds": 0.024
+        },
+        {
+          "section": "alerts",
+          "details": {
+            "prompt_accepted": true
+          },
+          "status": "passed",
+          "seconds": 0.226
+        },
+        {
+          "section": "scripts",
+          "details": {
+            "script_cache": "created, executed, removed",
+            "application_payload_preserved": true
+          },
+          "status": "passed",
+          "seconds": 0.058
+        },
+        {
+          "section": "actions",
+          "details": {
+            "reusable_chain": true,
+            "remote_input_state_reset": true
+          },
+          "status": "passed",
+          "seconds": 0.3
+        },
+        {
+          "section": "artifacts",
+          "details": {
+            "files": [
+              "page.png",
+              "page.pdf"
+            ],
+            "notes": []
+          },
+          "status": "passed",
+          "seconds": 0.146
+        },
+        {
+          "section": "vendor",
+          "details": {
+            "cdp_product": "Chrome/152.0.7977.76",
+            "network_reset": true,
+            "permission_restored": true,
+            "log_counts": {
+              "browser": 0
+            },
+            "casting": "not invoked; requires explicit device selection"
+          },
+          "status": "passed",
+          "seconds": 0.023
+        },
+        {
+          "section": "concurrency",
+          "details": {
+            "independent_sessions": 2,
+            "captured_timeouts_seconds": [
+              11,
+              17
+            ],
+            "cookies_isolated": true,
+            "physical_clones_checked": false
+          },
+          "status": "passed",
+          "seconds": 0.766
+        },
+        {
+          "section": "cancellation",
+          "details": {
+            "cancelled_task_awaited": true,
+            "fresh_acquisition_succeeded": true
+          },
+          "status": "passed",
+          "seconds": 1.144
+        }
+      ],
+      "status": "passed",
+      "scope": "loopback pages; fresh or empty-template profiles; no casting",
+      "session": {
+        "browser_version": "152.0.7977.76",
+        "driver_version": "152.0.7977.82",
+        "acquisition": "offline"
+      },
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      }
+    },
+    {
+      "demo": "local-html",
+      "browser": "edge",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "allow_download": false,
+      "selected_sections": [
+        "all"
+      ],
+      "output": "/private/tmp/aselenium-production-review.FGj6sT/local-edge-z95lbdv0",
+      "sections": [
+        {
+          "section": "driver-management",
+          "details": {
+            "request": {
+              "product": "Edge",
+              "version": "build",
+              "channel": "stable",
+              "binary": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+              "driver": null,
+              "os_name": "mac",
+              "architecture": "64",
+              "arm": true,
+              "policy": "offline",
+              "validate_compatibility": true
+            },
+            "driver_location": "/private/tmp/aselenium-demo-validation.YyYti3/cache/.aselenium/v2/fe8825480aea415603f1fa09446b3e9151243a3cd5677a5f3ac612aaff057982/extracted/msedgedriver",
+            "driver_version": "151.0.4129.107",
+            "browser_location": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "browser_version": "151.0.4129.93",
+            "channel": "stable"
+          },
+          "status": "passed",
+          "seconds": 0.072
+        },
+        {
+          "section": "options",
+          "details": {
+            "implicit_wait_seconds": 0,
+            "session_timeout_seconds": 30,
+            "defensive_capabilities": true,
+            "proxy": "serialization only; not enabled",
+            "profile": "fresh browser profile"
+          },
+          "status": "passed",
+          "seconds": 0.0
+        },
+        {
+          "section": "navigation",
+          "details": {
+            "page_width": 1192,
+            "page_height": 769,
+            "source_characters": 173,
+            "timeouts_ms": {
+              "implicit": 0,
+              "pageLoad": 20000,
+              "script": 5000
+            }
+          },
+          "status": "passed",
+          "seconds": 0.1
+        },
+        {
+          "section": "elements",
+          "details": {
+            "form": "submitted locally",
+            "upload": "one fixture file selected; no network upload",
+            "visibility": "hidden, zero-size, offscreen, covered, and shadow cases checked"
+          },
+          "status": "passed",
+          "seconds": 0.166
+        },
+        {
+          "section": "waits",
+          "details": {
+            "explicit_wait": "truthy result returned; zero-timeout missing lookup is falsey",
+            "current_conditions": [
+              "in_viewport",
+              "unobscured"
+            ]
+          },
+          "status": "passed",
+          "seconds": 0.237
+        },
+        {
+          "section": "cookies",
+          "details": {
+            "origin": "http://127.0.0.1:60337",
+            "cookie_deleted": true
+          },
+          "status": "passed",
+          "seconds": 0.03
+        },
+        {
+          "section": "windows",
+          "details": {
+            "temporary_tab_closed": true
+          },
+          "status": "passed",
+          "seconds": 0.056
+        },
+        {
+          "section": "frames",
+          "details": {
+            "default_frame_restored": true
+          },
+          "status": "passed",
+          "seconds": 0.026
+        },
+        {
+          "section": "alerts",
+          "details": {
+            "prompt_accepted": true
+          },
+          "status": "passed",
+          "seconds": 0.232
+        },
+        {
+          "section": "scripts",
+          "details": {
+            "script_cache": "created, executed, removed",
+            "application_payload_preserved": true
+          },
+          "status": "passed",
+          "seconds": 0.061
+        },
+        {
+          "section": "actions",
+          "details": {
+            "reusable_chain": true,
+            "remote_input_state_reset": true
+          },
+          "status": "passed",
+          "seconds": 0.318
+        },
+        {
+          "section": "artifacts",
+          "details": {
+            "files": [
+              "page.png",
+              "page.pdf"
+            ],
+            "notes": []
+          },
+          "status": "passed",
+          "seconds": 0.161
+        },
+        {
+          "section": "vendor",
+          "details": {
+            "cdp_product": "Edg/151.0.4129.93",
+            "network_reset": true,
+            "permission_restored": true,
+            "log_counts": {
+              "browser": 0
+            },
+            "casting": "not invoked; requires explicit device selection"
+          },
+          "status": "passed",
+          "seconds": 0.027
+        },
+        {
+          "section": "concurrency",
+          "details": {
+            "independent_sessions": 2,
+            "captured_timeouts_seconds": [
+              11,
+              17
+            ],
+            "cookies_isolated": true,
+            "physical_clones_checked": false
+          },
+          "status": "passed",
+          "seconds": 0.763
+        },
+        {
+          "section": "cancellation",
+          "details": {
+            "cancelled_task_awaited": true,
+            "fresh_acquisition_succeeded": true
+          },
+          "status": "passed",
+          "seconds": 1.16
+        }
+      ],
+      "status": "passed",
+      "scope": "loopback pages; fresh or empty-template profiles; no casting",
+      "session": {
+        "browser_version": "151.0.4129.93",
+        "driver_version": "151.0.4129.107",
+        "acquisition": "offline"
+      },
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      }
+    }
+  ],
+  "soaks": [
+    {
+      "status": "passed",
+      "browser": "chrome",
+      "browser_version": "152.0.7977.76",
+      "driver_version": "152.0.7977.82",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "cycles": 20,
+      "concurrency": 2,
+      "median_cycle_seconds": 1.0179835630115122,
+      "p95_cycle_seconds": 1.0927665840135887,
+      "resource_samples": [
+        {
+          "rss_bytes": 57769984,
+          "handles": 6
+        },
+        {
+          "rss_bytes": 60620800,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 60669952,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 60719104,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 60784640,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 60833792,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 60850176,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 60850176,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 60850176,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 60850176,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 60850176,
+          "handles": 8
+        }
+      ],
+      "observed_child_processes": 178,
+      "remaining_observed_processes": [],
+      "remaining_owned_tasks": 0,
+      "scope": "bounded local-data-URL soak; offline cache; fresh profiles; not a long-duration stability certification"
+    },
+    {
+      "status": "passed",
+      "browser": "edge",
+      "browser_version": "151.0.4129.93",
+      "driver_version": "151.0.4129.107",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "cycles": 20,
+      "concurrency": 2,
+      "median_cycle_seconds": 1.002321520994883,
+      "p95_cycle_seconds": 1.309270249970723,
+      "resource_samples": [
+        {
+          "rss_bytes": 49430528,
+          "handles": 6
+        },
+        {
+          "rss_bytes": 52494336,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 52707328,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 52805632,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 53510144,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 53559296,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 53575680,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 54067200,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 54083584,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 54083584,
+          "handles": 8
+        },
+        {
+          "rss_bytes": 54083584,
+          "handles": 8
+        }
+      ],
+      "observed_child_processes": 158,
+      "remaining_observed_processes": [],
+      "remaining_owned_tasks": 0,
+      "scope": "bounded local-data-URL soak; offline cache; fresh profiles; not a long-duration stability certification"
+    }
+  ],
+  "targeted_mutation_checks": {
+    "scope": "four targeted mutation probes in disposable source copies, not a whole-package mutation score",
+    "results": [
+      {
+        "mutation": "falsey-match",
+        "test": "test_first_match_preserves_non_none_falsey_values",
+        "control_exit": 0,
+        "mutant_exit": 1,
+        "killed": true,
+        "summary": "5 failed, 37 deselected in 0.14s"
+      },
+      {
+        "mutation": "rectangle-subclass",
+        "test": "test_rectangle_copy_preserves_concrete_type",
+        "control_exit": 0,
+        "mutant_exit": 1,
+        "killed": true,
+        "summary": "3 failed, 39 deselected in 0.07s"
+      },
+      {
+        "mutation": "insecure-firefox-default",
+        "test": "test_firefox_requires_explicit_insecure_certificate_opt_in",
+        "control_exit": 0,
+        "mutant_exit": 1,
+        "killed": true,
+        "summary": "1 failed, 41 deselected in 0.06s"
+      },
+      {
+        "mutation": "malformed-null-list",
+        "test": "test_plural_lookup_rejects_malformed_references",
+        "control_exit": 0,
+        "mutant_exit": 1,
+        "killed": true,
+        "summary": "9 failed, 9 passed, 24 deselected in 0.09s"
+      }
+    ]
+  },
+  "benchmarks": {
+    "manager": {
+      "recorded_at_utc": "2026-09-04T15:08:41.482727+00:00",
+      "python": "3.13.12 (main, Mar 28 2026, 18:23:07) [Clang 21.0.0 (clang-2100.0.123.102)]",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "machine": "arm64",
+      "source": {
+        "repository_head": "b714594d4b6cc9f0eadba13af14f924cb3b26f4e",
+        "package_source_sha256": "0a744442790063e1f89d890a1eb3f9fa705dfcb549cc81d34e2dc2d50527ed0c",
+        "package_source_file_count": 56,
+        "digest_definition": "Sorted package-relative POSIX paths and contents of .py/.json files, each NUL-terminated; includes uncommitted source.",
+        "benchmark_script_sha256": "a56320d7d600822456101f2303ec3f31923a252e9cc2e8dc4a7d7030953b9ff1"
+      },
+      "dependencies": {
+        "CacheControl": "0.14.4",
+        "PyYAML": "6.0.3",
+        "Pygments": "2.21.0",
+        "aiohappyeyeballs": "2.7.1",
+        "aiohttp": "3.14.3",
+        "aiosignal": "1.4.0",
+        "aselenium": "1.0.5",
+        "attrs": "26.1.0",
+        "boolean.py": "5.0",
+        "build": "1.6.0",
+        "certifi": "2026.7.22",
+        "charset-normalizer": "3.5.1",
+        "coverage": "7.16.0",
+        "cyclonedx-python-lib": "11.12.0",
+        "defusedxml": "0.7.1",
+        "docutils": "0.23",
+        "filelock": "3.32.5",
+        "frozenlist": "1.8.0",
+        "hypothesis": "6.167.1",
+        "id": "1.6.1",
+        "idna": "3.19",
+        "iniconfig": "2.3.0",
+        "jaraco.classes": "3.4.0",
+        "jaraco.context": "6.1.2",
+        "jaraco.functools": "4.6.0",
+        "keyring": "25.7.0",
+        "librt": "0.15.0",
+        "license-expression": "30.4.4",
+        "markdown-it-py": "4.2.0",
+        "mdurl": "0.1.2",
+        "more-itertools": "11.1.0",
+        "msgpack": "1.2.2",
+        "multidict": "6.7.1",
+        "mypy": "1.20.2",
+        "mypy_extensions": "1.1.0",
+        "nh3": "0.3.7",
+        "orjson": "3.12.0",
+        "packageurl-python": "0.17.6",
+        "packaging": "26.3",
+        "pathspec": "1.1.1",
+        "pip": "26.2.1",
+        "pip-api": "0.0.34",
+        "pip-requirements-parser": "32.0.1",
+        "pip_audit": "2.10.1",
+        "platformdirs": "4.11.7",
+        "pluggy": "1.6.0",
+        "propcache": "0.5.2",
+        "psutil": "7.2.2",
+        "py-serializable": "2.1.0",
+        "pyparsing": "3.3.2",
+        "pyproject_hooks": "1.2.0",
+        "pytest": "9.1.1",
+        "pytest-asyncio": "1.4.0",
+        "readme_renderer": "46.0",
+        "requests": "2.34.2",
+        "requests-toolbelt": "1.0.0",
+        "rfc3986": "2.0.0",
+        "rich": "15.0.0",
+        "ruff": "0.16.6",
+        "setuptools": "84.0.0",
+        "sortedcontainers": "2.4.0",
+        "tomli": "2.4.1",
+        "tomli_w": "1.2.0",
+        "twine": "6.2.0",
+        "typing_extensions": "4.16.0",
+        "urllib3": "2.7.0",
+        "wheel": "0.48.0",
+        "yarl": "1.24.5"
+      },
+      "parameters": {
+        "samples": 7,
+        "lookup_iterations": 50,
+        "cache_entries": [
+          10,
+          1000
+        ]
+      },
+      "scope": "Fresh interpreter package import; OS disk caches not flushed. Synthetic SQLite cache lookup/open, including executable checksum verification; no browser, network or install timing.",
+      "import_ms": {
+        "median": 92.00904198223725,
+        "min": 85.5922499904409,
+        "max": 99.8457910027355,
+        "samples": [
+          99.8457910027355,
+          92.41295902756974,
+          92.67295798053965,
+          92.00904198223725,
+          91.80183400167152,
+          90.12579201953486,
+          85.5922499904409
+        ]
+      },
+      "post_import_rss_bytes": {
+        "median": 46022656,
+        "min": 45875200,
+        "max": 46366720,
+        "samples": [
+          45973504,
+          46366720,
+          45875200,
+          46022656,
+          45989888,
+          46186496,
+          46104576
+        ]
+      },
+      "caches": [
+        {
+          "entries": 10,
+          "exact_hit_us": {
+            "median": 317.91832065209746,
+            "min": 312.5891799572855,
+            "max": 323.4799997881055,
+            "samples": [
+              323.4799997881055,
+              317.91832065209746,
+              322.1983404364437,
+              318.7700000125915,
+              312.5891799572855,
+              314.7649997845292,
+              317.1866596676409
+            ]
+          },
+          "exact_miss_us": {
+            "median": 205.26415901258588,
+            "min": 202.78668031096458,
+            "max": 209.16584064252675,
+            "samples": [
+              209.16584064252675,
+              204.03333939611912,
+              205.26415901258588,
+              203.7050004582852,
+              208.69416068308055,
+              206.3941804226488,
+              202.78668031096458
+            ]
+          },
+          "sqlite_open_query_ms": {
+            "median": 0.1674999948590994,
+            "min": 0.16491702990606427,
+            "max": 0.18554198322817683,
+            "samples": [
+              0.18554198322817683,
+              0.16850000247359276,
+              0.1674999948590994,
+              0.16662501730024815,
+              0.165749981533736,
+              0.16491702990606427,
+              0.1727920025587082
+            ]
+          },
+          "metadata_bytes": 28672
+        },
+        {
+          "entries": 1000,
+          "exact_hit_us": {
+            "median": 315.07750041782856,
+            "min": 311.6933396086097,
+            "max": 321.1533394642174,
+            "samples": [
+              321.1533394642174,
+              314.52416093088686,
+              311.6933396086097,
+              315.44749974273145,
+              316.403319593519,
+              314.5416604820639,
+              315.07750041782856
+            ]
+          },
+          "exact_miss_us": {
+            "median": 206.3858206383884,
+            "min": 202.46668020263314,
+            "max": 210.3750000242144,
+            "samples": [
+              206.3858206383884,
+              202.75334012694657,
+              209.16583947837353,
+              204.03333939611912,
+              207.01166009530425,
+              210.3750000242144,
+              202.46668020263314
+            ]
+          },
+          "sqlite_open_query_ms": {
+            "median": 0.18708303105086088,
+            "min": 0.1777910511009395,
+            "max": 0.20508398301899433,
+            "samples": [
+              0.19587500719353557,
+              0.18708303105086088,
+              0.20508398301899433,
+              0.19783299649134278,
+              0.1777910511009395,
+              0.18287496641278267,
+              0.18012500368058681
+            ]
+          },
+          "metadata_bytes": 364544
+        }
+      ]
+    },
+    "download": {
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "scope": "Generated chunks, no network; tracemalloc excludes OS file cache and native-library allocations; not RSS",
+      "samples": [
+        {
+          "download_bytes": 8388608,
+          "traced_peak_python_bytes": 627551,
+          "seconds": 0.010393540957011282
+        },
+        {
+          "download_bytes": 67108864,
+          "traced_peak_python_bytes": 535714,
+          "seconds": 0.06477933400310576
+        },
+        {
+          "download_bytes": 134217728,
+          "traced_peak_python_bytes": 535714,
+          "seconds": 0.12573774997144938
+        }
+      ]
+    },
+    "causal_speedup_claim": false
+  },
+  "dependency_audits": {
+    "revised_direct_minima": {
+      "dependencies": [
+        {
+          "name": "aiohttp",
+          "version": "3.14.3",
+          "vulns": []
+        },
+        {
+          "name": "orjson",
+          "version": "3.11.6",
+          "vulns": []
+        },
+        {
+          "name": "psutil",
+          "version": "5.8.0",
+          "vulns": []
+        }
+      ],
+      "fixes": []
+    },
+    "resolved_python313_environment": {
+      "dependencies": [
+        {
+          "name": "aiohappyeyeballs",
+          "version": "2.7.1",
+          "vulns": []
+        },
+        {
+          "name": "aiohttp",
+          "version": "3.14.3",
+          "vulns": []
+        },
+        {
+          "name": "aiosignal",
+          "version": "1.4.0",
+          "vulns": []
+        },
+        {
+          "name": "aselenium",
+          "skip_reason": "distribution marked as editable"
+        },
+        {
+          "name": "attrs",
+          "version": "26.1.0",
+          "vulns": []
+        },
+        {
+          "name": "boolean-py",
+          "version": "5.0",
+          "vulns": []
+        },
+        {
+          "name": "build",
+          "version": "1.6.0",
+          "vulns": []
+        },
+        {
+          "name": "cachecontrol",
+          "version": "0.14.4",
+          "vulns": []
+        },
+        {
+          "name": "certifi",
+          "version": "2026.7.22",
+          "vulns": []
+        },
+        {
+          "name": "charset-normalizer",
+          "version": "3.5.1",
+          "vulns": []
+        },
+        {
+          "name": "coverage",
+          "version": "7.16.0",
+          "vulns": []
+        },
+        {
+          "name": "cyclonedx-python-lib",
+          "version": "11.12.0",
+          "vulns": []
+        },
+        {
+          "name": "defusedxml",
+          "version": "0.7.1",
+          "vulns": []
+        },
+        {
+          "name": "docutils",
+          "version": "0.23",
+          "vulns": []
+        },
+        {
+          "name": "filelock",
+          "version": "3.32.5",
+          "vulns": []
+        },
+        {
+          "name": "frozenlist",
+          "version": "1.8.0",
+          "vulns": []
+        },
+        {
+          "name": "hypothesis",
+          "version": "6.167.1",
+          "vulns": []
+        },
+        {
+          "name": "id",
+          "version": "1.6.1",
+          "vulns": []
+        },
+        {
+          "name": "idna",
+          "version": "3.19",
+          "vulns": []
+        },
+        {
+          "name": "iniconfig",
+          "version": "2.3.0",
+          "vulns": []
+        },
+        {
+          "name": "jaraco-classes",
+          "version": "3.4.0",
+          "vulns": []
+        },
+        {
+          "name": "jaraco-context",
+          "version": "6.1.2",
+          "vulns": []
+        },
+        {
+          "name": "jaraco-functools",
+          "version": "4.6.0",
+          "vulns": []
+        },
+        {
+          "name": "keyring",
+          "version": "25.7.0",
+          "vulns": []
+        },
+        {
+          "name": "librt",
+          "version": "0.15.0",
+          "vulns": []
+        },
+        {
+          "name": "license-expression",
+          "version": "30.4.4",
+          "vulns": []
+        },
+        {
+          "name": "markdown-it-py",
+          "version": "4.2.0",
+          "vulns": []
+        },
+        {
+          "name": "mdurl",
+          "version": "0.1.2",
+          "vulns": []
+        },
+        {
+          "name": "more-itertools",
+          "version": "11.1.0",
+          "vulns": []
+        },
+        {
+          "name": "msgpack",
+          "version": "1.2.2",
+          "vulns": []
+        },
+        {
+          "name": "multidict",
+          "version": "6.7.1",
+          "vulns": []
+        },
+        {
+          "name": "mypy",
+          "version": "1.20.2",
+          "vulns": []
+        },
+        {
+          "name": "mypy-extensions",
+          "version": "1.1.0",
+          "vulns": []
+        },
+        {
+          "name": "nh3",
+          "version": "0.3.7",
+          "vulns": []
+        },
+        {
+          "name": "orjson",
+          "version": "3.12.0",
+          "vulns": []
+        },
+        {
+          "name": "packageurl-python",
+          "version": "0.17.6",
+          "vulns": []
+        },
+        {
+          "name": "packaging",
+          "version": "26.3",
+          "vulns": []
+        },
+        {
+          "name": "pathspec",
+          "version": "1.1.1",
+          "vulns": []
+        },
+        {
+          "name": "pip",
+          "version": "26.2.1",
+          "vulns": []
+        },
+        {
+          "name": "pip-api",
+          "version": "0.0.34",
+          "vulns": []
+        },
+        {
+          "name": "pip-audit",
+          "version": "2.10.1",
+          "vulns": []
+        },
+        {
+          "name": "pip-requirements-parser",
+          "version": "32.0.1",
+          "vulns": []
+        },
+        {
+          "name": "platformdirs",
+          "version": "4.11.7",
+          "vulns": []
+        },
+        {
+          "name": "pluggy",
+          "version": "1.6.0",
+          "vulns": []
+        },
+        {
+          "name": "propcache",
+          "version": "0.5.2",
+          "vulns": []
+        },
+        {
+          "name": "psutil",
+          "version": "7.2.2",
+          "vulns": []
+        },
+        {
+          "name": "py-serializable",
+          "version": "2.1.0",
+          "vulns": []
+        },
+        {
+          "name": "pygments",
+          "version": "2.21.0",
+          "vulns": []
+        },
+        {
+          "name": "pyparsing",
+          "version": "3.3.2",
+          "vulns": []
+        },
+        {
+          "name": "pyproject-hooks",
+          "version": "1.2.0",
+          "vulns": []
+        },
+        {
+          "name": "pytest",
+          "version": "9.1.1",
+          "vulns": []
+        },
+        {
+          "name": "pytest-asyncio",
+          "version": "1.4.0",
+          "vulns": []
+        },
+        {
+          "name": "pyyaml",
+          "version": "6.0.3",
+          "vulns": []
+        },
+        {
+          "name": "readme-renderer",
+          "version": "46.0",
+          "vulns": []
+        },
+        {
+          "name": "requests",
+          "version": "2.34.2",
+          "vulns": []
+        },
+        {
+          "name": "requests-toolbelt",
+          "version": "1.0.0",
+          "vulns": []
+        },
+        {
+          "name": "rfc3986",
+          "version": "2.0.0",
+          "vulns": []
+        },
+        {
+          "name": "rich",
+          "version": "15.0.0",
+          "vulns": []
+        },
+        {
+          "name": "ruff",
+          "version": "0.16.6",
+          "vulns": []
+        },
+        {
+          "name": "setuptools",
+          "version": "84.0.0",
+          "vulns": []
+        },
+        {
+          "name": "sortedcontainers",
+          "version": "2.4.0",
+          "vulns": []
+        },
+        {
+          "name": "tomli",
+          "version": "2.4.1",
+          "vulns": []
+        },
+        {
+          "name": "tomli-w",
+          "version": "1.2.0",
+          "vulns": []
+        },
+        {
+          "name": "twine",
+          "version": "6.2.0",
+          "vulns": []
+        },
+        {
+          "name": "typing-extensions",
+          "version": "4.16.0",
+          "vulns": []
+        },
+        {
+          "name": "urllib3",
+          "version": "2.7.0",
+          "vulns": []
+        },
+        {
+          "name": "wheel",
+          "version": "0.48.0",
+          "vulns": []
+        },
+        {
+          "name": "yarl",
+          "version": "1.24.5",
+          "vulns": []
+        }
+      ],
+      "fixes": []
+    },
+    "caveat": "No known advisories at the audit date, not proof of no vulnerabilities. The direct-minima audit is not a transitive locked-environment audit."
+  },
+  "packaging": {
+    "artifacts": [
+      {
+        "filename": "aselenium-1.0.5-py3-none-any.whl",
+        "sha256": "7217d69cfeb2b4617037082aae5cafc63e1ef6d1562663401e0bc4066096a973",
+        "bytes": 215901,
+        "path": "/private/tmp/aselenium-production-review.FGj6sT/candidate-dist/aselenium-1.0.5-py3-none-any.whl"
+      },
+      {
+        "filename": "aselenium-1.0.5.tar.gz",
+        "sha256": "141cebe435b4f0530fb07a06a7b81213b899944eb69b438684728e5fb08c2d8d",
+        "bytes": 395171,
+        "path": "/private/tmp/aselenium-production-review.FGj6sT/candidate-dist/aselenium-1.0.5.tar.gz"
+      }
+    ],
+    "packaged_python_files_matching_checkout": 55,
+    "typing_marker": true,
+    "compatibility_resource": true,
+    "removed_migration_absent": true,
+    "strict_twine": "passed",
+    "fresh_noneditable_wheel_import": "passed"
+  },
+  "source_inventory": [
+    {
+      "path": "src/_demo_support.py",
+      "sha256": "cc7f183114e71990373935fd4f66c85d9e230af61ca63fafe9d1f952e427042f",
+      "functions": 4,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/__init__.py",
+      "sha256": "e893c6a97283ce30eff4d15e76908e5824d781b6f37162f6193d5b614401408b",
+      "functions": 0,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/_async.py",
+      "sha256": "d7c7ed9c1a5e77b33ef14069f2a9bd2213dab8d277afb1f8167a8ca36acc2bff",
+      "functions": 2,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/_output.py",
+      "sha256": "1dccdab68bd064f038663401570cf02306b4c987187306f0c113e0f674848972",
+      "functions": 2,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/_profiles.py",
+      "sha256": "5080c9e0fac83952de331011fddd6a8341bdd48c3cd7a57f489af3e8f0a58dee",
+      "functions": 2,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/_wait.py",
+      "sha256": "7b4535c3531ff46d688f9a44daff55eb3a40b7ebd48def98f367bd3e9f97c853",
+      "functions": 3,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/actions.py",
+      "sha256": "5b34d774721dc11c05746aa04c57805fe881a894bc4d9e8baba00d635c266ccd",
+      "functions": 33,
+      "classes": 5,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/alert.py",
+      "sha256": "6016244a61eeeb7835f15c6a5058dfa8b9ddf9c2b7ddbbef3ebb0776d56d51b6",
+      "functions": 9,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chrome/__init__.py",
+      "sha256": "ddb7db61e94a3bdf053ed02aae87e68d80c5d3551d4656910562f7b2a68dfe43",
+      "functions": 0,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chrome/options.py",
+      "sha256": "c119fc02303fbb26db0e87bc2a63ddcd21841b44584aa1f5f97c685052b086c6",
+      "functions": 0,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chrome/service.py",
+      "sha256": "e1a093454d8a5a83b67f3a7573002ee62a8c313ba3d8bd1f2f4f76fc7ece896c",
+      "functions": 0,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chrome/session.py",
+      "sha256": "19550f4d57cd7cd8ddf78843b289cb3fd6c2d38f11672daf0bc63a30ac3ce50a",
+      "functions": 2,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chrome/webdriver.py",
+      "sha256": "7a7b50e4e9c9d564943799c39b4b092799bff92c8d0122b3721230789d37e94e",
+      "functions": 5,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chromium/__init__.py",
+      "sha256": "65f0634993ec5c6d571b31ebf1996d78ae3efa6789d3beedc049a088316af88a",
+      "functions": 0,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chromium/options.py",
+      "sha256": "b759e5ad6066b771cd979a7e47bb1fb2c7b302dcf26afcd8af40e21f58ef2c3d",
+      "functions": 0,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chromium/service.py",
+      "sha256": "8b3112d720f9bcab9ee328e20ce40db7013f93ff039d260a1201210d63375e2e",
+      "functions": 0,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chromium/session.py",
+      "sha256": "8c7ac5a0dc3615d52976815961bbff4e18c2935d3569b78fcc7e74749b6f0174",
+      "functions": 2,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/chromium/webdriver.py",
+      "sha256": "40177c99116f1d701ec57fdd74a261c7acf405975be67e6701f15078fedbf969",
+      "functions": 5,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/command.py",
+      "sha256": "f066ce687cb9062285299b46e336b3aa37be956151d676c76270531c4ffc9483",
+      "functions": 0,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/connection.py",
+      "sha256": "b13cbfd13af244cd1267579925265135148c3ff7f5a63c90c3a124d68f29ed10",
+      "functions": 10,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/edge/__init__.py",
+      "sha256": "5ec12845893860965261bc6d5c26107fe0e87a147e73e247dc3664b7e9bf0561",
+      "functions": 0,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/edge/options.py",
+      "sha256": "441b359e8743bd7274cf6b26f12cda4d41a332d9f6bf251f0a5d64596ec0b941",
+      "functions": 4,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/edge/service.py",
+      "sha256": "c50aeb99348557a3b8a64daf94307073c69d7f323f204259223820235a8e996f",
+      "functions": 0,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/edge/session.py",
+      "sha256": "d42fe28dd9f038095124b657f0d82666d8e2ebc2c8ad3f64104794b8376cab9e",
+      "functions": 2,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/edge/webdriver.py",
+      "sha256": "c6d93a02a09b1a5a2b99834677d8d3d6518f5a25ffb71c6f38795348f9deb18f",
+      "functions": 5,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/element.py",
+      "sha256": "da43fd6ce340f7273e4067b2e35a527554a8b4dd2fc8e6e416d682fd37a3e719",
+      "functions": 81,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/errors.py",
+      "sha256": "ddea9aff8904bb0208b51a7927cfa6c42d05b7d7b1468b904c7fc6952a957b80",
+      "functions": 5,
+      "classes": 99,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/firefox/__init__.py",
+      "sha256": "28b7b575be47d2e5972fa3170341dfc6e3e77e19d0aeff740168674609ae9158",
+      "functions": 0,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/firefox/options.py",
+      "sha256": "5b5251b86fa3653e46d4065bb76fec6dbb337db1e96e4c8f286b0b52aeb0211c",
+      "functions": 15,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/firefox/service.py",
+      "sha256": "69baa463a341da8245beab36fb99ed6e25e866ea0018ed27bca8f9c4f816e150",
+      "functions": 6,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/firefox/session.py",
+      "sha256": "7c5b06b243877148f07110e0830ef44f5f9f9d9d7861db70227654221060618e",
+      "functions": 15,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/firefox/utils.py",
+      "sha256": "ba2fe0bb33344d268045cf11a5cbdfdf76c1bd5800abeacc607e4f83ce49ee08",
+      "functions": 10,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/firefox/webdriver.py",
+      "sha256": "9a4e67ec036ac60beb425d5a0220a5bb502d24cc1b1291f79eeb4bbc7684cdbf",
+      "functions": 5,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/javascript/__init__.py",
+      "sha256": "79b34c5cd59262419e922d89ffc3ceb454ecb0bd4a1fb4666f778a2e0d33d327",
+      "functions": 0,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/logs.py",
+      "sha256": "6b9dac2ebda748d340a8c0ebaaf6470ed4cbdee4af2c26f0dffa707629329352",
+      "functions": 0,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/manager/__init__.py",
+      "sha256": "d9739dd64da54b3359bdca97050c3194d9c8653a87bda1ded9ef5f5a74a3540e",
+      "functions": 0,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/manager/_cache.py",
+      "sha256": "bd9684101bda4a5bde0b3fd56cda69524bd3848df403ed6d655b516281da44c0",
+      "functions": 29,
+      "classes": 6,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/manager/_filesystem.py",
+      "sha256": "1d2326eba4cfe8d3de603577fe8a5bc08a949a7e53f888473f680027d49189cc",
+      "functions": 7,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/manager/_http.py",
+      "sha256": "97d587cd27ff635b920333660034d1768b52e4f387a272933f54b6969dc111fc",
+      "functions": 9,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/manager/_installation.py",
+      "sha256": "68f63e33c9b0f963cac4413f90f35fa394bfc4f5c6eb7fc5020051cd7c8db876",
+      "functions": 12,
+      "classes": 4,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/manager/driver.py",
+      "sha256": "e281036f6ca20c37f5d84a406a459bf5a2c40b319dabf51dd6a72affdc3ed04f",
+      "functions": 113,
+      "classes": 10,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/manager/file.py",
+      "sha256": "ff9b37fad3311f178c44b73df1331967cdb3ba0623ae99db72a0e3f8a25dbf48",
+      "functions": 16,
+      "classes": 5,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/manager/version.py",
+      "sha256": "20521a48fec6e3650fc74d2c85d77bc4d670096186be8f84332d8f56354ae57a",
+      "functions": 29,
+      "classes": 5,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/options.py",
+      "sha256": "3dcb3bec966be97cc2d8173a242c2fa4c3ecf31a1bff67f6b22f02d909f61358",
+      "functions": 109,
+      "classes": 6,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/safari/__init__.py",
+      "sha256": "b5ddf2cb7e6fb66c8e1b9d79eaa42b8c1d30685c7febf32fb162578481361fa1",
+      "functions": 0,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/safari/options.py",
+      "sha256": "acb83e1836d91c2f1dc69175d16f8925adc3bac35704ef3ff6340c785e047b3d",
+      "functions": 10,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/safari/service.py",
+      "sha256": "e69ebd9e21c40ab4590b8c0d1cf3c986bd2fdfeca52565b99dd8063bf3bae9f8",
+      "functions": 1,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/safari/session.py",
+      "sha256": "e451a34dd0b18e577d173411d1c2ef828a3a77b95df977898db520f5db1ebce7",
+      "functions": 14,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/safari/webdriver.py",
+      "sha256": "cbabf2956f4db0cff90c86fcb3f73d00c50ff612733e5010fafe18e3ecbb1cce",
+      "functions": 6,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/service.py",
+      "sha256": "162c1ddab5018413463c6347d610a0abb0e3dfb0d324e50a2c2bfa75f1bda923",
+      "functions": 36,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/session.py",
+      "sha256": "3ec9018a885790666ce91a5d3bff80106b46719166dfaca4d4ac2e383ba9ce7d",
+      "functions": 238,
+      "classes": 10,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/settings.py",
+      "sha256": "6dc116dfe5d25d63e0c13698af52df8c3c4a24d7b61859f965fad934689381e9",
+      "functions": 0,
+      "classes": 3,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/shadow.py",
+      "sha256": "690199ce8e0b195896d4c217271d595c5a5275f201f7120681f3c2718e23d664",
+      "functions": 34,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/utils.py",
+      "sha256": "ca9ef7e436d107b2de9e8791b5f174beee119f0f6ac6f2078cc081f4dfe90514",
+      "functions": 46,
+      "classes": 4,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/valuewrap.py",
+      "sha256": "819c5df05171573e2d69459cbb5fa04e084f7592b592dc36069b1dacc69937b7",
+      "functions": 7,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/aselenium/webdriver.py",
+      "sha256": "737e55a2bfdb0b7b54d25c3c93b0f53a6748e71ae90214e1c6061ec39a7a5973",
+      "functions": 18,
+      "classes": 3,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/demo_google.py",
+      "sha256": "7abf2d09ea61dbcfe0f357ba672cf78a8d0fb0e621df3d57bbac648c677035f7",
+      "functions": 15,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/demo_local.py",
+      "sha256": "32298fbfd0c588ff4a5f51b19e83f31016e3e8abb732b454a1adf0a38cdba13f",
+      "functions": 33,
+      "classes": 4,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "src/quick_start.py",
+      "sha256": "81b329041aa5d215b00b8df125d2ee37f477fea9b0f560e42614214cc721d9ce",
+      "functions": 1,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "scripts/benchmark_download.py",
+      "sha256": "e2bd18dbe0bddc16ce6f8b02ef407adfd2212dae097c86be9e794b3190277b37",
+      "functions": 9,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "scripts/benchmark_manager.py",
+      "sha256": "a56320d7d600822456101f2303ec3f31923a252e9cc2e8dc4a7d7030953b9ff1",
+      "functions": 6,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "scripts/check_api_quality.py",
+      "sha256": "ac69581842ef1dbda4750ce1a8babd4d2cfdc13d88ce09143db75ebf1d45d8bc",
+      "functions": 5,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "scripts/check_example_contracts.py",
+      "sha256": "9a1ecd83321e53c9f2c09980d25d054c458af46dfb135e357d55705e8e334c04",
+      "functions": 12,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "scripts/check_release.py",
+      "sha256": "0ea516ddc241d8ea6908b449400af7ddc11dd3a7efccd7b925f7db84df9cb2a4",
+      "functions": 1,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "scripts/smoke_browser.py",
+      "sha256": "2e2b3ba75d651f51455d6b1c9eeb00fb063425f597adfc8c1b3d4a3c48bfb628",
+      "functions": 2,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "scripts/soak_browser.py",
+      "sha256": "cf8e31257baed55104341600df2e79e5472043e71b9495604026dd51b4f7597b",
+      "functions": 5,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/conftest.py",
+      "sha256": "fa107ed6b38e7445cf675b7f3ba7f218046e0181ccb2a805ffc3aa9b1783df86",
+      "functions": 4,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_archive_safety.py",
+      "sha256": "330497354b95b32c0d2805d7ebaaea906fef6e65f2a2f30818105122c0247c3f",
+      "functions": 24,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_cache_v2.py",
+      "sha256": "c394a2ac0e1c4b8ba5e58bfcec89798d586b9fbe577e7cf41328ebfe53a965b9",
+      "functions": 14,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_compatibility.py",
+      "sha256": "d933ff22c8ca9b7e0fa05124d353886134debbee121e29a6b3030119c86dba7a",
+      "functions": 1,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_discovery.py",
+      "sha256": "c5ea96c3c63ef7d274b6fa92782de68474974e4fb907c406716ada11ccab2ea7",
+      "functions": 12,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_discovery_paths.py",
+      "sha256": "4bbea734d7d79a5a110e5ec6e33b82a3d1df96208adf27c10502b0122f18638c",
+      "functions": 29,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_files.py",
+      "sha256": "1f0ffd4b139383d9290f1c7dd847074ad4823f268149465fb6895882f445300b",
+      "functions": 21,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_filesystem_safety.py",
+      "sha256": "0db093e565423676989aa30e12fdf10bca23fea5ee5399554b1ba8cba6b54cdd",
+      "functions": 43,
+      "classes": 3,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_installation.py",
+      "sha256": "741c4f7a510409546ea63ab70bab4dbb7cca0d63cd7dffe3b3475523897402eb",
+      "functions": 21,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_installation_results.py",
+      "sha256": "5a938669f7ce5be2ca86660366a625b71b3adaddfab0eb370ec42a96132635e7",
+      "functions": 17,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_probe_safety.py",
+      "sha256": "61481dde3098013fa033cb795ec3175f92ac15d27a9c11a0d1ae9c1285f33155",
+      "functions": 16,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_public_api.py",
+      "sha256": "c9d978c1192074f0316a29a3e8a815d6aa263ce32bf4e748cea9aae14b0a26f4",
+      "functions": 8,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_requests.py",
+      "sha256": "e34ddde9c1199f694f156c3205f0c44cf946d3d6230410581390d82fabe5224e",
+      "functions": 25,
+      "classes": 3,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_resolution_policies.py",
+      "sha256": "9400342d99a24aa0e602081f46b3d2c647cb626d9f9b8367328827b8f1bb4ced",
+      "functions": 18,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_resources.py",
+      "sha256": "ebdaced9ed170049dbc00d789901ca3c5bf3466c9cd277c2b23bcab35e1ebd81",
+      "functions": 8,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_safari_discovery.py",
+      "sha256": "d9943affc693d74f1f68c7263b34dffbd2161bcb02d5c535b957419ab92e2e0c",
+      "functions": 21,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/manager/test_versions.py",
+      "sha256": "a54baa09230afbaeec5a709ba2eb700e60c7865bdb9b66495b05782479e05162",
+      "functions": 4,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_api_quality.py",
+      "sha256": "96030ce83052d4e7d2268234026d9ba59c6e6d904188c6da495efade089deece",
+      "functions": 9,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_current_only.py",
+      "sha256": "3ffc711328cddc3561314f25b5ce12c5aa89a0d1f46171e8b1b7d0261f1aec07",
+      "functions": 16,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_demo_google.py",
+      "sha256": "2035969f7510177e21f9d8eddeb63a046adb31d97cb489eea8b543439be73ca4",
+      "functions": 34,
+      "classes": 4,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_demo_local.py",
+      "sha256": "8eef26f46c0c6d859d10de28f9e0c01babdb79e7387f4be7f3ca8621e994718a",
+      "functions": 31,
+      "classes": 4,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_distribution.py",
+      "sha256": "cc807f487274c064d7aef814fce151744362f6fd7d62825ef16f85b6c72233ce",
+      "functions": 9,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_examples.py",
+      "sha256": "b46cd792826a77140b9db1d4f94f53d4c6032d08a65500c3716d05a3b359cb32",
+      "functions": 37,
+      "classes": 7,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_generated_inputs.py",
+      "sha256": "2406f16ee72548ab15917d0729806d44b13d364799fbf9928c503ccbd7165b99",
+      "functions": 3,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_production_readiness.py",
+      "sha256": "5a251ba5fbd64790f08f5741ce2a20c7fbfbbe0a614aa0997cc2d778cf1ed019",
+      "functions": 15,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_release_configuration.py",
+      "sha256": "b4ea7fb4fb501865b33970de3009d60c1a8d6abb5d3c2c129805c2d4711b5267",
+      "functions": 5,
+      "classes": 0,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_runtime.py",
+      "sha256": "bd18cd2cab58f15f1a58113f4d4ee5616788ecf8f7881424283402062c6efd6d",
+      "functions": 40,
+      "classes": 2,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    },
+    {
+      "path": "tests/test_second_pass.py",
+      "sha256": "4c48e5e0b83ec70def789d78c8f7b8ab88cff984a59f9081699f38a9aa27ca90",
+      "functions": 26,
+      "classes": 1,
+      "automated_doc_import_signature_grammar_checks": "passed",
+      "semantic_boundary": "Structural and known-example-contract audit; not a claim that each definition was individually live-executed or formally verified."
+    }
+  ],
+  "unverified": [
+    "Native Firefox/Safari/standalone Chromium/CfT bundles",
+    "Native Windows/Linux",
+    "Python 3.10/3.12/3.14 runtime",
+    "Long-duration stress and hostile shared filesystems",
+    "All individual live-browser docstring examples",
+    "Remote CI execution",
+    "Publishing credentials and approval policies"
+  ],
+  "open_local_work": [
+    "Whole-package typing contracts",
+    "Deeper session/element/Firefox failure coverage",
+    "Byte-capped version-probe output",
+    "Large explicit-profile synchronous acquisition"
+  ],
+  "before_review_backup": "/private/tmp/aselenium-production-review.FGj6sT/before-review.tar.gz"
+}

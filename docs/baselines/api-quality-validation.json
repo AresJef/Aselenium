@@ -1,0 +1,65 @@
+{
+  "validation_date": "2026-09-04",
+  "scope": "Imports, unused imports, Google-style docstrings, meaningful examples, and function/method annotations across maintained Python sources",
+  "package_version": "1.0.5",
+  "published": false,
+  "structural_audit": {
+    "command": "python scripts/check_api_quality.py",
+    "files": 90,
+    "functions_and_methods": 1530,
+    "classes": 236,
+    "definitions_with_examples": 170,
+    "missing_docstrings": 0,
+    "missing_signature_annotations": 0,
+    "function_local_imports": 0,
+    "boundary": "Includes package, demos, quick-start, maintenance scripts, tests, and nested helpers. Does not establish semantic type correctness or performance improvements."
+  },
+  "offline_checks": [
+    {"command": "/private/tmp/aselenium-py311.wnNkJd/venv/bin/python -m pytest --asyncio-debug -q --tb=short", "result": "1147 passed", "python": "3.11.15"},
+    {"command": "python -m ruff check src tests scripts", "result": "Passed", "rules": ["E9", "F", "I", "D (Google convention)", "ANN excluding ANN401"]},
+    {"command": "python -m ruff format --check src tests scripts", "result": "Passed"},
+    {"command": "python -m mypy", "result": "Passed in 14 configured modules", "boundary": "Not a package-wide strict typing certification; broader diagnostic checks still report issues outside the configured gate"},
+    {"command": "git diff --check -- . ':(exclude).gitignore'", "result": "Passed", "boundary": "Unrelated pre-existing .gitignore EOF whitespace was preserved"},
+    {"command": "ast.parse with feature_version=(3, 10)", "result": "Passed for all 90 maintained Python files", "boundary": "Grammar compatibility only, not a Python 3.10 runtime test"},
+    {"command": "python -m build --no-isolation --outdir dist", "result": "Built wheel and source distribution"},
+    {"command": "python -m twine check --strict dist/aselenium-1.0.5-py3-none-any.whl dist/aselenium-1.0.5.tar.gz", "result": "Both distributions passed"},
+    {"command": "Distribution content and source parity inspection", "result": "All 55 packaged Python files match source; py.typed is present; removed legacy JavaScript modules are absent; source distribution includes the new checker, tests, and guide"}
+  ],
+  "example_checks": {
+    "browser_code_blocks_compiled": 167,
+    "pure_constructor_docstrings_executed": 3,
+    "pure_examples": ["Proxy.__init__", "Timeouts.__init__", "Version.__init__"],
+    "boundary": "Browser code blocks are syntax-checked with top-level-await support but never executed by the offline suite. Live page selectors, driver availability, and remote-site behavior are not certified by compilation."
+  },
+  "live_runs": [
+    {
+      "browser": "chrome",
+      "browser_version": "152.0.7977.76",
+      "driver_version": "152.0.7977.82",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "status": "passed",
+      "passed_sections": 15,
+      "failed_sections": 0,
+      "skipped_sections": 0,
+      "report": "/private/tmp/aselenium-api-quality.QL6G6U/local-chrome-hcs4imx9/report.json"
+    },
+    {
+      "browser": "edge",
+      "browser_version": "151.0.4129.93",
+      "driver_version": "151.0.4129.107",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "status": "passed",
+      "passed_sections": 15,
+      "failed_sections": 0,
+      "skipped_sections": 0,
+      "report": "/private/tmp/aselenium-api-quality.QL6G6U/local-edge-h6ifb7nq/report.json"
+    }
+  ],
+  "live_configuration": "Headless local HTML demo, fresh temporary profiles, existing cached drivers, offline provisioning. No real Google request, driver download, casting, or proxy authentication test.",
+  "preserved": ["Runtime dependencies and user environments", "Existing caches and personal browser profiles", "Public __all__ exports", "Package version and unpublished status", "Unrelated working-tree edits"],
+  "backup": "/private/tmp/aselenium-api-quality.QL6G6U/before-api-quality.tar.gz",
+  "not_validated": ["Package-wide strict mypy", "Full Python 3.13 test suite", "Firefox/Safari native behavior", "Windows/Linux native browsers", "Remote CI execution", "Google live-site behavior", "Vendor downloads", "Overall runtime or cold-import speedup"],
+  "evidence_retention": "This summary remains in the checkout. Temporary browser reports, captures, and the backup may be cleaned by the operating system."
+}

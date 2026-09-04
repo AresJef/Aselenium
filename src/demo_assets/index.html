@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Aselenium local demo</title>
+<style>
+  body { font: 16px system-ui, sans-serif; margin: 24px; max-width: 720px; }
+  label, input, button { margin: 4px; }
+  section { margin: 20px 0; }
+  #covered, #overlay { position: fixed; right: 20px; top: 20px; width: 100px; height: 40px; }
+  #overlay { background: #dbeafe; z-index: 2; }
+  #zero { width: 0; height: 0; overflow: hidden; }
+  #offscreen { position: fixed; left: -1000px; top: 0; }
+  #bottom { margin-top: 1300px; }
+</style>
+<h1>Aselenium local feature tour</h1>
+<p>No external scripts, fonts, services, or user data.</p>
+<form id="form">
+  <label>Name <input id="name" name="name" aria-label="Name"></label>
+  <label><input id="subscribe" type="checkbox">Subscribe locally</label>
+  <label>Fixture upload <input id="upload" type="file"></label>
+  <button type="submit">Submit locally</button>
+</form>
+<p id="submitted" role="status"></p>
+<section><span class="item">One</span> <span class="item">Two</span> <span class="item">Three</span></section>
+<div id="host"></div>
+<iframe id="frame" title="Local frame" src="/frame.html"></iframe>
+<p id="prompt-result" role="status"></p>
+<div id="hidden" style="display:none">Hidden DOM text</div>
+<div id="zero">Zero-sized content</div>
+<div id="offscreen">Offscreen content</div>
+<div id="covered">Covered target</div><div id="overlay">Overlay</div>
+<a href="/second.html">Second local page</a>
+<p id="bottom">Bottom scroll target</p>
+<script>
+  document.querySelector('#form').addEventListener('submit', event => {
+    event.preventDefault();
+    document.querySelector('#submitted').textContent = 'Submitted: ' + document.querySelector('#name').value;
+  });
+  document.querySelector('#host').attachShadow({mode: 'open'}).innerHTML = '<span id="shadow-text">Inside shadow DOM</span>';
+</script>
+</html>

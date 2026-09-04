@@ -1,22 +1,42 @@
 {
-    "0.33.0": {
+    "0.37.1": {
         "max_firefox_version": "9999.9999.9999",
-        "min_firefox_version": "113.0.0"
+        "min_firefox_version": "115.0.0"
+    },
+    "0.37.0": {
+        "max_firefox_version": "9999.9999.9999",
+        "min_firefox_version": "115.0.0"
+    },
+    "0.36.0": {
+        "max_firefox_version": "9999.9999.9999",
+        "min_firefox_version": "115.0.0"
+    },
+    "0.35.0": {
+        "max_firefox_version": "9999.9999.9999",
+        "min_firefox_version": "115.0.0"
+    },
+    "0.34.0": {
+        "max_firefox_version": "9999.9999.9999",
+        "min_firefox_version": "115.0.0"
+    },
+    "0.33.0": {
+        "max_firefox_version": "120.9999.9999",
+        "min_firefox_version": "102.0.0"
     },
     "0.32.2": {
-        "max_firefox_version": "9999.9999.9999",
+        "max_firefox_version": "120.9999.9999",
         "min_firefox_version": "102.0.0"
     },
     "0.32.1": {
-        "max_firefox_version": "9999.9999.9999",
+        "max_firefox_version": "120.9999.9999",
         "min_firefox_version": "102.0.0"
     },
     "0.32.0": {
-        "max_firefox_version": "9999.9999.9999",
+        "max_firefox_version": "120.9999.9999",
         "min_firefox_version": "102.0.0"
     },
     "0.31.0": {
-        "max_firefox_version": "9999.9999.9999",
+        "max_firefox_version": "120.9999.9999",
         "min_firefox_version": "91.0.0"
     },
     "0.30.0": {

@@ -1,0 +1,16 @@
+# Development-only tools for the current SQLite/W3C implementation.
+-e .
+build>=1.2,<2
+setuptools>=77.0.3
+wheel>=0.41
+pytest>=9.0.3,<10
+pytest-asyncio>=1.4,<2
+ruff>=0.12,<1
+mypy>=1.17,<2
+PyYAML>=6,<7
+twine>=6,<7
+readme-renderer[md]>=46,<47
+tomli>=2; python_version < "3.11"
+coverage>=7.16,<8
+hypothesis>=6.167,<7
+pip-audit>=2.10,<3

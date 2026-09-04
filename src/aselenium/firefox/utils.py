@@ -16,128 +16,157 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+"""Aselenium utils implementation and supporting types."""
+
 from __future__ import annotations
-from io import BytesIO
-from typing import Any
-from orjson import loads
-from xml.dom import minidom
+
 from base64 import b64encode
+from io import BytesIO
 from os import walk as walk_path
 from os.path import join as join_path
-from zipfile import ZipFile, ZIP_DEFLATED, is_zipfile
+from os.path import relpath
+from typing import (
+    Any,
+)
+from zipfile import ZIP_DEFLATED, ZipFile, is_zipfile
+
+from orjson import loads
+
 from aselenium import errors
-from aselenium.utils import CustomDict, is_path_file, is_path_dir
+from aselenium.utils import CustomDict, is_path_dir, is_path_file, validate_dir
 
 
 # Utils: addon ------------------------------------------------------------------------------------
 class FirefoxAddon(CustomDict):
-    """Represents the detail of a Firefox add-on."""
+    """Represent the detail of a Firefox add-on."""
 
     def __init__(self, **details: Any) -> None:
-        """The detail of a Firefox add-on.
+        """Initialize the instance with the supplied configuration.
 
-        :param details [keywords]: `<Any>` The detail of the add-on.
+        Args:
+            **details: The detail of the add-on.
         """
         super().__init__(**details)
 
     # Properties --------------------------------------------------------------------------
     @property
-    def id(self) -> str:
-        """Access the identifier of the add-on `<str>`."""
+    def id(self) -> str | None:
+        """Return the identifier of the add-on.
+
+        Returns:
+            The add-on identifier, or None before a temporary add-on receives an ID.
+        """
         return self["id"]
 
     @id.setter
     def id(self, value: str) -> None:
-        """Set the identifier of the add-on `<str>`."""
+        """Set the identifier of the add-on.
+
+        Args:
+            value: New id value.
+        """
         self["id"] = value
 
     @property
     def name(self) -> str:
-        """Access the name of the add-on `<str>`."""
+        """Return the name of the add-on.
+
+        Returns:
+            The name of the add-on.
+        """
         return self["name"]
 
     @property
     def version(self) -> str:
-        """Access the version of the add-on `<str>`."""
-        return self["version"]
+        """Return the version of the add-on.
 
-    @property
-    def unpack(self) -> bool:
-        """Access whether the add-on requires to be unpacked `<bool>`."""
-        return self["unpack"]
+        Returns:
+            The version of the add-on.
+        """
+        return self["version"]
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
-        return "<%s (id='%s', name='%s', version='%s', unpack=%s)>" % (
+        """Return a diagnostic representation of this instance.
+
+        Returns:
+            A diagnostic representation of this instance.
+        """
+        return "<%s (id='%s', name='%s', version='%s')>" % (
             self.__class__.__name__,
             self.id,
             self.name,
             self.version,
-            self.unpack,
         )
 
     def copy(self) -> FirefoxAddon:
-        """Copy the Firefox Addon object `<Firefix Addon>`."""
+        """Copy the Firefox Addon object.
+
+        Returns:
+            An independent copy of this value object.
+        """
         return FirefoxAddon(**self._dict)
 
 
 def extract_firefox_addon_details(path: str) -> FirefoxAddon:
     """Extract the details of a Firefox addon.
 
-    :param path: `<str>` The absolute path to the addon file (//.xpi) or folder.
-    :return `<FirefoxAddon>`: The details of the addon.
+    Args:
+        path: The absolute path to the addon file (//.xpi) or folder.
 
-    ### Example:
-    >>> details = extract_firefox_addon_details("/path/to/extension.xpi")
-        # <FirefoxAddon (id='extension@name', name='Extension Name', version='1.0.0', unpack=False)>
+    Returns:
+        The details of the addon.
+
+    Example:
+        >>> details = extract_firefox_addon_details("/path/to/extension.xpi")
     """
 
-    def parse_manifest_json(content):
+    def parse_manifest_json(content: str | bytes) -> FirefoxAddon:
+        """Validate a WebExtension manifest and extract its identity fields.
+
+        Args:
+            content: Manifest or downloaded resource content to decode.
+
+        Returns:
+            An add-on containing the validated name, version, and optional Gecko ID.
+        """
         manifest = loads(content)
-        try:
-            id = manifest["applications"]["gecko"]["id"]
-        except KeyError:
-            id = manifest["name"].replace(" ", "") + "@" + manifest["version"]
+        if (
+            not isinstance(manifest, dict)
+            or type(manifest.get("manifest_version")) is not int
+            or manifest["manifest_version"] not in (2, 3)
+        ):
+            raise ValueError("Expected a WebExtension manifest_version of 2 or 3")
+        if "applications" in manifest:
+            raise ValueError(
+                "Use browser_specific_settings instead of the removed applications key"
+            )
+        for key in ("name", "version"):
+            if not isinstance(manifest.get(key), str) or not manifest[key].strip():
+                raise ValueError("Manifest %s must be a nonempty string" % key)
+        settings = manifest.get("browser_specific_settings", {})
+        if not isinstance(settings, dict) or not isinstance(
+            settings.get("gecko", {}), dict
+        ):
+            raise ValueError("browser_specific_settings.gecko must be an object")
+        # Temporary add-ons can receive their identifier from Firefox.
+        id = settings.get("gecko", {}).get("id")
+        if id is not None and (not isinstance(id, str) or not id.strip()):
+            raise ValueError("The Gecko add-on id must be a nonempty string")
         return FirefoxAddon(
             id=id,
             name=manifest["name"],
             version=manifest["version"],
-            unpack=False,
         )
-
-    def parse_namespace(doc: minidom.Document, url: str) -> str:
-        attributes: minidom.NamedNodeMap = doc.documentElement.attributes
-        for i in range(attributes.length):
-            if attributes.item(i).value == url:
-                if ":" in attributes.item(i).name:
-                    # If the namespace is not the default one remove 'xlmns:'
-                    return attributes.item(i).name.split(":")[1] + ":"
-        return ""
-
-    def parse_node_text(element: minidom.Element) -> str:
-        return "".join(
-            [
-                node.data
-                for node in element.childNodes
-                if node.nodeType == node.TEXT_NODE
-            ]
-        ).strip()
 
     # Extract add-on details
     try:
         if is_path_file(path) and is_zipfile(path):
             with ZipFile(path, "r") as zip:
-                if "manifest.json" in zip.namelist():
-                    return parse_manifest_json(zip.read("manifest.json"))  # exit
-                install_rdf = zip.read("install.rdf")
+                return parse_manifest_json(zip.read("manifest.json"))
         elif is_path_dir(path):
-            manifest_js = join_path(path, "manifest.json")
-            if is_path_file(manifest_js):
-                with open(manifest_js, "r", encoding="utf-8") as file:
-                    return parse_manifest_json(file.read())  # exit
-            install_rdf = join_path(path, "install.rdf")
-            with open(install_rdf, "r", encoding="utf-8") as file:
-                install_rdf = file.read()
+            with open(join_path(path, "manifest.json"), "r", encoding="utf-8") as file:
+                return parse_manifest_json(file.read())
         else:
             raise errors.InvalidExtensionError(
                 "Invalid Firefox add-on path: {}. Must either be a .xpi "
@@ -148,61 +177,29 @@ def extract_firefox_addon_details(path: str) -> FirefoxAddon:
         raise
     except Exception as err:
         raise errors.InvalidExtensionError(
-            f"Invalid Firefox add-on: {repr(path)}. Error: {err}"
+            f"Invalid Firefox WebExtension: {repr(path)}. A valid manifest.json is required. Error: {err}"
         ) from err
-
-    # Parse from install.rdf
-    details = {"id": None, "name": None, "version": None, "unpack": False}
-    try:
-        # . parse the xml document
-        doc = minidom.parseString(install_rdf)
-
-        # . parse the namespaces
-        em = parse_namespace(doc, "http://www.mozilla.org/2004/em-rdf#")
-        rdf = parse_namespace(doc, "http://www.w3.org/1999/02/22-rdf-syntax-ns#")
-        description = doc.getElementsByTagName(rdf + "Description")[0]
-        if not description:
-            description = doc.getElementsByTagName("Description").item(0)
-        for node in description.childNodes:
-            # Remove the namespace prefix from the tag for comparison
-            entry = node.nodeName.replace(em, "")
-            if entry in details:
-                details[entry] = parse_node_text(node)
-        if not details["id"]:
-            for i in range(description.attributes.length):
-                attribute = description.attributes.item(i)
-                if attribute.name == em + "id":
-                    details["id"] = attribute.value
-    except Exception as err:
-        raise errors.InvalidExtensionError(
-            f"Invalid Firefox add-on file: {repr(path)}. {err}"
-        )
-
-    # Validate addon id
-    if not details["id"]:
-        raise errors.InvalidExtensionError(
-            f"Invalid Firefox add-on file: {repr(path)}. Add-on id not found."
-        )
-
-    # Adjust unpack boolean
-    if isinstance(details["unpack"], str):
-        details["unpack"] = details["unpack"].lower() == "true"
-
-    # Return details
-    return FirefoxAddon(**details)
 
 
 def encode_dir_to_firefox_wire_protocol(directory: str) -> str:
-    """Encodes a directory to the Firefox wire protocol format.
+    """Encode a directory as a base64 ZIP with paths relative to its root.
 
-    :param directory: `<str>` The directory to be encoded.
-    :return `<str>`: The encoded directory in the Firefox wire protocol format.
+    Args:
+        directory: Existing directory path; relative paths and trailing separators
+            are normalized before deriving archive member names.
+
+    Returns:
+        The ZIP bytes encoded as base64 text for Firefox's profile/add-on protocol.
+
+    Raises:
+        AseleniumInvalidPathError: If the path is invalid or the directory is missing.
+        OSError: If a contained file cannot be read.
     """
+    directory = validate_dir(directory)
     fp = BytesIO()
-    path_root = len(directory) + 1  # account for trailing slash
     with ZipFile(fp, "w", ZIP_DEFLATED) as zip:
         for base, _, files in walk_path(directory):
             for fyle in files:
                 filename = join_path(base, fyle)
-                zip.write(filename, filename[path_root:])
+                zip.write(filename, relpath(filename, directory))
     return b64encode(fp.getvalue()).decode("utf-8")

@@ -16,7 +16,10 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+"""Aselenium options implementation and supporting types."""
+
 from typing import Any
+
 from aselenium.options import ChromiumBaseOptions
 
 __all__ = ["ChromeOptions"]

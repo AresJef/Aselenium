@@ -20,35 +20,150 @@
 
 # Chromium Based --------------------------------------------------------------------------------------------
 # fmt: off
-from aselenium.manager import ChromiumVersion
-from aselenium.options import ChromiumProfile
-# . Chrome
-from aselenium.manager import ChromeDriverManager
-from aselenium.chrome import Chrome, ChromeOptions, ChromeService, ChromeSession
-# . Chromium
-from aselenium.manager import ChromiumDriverManager
-from aselenium.chromium import Chromium, ChromiumOptions, ChromiumService, ChromiumSession
-# . Edge
-from aselenium.manager import EdgeDriverManager
-from aselenium.edge import Edge, EdgeOptions, EdgeService, EdgeSession
-
-# Gecko Based -----------------------------------------------------------------------------------------------
-from aselenium.firefox import FirefoxProfile
-from aselenium.manager import FirefoxDriverManager, GeckoVersion, FirefoxVersion
-# . Firefox
-from aselenium.firefox import Firefox, FirefoxOptions, FirefoxService, FirefoxSession
-
-# Safari ----------------------------------------------------------------------------------------------------
-from aselenium.manager import SafariDriverManager, SafariVersion
-from aselenium.safari import Safari, SafariOptions, SafariService, SafariSession
-
 # Common ----------------------------------------------------------------------------------------------------
+"""Public exports for the aselenium package."""
+
 from aselenium.actions import Actions
 from aselenium.alert import Alert
+from aselenium.chrome import Chrome, ChromeOptions, ChromeService, ChromeSession
+from aselenium.chromium import (
+    Chromium,
+    ChromiumOptions,
+    ChromiumService,
+    ChromiumSession,
+)
 from aselenium.connection import Connection
+from aselenium.edge import Edge, EdgeOptions, EdgeService, EdgeSession
 from aselenium.element import Element, ElementRect
-from aselenium.options import Proxy, Timeouts
-from aselenium.session import Session, Cookie, DevToolsCMD, JavaScript, Network, Permission, Viewport, Window, WindowRect
+from aselenium.errors import (
+    AlertError,
+    AlertNotFoundError,
+    AseleniumError,
+    AseleniumFileNotFoundError,
+    AseleniumInvalidValueError,
+    AseleniumOSError,
+    AseleniumTimeout,
+    BrowserBinaryNotDetectedError,
+    BrowserDownloadFailedError,
+    BrowserPermissionError,
+    CastingError,
+    CastSinkNotFoundError,
+    ChangeWindowStateError,
+    ConnectionClosedError,
+    CookieError,
+    CookieNotFoundError,
+    DevToolsCMDError,
+    DevToolsCMDNotFoundError,
+    DriverDownloadFailedError,
+    DriverExecutableNotDetectedError,
+    DriverInstallationError,
+    DriverManagerError,
+    DriverManagerTimeoutError,
+    DriverRequestFailedError,
+    DriverRequestRateLimitError,
+    DriverRequestTimeoutError,
+    ElementClickInterceptedError,
+    ElementError,
+    ElementNotFoundError,
+    ElementNotInteractableError,
+    ElementStaleReferenceError,
+    FileDownloadTimeoutError,
+    FrameError,
+    FrameNotFoundError,
+    IncompatibleWebdriverError,
+    InsecureCertificateError,
+    InternetDisconnectedError,
+    InvalidArgumentError,
+    InvalidBrowserVersionError,
+    InvalidCookieDomainError,
+    InvalidCoordinatesError,
+    InvalidDownloadFileError,
+    InvalidDriverVersionError,
+    InvalidElementStateError,
+    InvalidExtensionError,
+    InvalidJavaScriptError,
+    InvalidMethodError,
+    InvalidOptionsError,
+    InvalidPermissionNameError,
+    InvalidPermissionStateError,
+    InvalidProfileError,
+    InvalidProxyError,
+    InvalidRectValueError,
+    InvalidResponseError,
+    InvalidSelectorError,
+    InvalidSessionError,
+    InvalidValueError,
+    InvalidVersionError,
+    InvalidXPathSelectorError,
+    JavaScriptError,
+    JavaScriptNotFoundError,
+    JavaScriptTimeoutError,
+    MoveTargetOutOfBoundsError,
+    NetworkConditionsError,
+    NetworkConditionsNotFoundError,
+    OptionsError,
+    OptionsNotSetError,
+    PlatformError,
+    ScreenshotError,
+    SelectorError,
+    ServiceError,
+    ServiceExecutableNotFoundError,
+    ServiceProcessError,
+    ServiceSocketError,
+    ServiceStartError,
+    ServiceStopError,
+    ServiceTimeoutError,
+    SessionClientError,
+    SessionDataError,
+    SessionError,
+    SessionQuitError,
+    SessionShutdownError,
+    SessionTimeoutError,
+    ShadowRootError,
+    ShadowRootNotFoundError,
+    UnableToSetCookieError,
+    UnexpectedAlertFoundError,
+    UnknownCommandError,
+    UnknownError,
+    UnknownMethodError,
+    UnsupportedPlatformError,
+    WebDriverError,
+    WebdriverNotFoundError,
+    WebDriverTimeoutError,
+    WindowError,
+    WindowNotFountError,
+)
+from aselenium.firefox import (
+    Firefox,
+    FirefoxOptions,
+    FirefoxProfile,
+    FirefoxService,
+    FirefoxSession,
+)
+from aselenium.manager import (
+    ChromeDriverManager,
+    ChromiumDriverManager,
+    ChromiumVersion,
+    EdgeDriverManager,
+    FirefoxDriverManager,
+    FirefoxVersion,
+    GeckoVersion,
+    SafariDriverManager,
+    SafariVersion,
+)
+from aselenium.options import ChromiumProfile, Proxy, Timeouts
+from aselenium.safari import Safari, SafariOptions, SafariService, SafariSession
+from aselenium.session import (
+    Cookie,
+    DevToolsCMD,
+    JavaScript,
+    Network,
+    Permission,
+    Session,
+    Viewport,
+    Window,
+    WindowRect,
+)
 from aselenium.shadow import Shadow
 from aselenium.utils import KeyboardKeys, MouseButtons
 from aselenium.webdriver import WebDriver
@@ -56,127 +171,19 @@ from aselenium.webdriver import WebDriver
 # Exceptions ------------------------------------------------------------------------------------------------
 # fmt: on
 # . base
-from aselenium.errors import (
-    AseleniumError,
-    AseleniumTimeout,
-    AseleniumFileNotFoundError,
-    AseleniumInvalidValueError,
-    AseleniumOSError,
-)
-
 # . platform
-from aselenium.errors import PlatformError, UnsupportedPlatformError
-
 # . driver manager
-from aselenium.errors import (
-    DriverManagerError,
-    DriverManagerTimeoutError,
-    DriverInstallationError,
-    DriverExecutableNotDetectedError,
-    DriverRequestFailedError,
-    DriverRequestTimeoutError,
-    DriverRequestRateLimitError,
-    DriverDownloadFailedError,
-    InvalidVersionError,
-    InvalidDriverVersionError,
-    InvalidBrowserVersionError,
-    BrowserBinaryNotDetectedError,
-    BrowserDownloadFailedError,
-    FileDownloadTimeoutError,
-    InvalidDownloadFileError,
-)
-
 # . options
-from aselenium.errors import (
-    OptionsError,
-    InvalidOptionsError,
-    InvalidProxyError,
-    InvalidProfileError,
-    OptionsNotSetError,
-)
-
 # . service
-from aselenium.errors import (
-    ServiceError,
-    ServiceExecutableNotFoundError,
-    ServiceStartError,
-    ServiceStopError,
-    ServiceSocketError,
-    ServiceProcessError,
-    ServiceTimeoutError,
-)
-
 # . webdriver
-from aselenium.errors import (
-    WebDriverError,
-    WebDriverTimeoutError,
-    WebdriverNotFoundError,
-    ConnectionClosedError,
-    InternetDisconnectedError,
-    InvalidValueError,
-    InvalidArgumentError,
-    InvalidMethodError,
-    InvalidRectValueError,
-    InvalidResponseError,
-    InvalidExtensionError,
-    UnknownMethodError,
-    SessionError,
-    SessionClientError,
-    InvalidSessionError,
-    IncompatibleWebdriverError,
-    SessionDataError,
-    SessionTimeoutError,
-    SessionShutdownError,
-    SessionQuitError,
-    WindowError,
-    ChangeWindowStateError,
-    WindowNotFountError,
-    CookieError,
-    UnableToSetCookieError,
-    InvalidCookieDomainError,
-    CookieNotFoundError,
-    JavaScriptError,
-    InvalidJavaScriptError,
-    JavaScriptNotFoundError,
-    JavaScriptTimeoutError,
-    ElementError,
-    InvalidElementStateError,
-    ElementNotVisibleError,
-    ElementNotInteractableError,
-    ElementNotSelectableError,
-    ElementClickInterceptedError,
-    ElementNotFoundError,
-    ElementStaleReferenceError,
-    ElementCoordinatesError,
-    FrameError,
-    FrameNotFoundError,
-    ShadowRootError,
-    ShadowRootNotFoundError,
-    SelectorError,
-    InvalidSelectorError,
-    InvalidXPathSelectorError,
-    NetworkConditionsError,
-    NetworkConditionsNotFoundError,
-    BrowserPermissionError,
-    InvalidPermissionNameError,
-    InvalidPermissionStateError,
-    AlertError,
-    UnexpectedAlertFoundError,
-    AlertNotFoundError,
-    ImeError,
-    ImeNotAvailableError,
-    ImeActivationFailedError,
-    CastingError,
-    CastSinkNotFoundError,
-    DevToolsCMDError,
-    DevToolsCMDNotFoundError,
-    ScreenshotError,
-    MoveTargetOutOfBoundsError,
-    InsecureCertificateError,
-    InvalidCoordinatesError,
-    UnknownError,
-    UnknownCommandError,
-)
+
+# Gecko Based -----------------------------------------------------------------------------------------------
+# . Firefox
+
+# . Chrome
+# . Chromium
+# . Edge
+# Safari ----------------------------------------------------------------------------------------------------
 
 # All -------------------------------------------------------------------------------------------------------
 # fmt: off
@@ -217,31 +224,16 @@ __all__ = [
     "SessionTimeoutError", "SessionShutdownError", "SessionQuitError", "WindowError", "ChangeWindowStateError",
     "WindowNotFountError", "CookieError", "UnableToSetCookieError", "InvalidCookieDomainError",
     "CookieNotFoundError", "JavaScriptError", "InvalidJavaScriptError", "JavaScriptNotFoundError",
-    "JavaScriptTimeoutError", "ElementError", "InvalidElementStateError", "ElementNotVisibleError",
-    "ElementNotInteractableError", "ElementNotSelectableError", "ElementClickInterceptedError",
-    "ElementNotFoundError", "ElementStaleReferenceError", "ElementCoordinatesError", "FrameError",
+    "JavaScriptTimeoutError", "ElementError", "InvalidElementStateError",
+    "ElementNotInteractableError", "ElementClickInterceptedError",
+    "ElementNotFoundError", "ElementStaleReferenceError", "FrameError",
     "FrameNotFoundError", "ShadowRootError", "ShadowRootNotFoundError", "SelectorError",
     "InvalidSelectorError", "InvalidXPathSelectorError", "NetworkConditionsError",
     "NetworkConditionsNotFoundError", "BrowserPermissionError", "InvalidPermissionNameError",
     "InvalidPermissionStateError", "AlertError", "UnexpectedAlertFoundError", "AlertNotFoundError",
-    "ImeError", "ImeNotAvailableError", "ImeActivationFailedError", "CastingError",
+    "CastingError",
     "CastSinkNotFoundError", "DevToolsCMDError", "DevToolsCMDNotFoundError", "ScreenshotError",
     "MoveTargetOutOfBoundsError", "InsecureCertificateError", "InvalidCoordinatesError",
     "UnknownError", "UnknownCommandError",
 ]
-(
-    # Chromium Based
-    ChromiumVersion, ChromiumProfile,
-    ChromeDriverManager, Chrome, ChromeOptions, ChromeService, ChromeSession,
-    ChromiumDriverManager, Chromium, ChromiumOptions, ChromiumService, ChromiumSession,
-    EdgeDriverManager, Edge, EdgeOptions, EdgeService, EdgeSession,
-    # Gecko Based
-    FirefoxProfile, FirefoxDriverManager, GeckoVersion, FirefoxVersion,
-    Firefox, FirefoxOptions, FirefoxService, FirefoxSession,
-    # Safari
-    SafariDriverManager, SafariVersion, Safari, SafariOptions, SafariService, SafariSession,
-    # Common
-    Actions, Alert, Connection, Element, ElementRect, Proxy, Timeouts, Session, Cookie, DevToolsCMD, 
-    JavaScript, Network, Permission, Viewport, Window, WindowRect, Shadow, KeyboardKeys, MouseButtons, WebDriver,
-)   # pyflakes
 # fmt: on

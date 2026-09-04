@@ -16,47 +16,119 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any, Callable
-from aselenium.element import Element, ELEMENT_KEY
-from aselenium.shadow import Shadow, SHADOWROOT_KEY
+"""Convert nested Python values and browser handles to W3C command parameters."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from typing import (
+    Any,
+    TypeVar,
+)
+
+from aselenium.element import ELEMENT_KEY, Element
+from aselenium.shadow import SHADOWROOT_KEY, Shadow
+
+T = TypeVar("T")
 
 
-def wrap_value(value: Any) -> list[Any] | dict[str, Any] | Any:
-    """Wrap value `<Any>` to webdriver protocol `<list/dict>`."""
-    return WARP_MAPPER.get(type(value), through)(value)
+def wrap_value(value: Any) -> Any:
+    """Recursively encode containers and browser handles as WebDriver values.
+
+    Args:
+        value: A list, tuple, dictionary, Element, Shadow, or scalar value.
+            Subclasses of these containers and handles are also supported.
+
+    Returns:
+        Lists and dictionaries with nested handles encoded by their W3C IDs.
+        Tuples become lists. Other values pass through unchanged; serialization
+        of unsupported objects may subsequently fail in the transport layer.
+
+    Example:
+        >>> payload = wrap_value({"target": element, "arguments": (1, 2)})
+    """
+    wrapper = WARP_MAPPER.get(type(value))
+    if wrapper is not None:
+        return wrapper(value)
+    for value_type, wrapper in WARP_MAPPER.items():
+        if isinstance(value, value_type):
+            return wrapper(value)
+    return value
 
 
 def warp_list(value: list[Any]) -> list[Any]:
-    """Wrap value `<list>` to webdriver protocol `<list>`."""
+    """Encode each item in a list without mutating the input.
+
+    Args:
+        value: List containing command arguments or nested containers.
+
+    Returns:
+        A new list of recursively encoded values.
+    """
     return [wrap_value(v) for v in value]
 
 
-def warp_tuple(value: tuple[Any]) -> tuple[Any]:
-    """Wrap value `<tuple>` to webdriver protocol `<list>`."""
+def warp_tuple(value: tuple[Any, ...]) -> list[Any]:
+    """Convert a tuple of command arguments to an encoded JSON-compatible list.
+
+    Args:
+        value: Positional command arguments to encode in their original order.
+
+    Returns:
+        A new list of recursively encoded values.
+    """
     return [wrap_value(v) for v in value]
 
 
 def warp_dict(value: dict[str, Any]) -> dict[str, Any]:
-    """Wrap value `<dict>` to webdriver protocol `<dict>`."""
+    """Encode dictionary values while preserving their keys.
+
+    Args:
+        value: String-keyed command data containing scalars or nested values.
+
+    Returns:
+        A new dictionary with the same keys and recursively encoded values.
+    """
     return {k: wrap_value(v) for k, v in value.items()}
 
 
 def warp_element(value: Element) -> dict[str, str]:
-    """Wrap value `<Element>` to webdriver protocol `<dict>`."""
+    """Encode an element handle as a W3C element reference.
+
+    Args:
+        value: Element handle belonging to the target browser session.
+
+    Returns:
+        A single-entry mapping from the W3C element key to the element ID.
+    """
     return {ELEMENT_KEY: value.id}
 
 
 def warp_shadow(value: Shadow) -> dict[str, str]:
-    """Wrap value `<Shadow>` to webdriver protocol `<dict>`."""
+    """Encode a shadow-root handle as a W3C shadow reference.
+
+    Args:
+        value: Shadow-root handle belonging to the target browser session.
+
+    Returns:
+        A single-entry mapping from the W3C shadow key to the shadow-root ID.
+    """
     return {SHADOWROOT_KEY: value.id}
 
 
-def through(value: Any) -> Any:
-    """Pass through value `<Any>`."""
+def through(value: T) -> T:
+    """Pass through value.
+
+    Args:
+        value: A value that does not need container or handle conversion.
+
+    Returns:
+        The original value, retaining its identity and concrete type.
+    """
     return value
 
 
-WARP_MAPPER: dict[type, Callable] = {
+WARP_MAPPER: dict[type[Any], Callable[[Any], Any]] = {
     list: warp_list,
     tuple: warp_tuple,
     dict: warp_dict,

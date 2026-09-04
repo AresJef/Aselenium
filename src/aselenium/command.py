@@ -19,6 +19,9 @@
 
 
 # Driver Commands ---------------------------------------------------------------------------------
+"""Aselenium command implementation and supporting types."""
+
+
 class Command:
     """Defines constants for the standard WebDriver commands."""
 
@@ -49,7 +52,6 @@ class Command:
     # Session - Network
     SET_NETWORK_CONDITIONS: str = "setNetworkConditions"
     GET_NETWORK_CONDITIONS: str = "getNetworkConditions"
-    DELETE_NETWORK_CONDITIONS: str = "deleteNetworkConditions"
     # Session - Permission
     SET_PERMISSION: str = "setPermissions"
     # Session - Action
@@ -72,7 +74,6 @@ class Command:
     # Session - Script
     W3C_EXECUTE_SCRIPT: str = "w3cExecuteScript"
     W3C_EXECUTE_SCRIPT_ASYNC: str = "w3cExecuteScriptAsync"
-    EXECUTE_ASYNC_SCRIPT: str = "executeAsyncScript"
     # Session - Alert
     W3C_DISMISS_ALERT: str = "w3cDismissAlert"
     W3C_ACCEPT_ALERT: str = "w3cAcceptAlert"
@@ -120,16 +121,6 @@ class Command:
     EXECUTE_CDP_COMMAND: str = "executeCdpCommand"
 
     ### Not Implemented ###
-    # Session - Delete
-    DELETE_SESSION: str = "deleteSession"
-    # Mobile - Mobile
-    SET_SCREEN_ORIENTATION: str = "setScreenOrientation"
-    GET_SCREEN_ORIENTATION: str = "getScreenOrientation"
-    GET_NETWORK_CONNECTION: str = "getNetworkConnection"
-    SET_NETWORK_CONNECTION: str = "setNetworkConnection"
-    CURRENT_CONTEXT_HANDLE: str = "getCurrentContextHandle"
-    CONTEXT_HANDLES: str = "getContextHandles"
-    SWITCH_TO_CONTEXT: str = "switchToContext"
     # Element - Upload
     UPLOAD_FILE: str = "uploadFile"
     # Authenticator - WebAuthn
@@ -140,8 +131,6 @@ class Command:
     REMOVE_CREDENTIAL: str = "removeCredential"
     REMOVE_ALL_CREDENTIALS: str = "removeAllCredentials"
     SET_USER_VERIFIED: str = "setUserVerified"
-    # Chromium - Application
-    LAUNCH_APP: str = "launchApp"
 
     ### Safari Specific ###
     SAFARI_GET_PERMISSIONS: str = "safariGetPermissions"
@@ -184,8 +173,6 @@ COMMANDS: dict[str, tuple[str, str]] = {
     # Session - Network | format: "/session/$sessionId{CMD}"
     Command.SET_NETWORK_CONDITIONS: ("POST", "/chromium/network_conditions"),
     Command.GET_NETWORK_CONDITIONS: ("GET", "/chromium/network_conditions"),
-    # . / Not Implemented / Use SET_NETWORK_CONDITIONS to default instead.
-    Command.DELETE_NETWORK_CONDITIONS: ("DELETE", "/chromium/network_conditions"),
     # Session - Permission | format: "/session/$sessionId{CMD}"
     Command.SET_PERMISSION: ("POST", "/permissions"),
     # Session - Action | format: "/session/$sessionId{CMD}"
@@ -208,7 +195,6 @@ COMMANDS: dict[str, tuple[str, str]] = {
     # Session - Script | format: "/session/$sessionId{CMD}"
     Command.W3C_EXECUTE_SCRIPT: ("POST", "/execute/sync"),
     Command.W3C_EXECUTE_SCRIPT_ASYNC: ("POST", "/execute/async"),
-    Command.EXECUTE_ASYNC_SCRIPT: ("POST", "/execute_async"),
     # Session - Alert | format: "/session/$sessionId{CMD}"
     Command.W3C_DISMISS_ALERT: ("POST", "/alert/dismiss"),
     Command.W3C_ACCEPT_ALERT: ("POST", "/alert/accept"),
@@ -250,42 +236,48 @@ COMMANDS: dict[str, tuple[str, str]] = {
     Command.GET_SINKS: ("GET", "/$vendorPrefix/cast/get_sinks"),
     Command.GET_ISSUE_MESSAGE: ("GET", "/$vendorPrefix/cast/get_issue_message"),
     Command.SET_SINK_TO_USE: ("POST", "/$vendorPrefix/cast/set_sink_to_use"),
-    Command.START_DESKTOP_MIRRORING: ("POST", "/$vendorPrefix/cast/start_desktop_mirroring"),
+    Command.START_DESKTOP_MIRRORING: (
+        "POST",
+        "/$vendorPrefix/cast/start_desktop_mirroring",
+    ),
     Command.START_TAB_MIRRORING: ("POST", "/$vendorPrefix/cast/start_tab_mirroring"),
     Command.STOP_CASTING: ("POST", "/$vendorPrefix/cast/stop_casting"),
     # Chromium - DevTools Protocol | format: "/session/$sessionId{CMD}"
     Command.EXECUTE_CDP_COMMAND: ("POST", "/$vendorPrefix/cdp/execute"),
     ################# Not Implemented ##################
-    # Session - Mobile | format: "/session/$sessionId{CMD}"
-    Command.GET_SCREEN_ORIENTATION: ("GET", "/orientation"),
-    Command.SET_SCREEN_ORIENTATION: ("POST", "/orientation"),
-    Command.GET_NETWORK_CONNECTION: ("GET", "/network_connection"),
-    Command.SET_NETWORK_CONNECTION: ("POST", "/network_connection"),
-    Command.CURRENT_CONTEXT_HANDLE: ("GET", "/context"),
-    Command.CONTEXT_HANDLES: ("GET", "/contexts"),
-    Command.SWITCH_TO_CONTEXT: ("POST", "/context"),
     # Element - Upload | format: "/session/$sessionId/{CMD}"
     Command.UPLOAD_FILE: ("POST", "/se/file"),
     # Authenticator - WebAuthn | format: "/session/$sessionId{CMD}"
     Command.ADD_VIRTUAL_AUTHENTICATOR: ("POST", "/webauthn/authenticator"),
-    Command.REMOVE_VIRTUAL_AUTHENTICATOR: ("DELETE", "/webauthn/authenticator/$authenticatorId"),
-    Command.ADD_CREDENTIAL: ("POST", "/webauthn/authenticator/$authenticatorId/credential"),
-    Command.GET_CREDENTIALS: ("GET", "/webauthn/authenticator/$authenticatorId/credentials"),
-    Command.REMOVE_CREDENTIAL: ("DELETE", "/webauthn/authenticator/$authenticatorId/credentials/$credentialId"),
-    Command.REMOVE_ALL_CREDENTIALS: ("DELETE", "/webauthn/authenticator/$authenticatorId/credentials"),
+    Command.REMOVE_VIRTUAL_AUTHENTICATOR: (
+        "DELETE",
+        "/webauthn/authenticator/$authenticatorId",
+    ),
+    Command.ADD_CREDENTIAL: (
+        "POST",
+        "/webauthn/authenticator/$authenticatorId/credential",
+    ),
+    Command.GET_CREDENTIALS: (
+        "GET",
+        "/webauthn/authenticator/$authenticatorId/credentials",
+    ),
+    Command.REMOVE_CREDENTIAL: (
+        "DELETE",
+        "/webauthn/authenticator/$authenticatorId/credentials/$credentialId",
+    ),
+    Command.REMOVE_ALL_CREDENTIALS: (
+        "DELETE",
+        "/webauthn/authenticator/$authenticatorId/credentials",
+    ),
     Command.SET_USER_VERIFIED: ("POST", "/webauthn/authenticator/$authenticatorId/uv"),
-    # Chromium - Application | format: "/session/$sessionId{CMD}"
-    Command.LAUNCH_APP: ("POST", "/chromium/launch_app"),
     # fmt : on
-
     ### Firefox Specific ###
     # Session | format: "/session/$sessionId{CMD}"
     Command.FIREFOX_GET_CONTEXT: ("GET", "/moz/context"),
     Command.FIREFOX_SET_CONTEXT: ("POST", "/moz/context"),
-    Command.FIREFOX_INSTALL_ADDON:  ("POST", "/moz/addon/install"),
+    Command.FIREFOX_INSTALL_ADDON: ("POST", "/moz/addon/install"),
     Command.FIREFOX_UNINSTALL_ADDON: ("POST", "/moz/addon/uninstall"),
-    Command.FIREFOX_FULL_PAGE_SCREENSHOT:  ("GET", "/moz/screenshot/full"),
-    
+    Command.FIREFOX_FULL_PAGE_SCREENSHOT: ("GET", "/moz/screenshot/full"),
     ### Safari Specific ###
     # Session | format: "/session/$sessionId{CMD}"
     Command.SAFARI_GET_PERMISSIONS: ("GET", "/apple/permissions"),

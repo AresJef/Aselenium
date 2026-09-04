@@ -1,0 +1,1910 @@
+{
+  "recorded_at_utc": "2026-09-04 17:06:29 UTC",
+  "report_date_local": "2026-09-05",
+  "scope": "Driver-management-first expansion of conductible release acceptance, using installed Firefox and automation-enabled Safari, plus regression fixes discovered by real browser checks.",
+  "status": "local_acceptance_passed_with_explicit_native_scope_exclusions",
+  "previous_validation": "docs/baselines/known-issue-fixes-validation.json",
+  "release": {
+    "version": "1.0.5",
+    "published": false,
+    "commit_or_push_performed": false
+  },
+  "test_runs": {
+    "python_313": {
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "dependencies": {
+        "aiohttp": "3.14.3",
+        "psutil": "7.2.2",
+        "orjson": "3.12.0"
+      },
+      "tests": 2652,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 25.818,
+      "tests_per_module": {
+        "tests.manager.test_archive_safety": 86,
+        "tests.manager.test_cache_v2": 13,
+        "tests.manager.test_compatibility": 2,
+        "tests.manager.test_discovery": 9,
+        "tests.manager.test_discovery_paths": 120,
+        "tests.manager.test_files": 21,
+        "tests.manager.test_filesystem_safety": 69,
+        "tests.manager.test_http_integration": 27,
+        "tests.manager.test_installation": 17,
+        "tests.manager.test_installation_results": 6,
+        "tests.manager.test_probe_safety": 27,
+        "tests.manager.test_public_api": 21,
+        "tests.manager.test_requests": 37,
+        "tests.manager.test_resolution_policies": 70,
+        "tests.manager.test_resources": 23,
+        "tests.manager.test_safari_discovery": 51,
+        "tests.manager.test_versions": 22,
+        "tests.test_acceptance_gates": 21,
+        "tests.test_api_quality": 319,
+        "tests.test_browser_features": 175,
+        "tests.test_current_only": 76,
+        "tests.test_demo_google": 53,
+        "tests.test_demo_local": 77,
+        "tests.test_distribution": 11,
+        "tests.test_docstring_runtime": 39,
+        "tests.test_dom_features": 303,
+        "tests.test_examples": 80,
+        "tests.test_feature_inventory": 3,
+        "tests.test_generated_inputs": 3,
+        "tests.test_input_features": 38,
+        "tests.test_lifecycle_features": 34,
+        "tests.test_output_path_contracts": 66,
+        "tests.test_owned_subprocess": 35,
+        "tests.test_production_readiness": 43,
+        "tests.test_proxy_harness": 62,
+        "tests.test_recovery_harness": 26,
+        "tests.test_release_configuration": 13,
+        "tests.test_reliability_runner": 124,
+        "tests.test_runtime": 58,
+        "tests.test_second_pass": 34,
+        "tests.test_service_crash_ownership": 18,
+        "tests.test_session_features": 238,
+        "tests.test_soak_harness": 25,
+        "tests.test_transport_loopback": 30,
+        "tests.test_value_features": 27
+      },
+      "asyncio_debug": true,
+      "loopback_included": true,
+      "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/py313.xml",
+      "sha256": "443cd467862f7a74f2c9089cd2d470db1704b0d605d4d33308c103f1891b9d23"
+    },
+    "python_311": {
+      "python": "3.11.15",
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "dependencies": {
+        "aiohttp": "3.14.3",
+        "psutil": "7.2.2",
+        "orjson": "3.12.0"
+      },
+      "tests": 2652,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 21.164,
+      "tests_per_module": {
+        "tests.manager.test_archive_safety": 86,
+        "tests.manager.test_cache_v2": 13,
+        "tests.manager.test_compatibility": 2,
+        "tests.manager.test_discovery": 9,
+        "tests.manager.test_discovery_paths": 120,
+        "tests.manager.test_files": 21,
+        "tests.manager.test_filesystem_safety": 69,
+        "tests.manager.test_http_integration": 27,
+        "tests.manager.test_installation": 17,
+        "tests.manager.test_installation_results": 6,
+        "tests.manager.test_probe_safety": 27,
+        "tests.manager.test_public_api": 21,
+        "tests.manager.test_requests": 37,
+        "tests.manager.test_resolution_policies": 70,
+        "tests.manager.test_resources": 23,
+        "tests.manager.test_safari_discovery": 51,
+        "tests.manager.test_versions": 22,
+        "tests.test_acceptance_gates": 21,
+        "tests.test_api_quality": 319,
+        "tests.test_browser_features": 175,
+        "tests.test_current_only": 76,
+        "tests.test_demo_google": 53,
+        "tests.test_demo_local": 77,
+        "tests.test_distribution": 11,
+        "tests.test_docstring_runtime": 39,
+        "tests.test_dom_features": 303,
+        "tests.test_examples": 80,
+        "tests.test_feature_inventory": 3,
+        "tests.test_generated_inputs": 3,
+        "tests.test_input_features": 38,
+        "tests.test_lifecycle_features": 34,
+        "tests.test_output_path_contracts": 66,
+        "tests.test_owned_subprocess": 35,
+        "tests.test_production_readiness": 43,
+        "tests.test_proxy_harness": 62,
+        "tests.test_recovery_harness": 26,
+        "tests.test_release_configuration": 13,
+        "tests.test_reliability_runner": 124,
+        "tests.test_runtime": 58,
+        "tests.test_second_pass": 34,
+        "tests.test_service_crash_ownership": 18,
+        "tests.test_session_features": 238,
+        "tests.test_soak_harness": 25,
+        "tests.test_transport_loopback": 30,
+        "tests.test_value_features": 27
+      },
+      "asyncio_debug": true,
+      "loopback_included": true,
+      "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/py311.xml",
+      "sha256": "bbc0e0f83dc10ac2c45dd2c807bca6d0f296332916a03f05122a5e180e6a1df0"
+    },
+    "minimums_python_311": {
+      "python": "3.11.15",
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "dependencies": {
+        "aiohttp": "3.14.3",
+        "psutil": "5.8.0",
+        "orjson": "3.11.6"
+      },
+      "tests": 2652,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "seconds": 19.673,
+      "tests_per_module": {
+        "tests.manager.test_archive_safety": 86,
+        "tests.manager.test_cache_v2": 13,
+        "tests.manager.test_compatibility": 2,
+        "tests.manager.test_discovery": 9,
+        "tests.manager.test_discovery_paths": 120,
+        "tests.manager.test_files": 21,
+        "tests.manager.test_filesystem_safety": 69,
+        "tests.manager.test_http_integration": 27,
+        "tests.manager.test_installation": 17,
+        "tests.manager.test_installation_results": 6,
+        "tests.manager.test_probe_safety": 27,
+        "tests.manager.test_public_api": 21,
+        "tests.manager.test_requests": 37,
+        "tests.manager.test_resolution_policies": 70,
+        "tests.manager.test_resources": 23,
+        "tests.manager.test_safari_discovery": 51,
+        "tests.manager.test_versions": 22,
+        "tests.test_acceptance_gates": 21,
+        "tests.test_api_quality": 319,
+        "tests.test_browser_features": 175,
+        "tests.test_current_only": 76,
+        "tests.test_demo_google": 53,
+        "tests.test_demo_local": 77,
+        "tests.test_distribution": 11,
+        "tests.test_docstring_runtime": 39,
+        "tests.test_dom_features": 303,
+        "tests.test_examples": 80,
+        "tests.test_feature_inventory": 3,
+        "tests.test_generated_inputs": 3,
+        "tests.test_input_features": 38,
+        "tests.test_lifecycle_features": 34,
+        "tests.test_output_path_contracts": 66,
+        "tests.test_owned_subprocess": 35,
+        "tests.test_production_readiness": 43,
+        "tests.test_proxy_harness": 62,
+        "tests.test_recovery_harness": 26,
+        "tests.test_release_configuration": 13,
+        "tests.test_reliability_runner": 124,
+        "tests.test_runtime": 58,
+        "tests.test_second_pass": 34,
+        "tests.test_service_crash_ownership": 18,
+        "tests.test_session_features": 238,
+        "tests.test_soak_harness": 25,
+        "tests.test_transport_loopback": 30,
+        "tests.test_value_features": 27
+      },
+      "asyncio_debug": true,
+      "loopback_included": true,
+      "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/minimums-py311.xml",
+      "sha256": "94fe4796fadd8656b527580ed9311c3fbedfbea4e3d254bb2a186c27cfd0d681"
+    }
+  },
+  "coverage": {
+    "totals": {
+      "covered_lines": 6643,
+      "num_statements": 7218,
+      "percent_covered": 89.94720633523977,
+      "percent_covered_display": "90",
+      "missing_lines": 575,
+      "excluded_lines": 72,
+      "percent_statements_covered": 92.03380437794402,
+      "percent_statements_covered_display": "92",
+      "num_branches": 1874,
+      "num_partial_branches": 213,
+      "covered_branches": 1535,
+      "missing_branches": 339,
+      "percent_branches_covered": 81.91035218783351,
+      "percent_branches_covered_display": "82"
+    },
+    "critical_components": {
+      "src/aselenium/connection.py": {
+        "covered_lines": 117,
+        "num_statements": 126,
+        "percent_covered": 91.66666666666667,
+        "percent_covered_display": "92",
+        "missing_lines": 9,
+        "excluded_lines": 0,
+        "percent_statements_covered": 92.85714285714286,
+        "percent_statements_covered_display": "93",
+        "num_branches": 30,
+        "num_partial_branches": 4,
+        "covered_branches": 26,
+        "missing_branches": 4,
+        "percent_branches_covered": 86.66666666666667,
+        "percent_branches_covered_display": "87"
+      },
+      "src/aselenium/manager/_cache.py": {
+        "covered_lines": 285,
+        "num_statements": 324,
+        "percent_covered": 85.14851485148515,
+        "percent_covered_display": "85",
+        "missing_lines": 39,
+        "excluded_lines": 2,
+        "percent_statements_covered": 87.96296296296296,
+        "percent_statements_covered_display": "88",
+        "num_branches": 80,
+        "num_partial_branches": 13,
+        "covered_branches": 59,
+        "missing_branches": 21,
+        "percent_branches_covered": 73.75,
+        "percent_branches_covered_display": "74"
+      },
+      "src/aselenium/manager/_http.py": {
+        "covered_lines": 147,
+        "num_statements": 158,
+        "percent_covered": 91.82692307692308,
+        "percent_covered_display": "92",
+        "missing_lines": 11,
+        "excluded_lines": 2,
+        "percent_statements_covered": 93.0379746835443,
+        "percent_statements_covered_display": "93",
+        "num_branches": 50,
+        "num_partial_branches": 6,
+        "covered_branches": 44,
+        "missing_branches": 6,
+        "percent_branches_covered": 88,
+        "percent_branches_covered_display": "88"
+      },
+      "src/aselenium/manager/_installation.py": {
+        "covered_lines": 154,
+        "num_statements": 159,
+        "percent_covered": 95.38461538461539,
+        "percent_covered_display": "95",
+        "missing_lines": 5,
+        "excluded_lines": 4,
+        "percent_statements_covered": 96.85534591194968,
+        "percent_statements_covered_display": "97",
+        "num_branches": 36,
+        "num_partial_branches": 4,
+        "covered_branches": 32,
+        "missing_branches": 4,
+        "percent_branches_covered": 88.88888888888889,
+        "percent_branches_covered_display": "89"
+      },
+      "src/aselenium/service.py": {
+        "covered_lines": 229,
+        "num_statements": 292,
+        "percent_covered": 77.5,
+        "percent_covered_display": "78",
+        "missing_lines": 63,
+        "excluded_lines": 2,
+        "percent_statements_covered": 78.42465753424658,
+        "percent_statements_covered_display": "78",
+        "num_branches": 68,
+        "num_partial_branches": 6,
+        "covered_branches": 50,
+        "missing_branches": 18,
+        "percent_branches_covered": 73.52941176470588,
+        "percent_branches_covered_display": "74"
+      },
+      "src/aselenium/webdriver.py": {
+        "covered_lines": 107,
+        "num_statements": 125,
+        "percent_covered": 81.69934640522875,
+        "percent_covered_display": "82",
+        "missing_lines": 18,
+        "excluded_lines": 7,
+        "percent_statements_covered": 85.6,
+        "percent_statements_covered_display": "86",
+        "num_branches": 28,
+        "num_partial_branches": 8,
+        "covered_branches": 18,
+        "missing_branches": 10,
+        "percent_branches_covered": 64.28571428571429,
+        "percent_branches_covered_display": "64"
+      }
+    },
+    "floors_passed": true,
+    "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/coverage.json",
+    "sha256": "b1a474bd3002b7563ed287483b57d1c40e2a6ab43f01d16e773461b5c17ecb5f"
+  },
+  "installed_wheel": {
+    "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/timeout-fixed-dist/aselenium-1.0.5-py3-none-any.whl",
+    "sha256": "bfe0ceef9d4dbf8a28e351da023b8a0a8e53431a1eaec2d5facf00a8eef19da0",
+    "source_files_compared": 56,
+    "installed_source_mismatches": [],
+    "python": "3.13.12",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "dependencies": {
+      "aiohttp": "3.14.3",
+      "psutil": "7.2.2",
+      "orjson": "3.12.0"
+    },
+    "installation": "Clean non-editable environment outside checkout; only this disposable environment was reinstalled after fixes; user .venv unchanged."
+  },
+  "native_tours": {
+    "chrome": {
+      "installed": {
+        "package": "/private/tmp/aselenium-release-acceptance.YzHcNV/installed/lib/python3.13/site-packages/aselenium/__init__.py",
+        "prefix": "/private/tmp/aselenium-release-acceptance.YzHcNV/installed",
+        "version": "1.0.5",
+        "python": "3.13.12 (main, Mar 28 2026, 18:23:07) [Clang 21.0.0 (clang-2100.0.123.102)]"
+      },
+      "status": "passed",
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      },
+      "versions": {
+        "browser_version": "152.0.7977.76",
+        "driver_version": "152.0.7977.82",
+        "acquisition": "offline"
+      },
+      "sections": [
+        {
+          "section": "driver-management",
+          "status": "passed",
+          "seconds": 0.033
+        },
+        {
+          "section": "options",
+          "status": "passed",
+          "seconds": 0.001
+        },
+        {
+          "section": "navigation",
+          "status": "passed",
+          "seconds": 0.731
+        },
+        {
+          "section": "elements",
+          "status": "passed",
+          "seconds": 0.155
+        },
+        {
+          "section": "waits",
+          "status": "passed",
+          "seconds": 0.235
+        },
+        {
+          "section": "cookies",
+          "status": "passed",
+          "seconds": 0.016
+        },
+        {
+          "section": "windows",
+          "status": "passed",
+          "seconds": 0.049
+        },
+        {
+          "section": "frames",
+          "status": "passed",
+          "seconds": 0.022
+        },
+        {
+          "section": "alerts",
+          "status": "passed",
+          "seconds": 0.219
+        },
+        {
+          "section": "scripts",
+          "status": "passed",
+          "seconds": 0.046
+        },
+        {
+          "section": "actions",
+          "status": "passed",
+          "seconds": 0.285
+        },
+        {
+          "section": "artifacts",
+          "status": "passed",
+          "seconds": 0.26
+        },
+        {
+          "section": "vendor",
+          "status": "passed",
+          "seconds": 0.019
+        },
+        {
+          "section": "concurrency",
+          "status": "passed",
+          "seconds": 1.699
+        },
+        {
+          "section": "cancellation",
+          "status": "passed",
+          "seconds": 2.308
+        }
+      ],
+      "scope": "loopback pages; fresh or empty-template profiles; no casting",
+      "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-tours/installed-chrome-p48j0f3v/local-chrome-_r24_wsn/installed-acceptance.json",
+      "sha256": "13c5d75f3433935e59cab40fe4e7e78efce4412fe8bea17c8af07a9e252ec014"
+    },
+    "edge": {
+      "installed": {
+        "package": "/private/tmp/aselenium-release-acceptance.YzHcNV/installed/lib/python3.13/site-packages/aselenium/__init__.py",
+        "prefix": "/private/tmp/aselenium-release-acceptance.YzHcNV/installed",
+        "version": "1.0.5",
+        "python": "3.13.12 (main, Mar 28 2026, 18:23:07) [Clang 21.0.0 (clang-2100.0.123.102)]"
+      },
+      "status": "passed",
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      },
+      "versions": {
+        "browser_version": "152.0.4191.62",
+        "driver_version": "152.0.4191.62",
+        "acquisition": "offline"
+      },
+      "sections": [
+        {
+          "section": "driver-management",
+          "status": "passed",
+          "seconds": 0.067
+        },
+        {
+          "section": "options",
+          "status": "passed",
+          "seconds": 0.001
+        },
+        {
+          "section": "navigation",
+          "status": "passed",
+          "seconds": 0.473
+        },
+        {
+          "section": "elements",
+          "status": "passed",
+          "seconds": 0.223
+        },
+        {
+          "section": "waits",
+          "status": "passed",
+          "seconds": 0.245
+        },
+        {
+          "section": "cookies",
+          "status": "passed",
+          "seconds": 0.04
+        },
+        {
+          "section": "windows",
+          "status": "passed",
+          "seconds": 0.077
+        },
+        {
+          "section": "frames",
+          "status": "passed",
+          "seconds": 0.082
+        },
+        {
+          "section": "alerts",
+          "status": "passed",
+          "seconds": 0.28
+        },
+        {
+          "section": "scripts",
+          "status": "passed",
+          "seconds": 0.051
+        },
+        {
+          "section": "actions",
+          "status": "passed",
+          "seconds": 0.298
+        },
+        {
+          "section": "artifacts",
+          "status": "passed",
+          "seconds": 0.122
+        },
+        {
+          "section": "vendor",
+          "status": "passed",
+          "seconds": 0.027
+        },
+        {
+          "section": "concurrency",
+          "status": "passed",
+          "seconds": 1.902
+        },
+        {
+          "section": "cancellation",
+          "status": "passed",
+          "seconds": 2.566
+        }
+      ],
+      "scope": "loopback pages; fresh or empty-template profiles; no casting",
+      "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-tours/installed-edge-i0notgk2/local-edge-altc1w7k/installed-acceptance.json",
+      "sha256": "e296fa6e53687d2ec17e33efdb3d01fa6373edbfa48a056445b9758c729bc37f"
+    },
+    "firefox": {
+      "installed": {
+        "package": "/private/tmp/aselenium-release-acceptance.YzHcNV/installed/lib/python3.13/site-packages/aselenium/__init__.py",
+        "prefix": "/private/tmp/aselenium-release-acceptance.YzHcNV/installed",
+        "version": "1.0.5",
+        "python": "3.13.12 (main, Mar 28 2026, 18:23:07) [Clang 21.0.0 (clang-2100.0.123.102)]"
+      },
+      "status": "passed",
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      },
+      "versions": {
+        "browser_version": "155.0.1",
+        "driver_version": "0.37.1",
+        "acquisition": "offline"
+      },
+      "sections": [
+        {
+          "section": "driver-management",
+          "status": "passed",
+          "seconds": 0.219
+        },
+        {
+          "section": "options",
+          "status": "passed",
+          "seconds": 0.001
+        },
+        {
+          "section": "navigation",
+          "status": "passed",
+          "seconds": 0.187
+        },
+        {
+          "section": "elements",
+          "status": "passed",
+          "seconds": 0.112
+        },
+        {
+          "section": "waits",
+          "status": "passed",
+          "seconds": 0.221
+        },
+        {
+          "section": "cookies",
+          "status": "passed",
+          "seconds": 0.015
+        },
+        {
+          "section": "windows",
+          "status": "passed",
+          "seconds": 0.058
+        },
+        {
+          "section": "frames",
+          "status": "passed",
+          "seconds": 0.016
+        },
+        {
+          "section": "alerts",
+          "status": "passed",
+          "seconds": 0.236
+        },
+        {
+          "section": "scripts",
+          "status": "passed",
+          "seconds": 0.041
+        },
+        {
+          "section": "actions",
+          "status": "passed",
+          "seconds": 0.285
+        },
+        {
+          "section": "artifacts",
+          "status": "passed",
+          "seconds": 1.076
+        },
+        {
+          "section": "vendor",
+          "status": "passed",
+          "seconds": 0.053
+        },
+        {
+          "section": "concurrency",
+          "status": "passed",
+          "seconds": 4.716
+        },
+        {
+          "section": "cancellation",
+          "status": "passed",
+          "seconds": 4.442
+        }
+      ],
+      "scope": "loopback pages; fresh or empty-template profiles; no casting",
+      "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-tours/installed-firefox-gbfmjk7p/local-firefox-1tx66sqh/installed-acceptance.json",
+      "sha256": "86fa97a8ed8f5bf3964c4b53f80557ced078a80ee152836788d026f0e990b139"
+    },
+    "safari": {
+      "installed": {
+        "package": "/private/tmp/aselenium-release-acceptance.YzHcNV/installed/lib/python3.13/site-packages/aselenium/__init__.py",
+        "prefix": "/private/tmp/aselenium-release-acceptance.YzHcNV/installed",
+        "version": "1.0.5",
+        "python": "3.13.12 (main, Mar 28 2026, 18:23:07) [Clang 21.0.0 (clang-2100.0.123.102)]"
+      },
+      "status": "passed",
+      "counts": {
+        "passed": 12,
+        "skipped": 3,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      },
+      "versions": {
+        "browser_version": "26.6.2",
+        "driver_version": "26.6.2",
+        "acquisition": "offline"
+      },
+      "sections": [
+        {
+          "section": "driver-management",
+          "status": "passed",
+          "seconds": 0.021
+        },
+        {
+          "section": "options",
+          "status": "passed",
+          "seconds": 0
+        },
+        {
+          "section": "navigation",
+          "status": "passed",
+          "seconds": 0.188
+        },
+        {
+          "section": "elements",
+          "status": "passed",
+          "seconds": 0.245
+        },
+        {
+          "section": "waits",
+          "status": "passed",
+          "seconds": 0.287
+        },
+        {
+          "section": "cookies",
+          "status": "passed",
+          "seconds": 0.103
+        },
+        {
+          "section": "windows",
+          "status": "passed",
+          "seconds": 0.247
+        },
+        {
+          "section": "frames",
+          "status": "skipped",
+          "reason": "The current Safari facade disables frame switching",
+          "seconds": 0.054
+        },
+        {
+          "section": "alerts",
+          "status": "passed",
+          "seconds": 0.276
+        },
+        {
+          "section": "scripts",
+          "status": "passed",
+          "seconds": 0.081
+        },
+        {
+          "section": "actions",
+          "status": "skipped",
+          "reason": "The current Safari facade disables W3C action chains",
+          "seconds": 0.033
+        },
+        {
+          "section": "artifacts",
+          "status": "passed",
+          "seconds": 0.074
+        },
+        {
+          "section": "vendor",
+          "status": "passed",
+          "seconds": 0.043
+        },
+        {
+          "section": "concurrency",
+          "status": "skipped",
+          "reason": "Safari's automation service is single-session; no concurrent tour",
+          "seconds": 0
+        },
+        {
+          "section": "cancellation",
+          "status": "passed",
+          "seconds": 2.017
+        }
+      ],
+      "scope": "loopback pages; fresh or empty-template profiles; no casting",
+      "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-tours/installed-safari-towr72bg/local-safari-2_1cy8pv/installed-acceptance.json",
+      "sha256": "ab67951b3660c30b86fa2c5dc8fbfd47e89920d3da3d2e1d997375be43829568"
+    }
+  },
+  "native_reliability": {
+    "chrome": {
+      "reliability": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/chrome-px137j04/chrome-reliability.json",
+          "sha256": "46334a90d46651d14a40ee44f46f413eb33091dbb8a856e870992784933f40ac"
+        },
+        "result": {
+          "status": "passed",
+          "browser": "chrome",
+          "duration_seconds": 120,
+          "checks": {
+            "recovery": {
+              "status": "passed",
+              "exit_code": 0,
+              "report": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/chrome-px137j04/chrome-recovery.json"
+            },
+            "browser-proxy": {
+              "status": "passed",
+              "exit_code": 0,
+              "report": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/chrome-px137j04/chrome-browser-proxy.json"
+            },
+            "manager-proxy-auth": {
+              "status": "passed",
+              "exit_code": 0,
+              "report": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/chrome-px137j04/chrome-manager-proxy-auth.json"
+            },
+            "long-lived": {
+              "status": "passed",
+              "exit_code": 0,
+              "report": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/chrome-px137j04/chrome-long-lived.json"
+            }
+          }
+        }
+      },
+      "recovery": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/chrome-px137j04/chrome-recovery.json",
+          "sha256": "84d0672a023cb54031ee272e1473a1285ea73130e14cd6db6d0fc1f58ddcd5b3"
+        },
+        "result": {
+          "status": "passed",
+          "browser": "chrome",
+          "python": "3.13.12",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "scenarios": [
+            {
+              "scenario": "browser-crash",
+              "status": "passed",
+              "fault_session_id": "b32aae0686c1892689ec6f2834e9842b",
+              "target": {
+                "pid": 36153,
+                "created": 1788541337.720387,
+                "owner_pid": 36149,
+                "service_pid": 36152
+              },
+              "target_executable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "selected_launcher": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "command_acknowledged_before_fault": true,
+              "command_failure_type": "InvalidSessionError",
+              "failure_after_injection_seconds": 0.008481791999656707,
+              "library_cleanup_survivors": [],
+              "library_profile_removed": true,
+              "harness_emergency_cleanup": [],
+              "reacquisition": {
+                "session_id": "4aec1316bc677c8502f48b103567cf8c",
+                "profile_removed": true
+              },
+              "browser_version": "152.0.7977.76",
+              "driver_version": "152.0.7977.82",
+              "template_profile_removed": true,
+              "remaining_owned_tasks": 0,
+              "remaining_observed_processes": []
+            },
+            {
+              "scenario": "driver-crash",
+              "status": "passed",
+              "fault_session_id": "1502cf4213e7a5b548928fbc3a627b21",
+              "target": {
+                "pid": 36197,
+                "created": 1788541339.599771,
+                "owner_pid": 36149,
+                "service_pid": 36197
+              },
+              "target_executable": "/private/tmp/aselenium-demo-validation.YyYti3/cache/.aselenium/v2/3a9ffa8791062c23a77304d089e2361d58ac76043a3d1a7b7405c76b7cce2805/extracted/chromedriver-mac-arm64/chromedriver",
+              "selected_launcher": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "command_acknowledged_before_fault": true,
+              "command_failure_type": "SessionClientError",
+              "failure_after_injection_seconds": 0.0012904590112157166,
+              "library_cleanup_survivors": [],
+              "library_profile_removed": true,
+              "harness_emergency_cleanup": [],
+              "reacquisition": {
+                "session_id": "bb55c647fd26e5916ca22a2e52499087",
+                "profile_removed": true
+              },
+              "browser_version": "152.0.7977.76",
+              "driver_version": "152.0.7977.82",
+              "template_profile_removed": true,
+              "remaining_owned_tasks": 0,
+              "remaining_observed_processes": []
+            },
+            {
+              "scenario": "browser-hang",
+              "status": "passed",
+              "fault_session_id": "2d35a38e7604454e61cb33b4f27c2417",
+              "target": {
+                "pid": 36246,
+                "created": 1788541341.669089,
+                "owner_pid": 36149,
+                "service_pid": 36245
+              },
+              "target_executable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "selected_launcher": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "command_acknowledged_before_fault": true,
+              "command_failure_type": "SessionTimeoutError",
+              "failure_after_injection_seconds": 4.970693000010215,
+              "library_cleanup_survivors": [],
+              "library_profile_removed": true,
+              "harness_emergency_cleanup": [],
+              "reacquisition": {
+                "session_id": "a1466a16795ba03c9e801437c31eac22",
+                "profile_removed": true
+              },
+              "browser_version": "152.0.7977.76",
+              "driver_version": "152.0.7977.82",
+              "template_profile_removed": true,
+              "remaining_owned_tasks": 0,
+              "remaining_observed_processes": []
+            },
+            {
+              "scenario": "driver-hang",
+              "status": "passed",
+              "fault_session_id": "d7929ed29688e68a688625a39c0b26ab",
+              "target": {
+                "pid": 36376,
+                "created": 1788541349.579841,
+                "owner_pid": 36149,
+                "service_pid": 36376
+              },
+              "target_executable": "/private/tmp/aselenium-demo-validation.YyYti3/cache/.aselenium/v2/3a9ffa8791062c23a77304d089e2361d58ac76043a3d1a7b7405c76b7cce2805/extracted/chromedriver-mac-arm64/chromedriver",
+              "selected_launcher": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "command_acknowledged_before_fault": true,
+              "command_failure_type": "SessionTimeoutError",
+              "failure_after_injection_seconds": 4.942388084018603,
+              "library_cleanup_survivors": [],
+              "library_profile_removed": true,
+              "harness_emergency_cleanup": [],
+              "reacquisition": {
+                "session_id": "d869403ed4f722efffb80c0d01b9dfbc",
+                "profile_removed": true
+              },
+              "browser_version": "152.0.7977.76",
+              "driver_version": "152.0.7977.82",
+              "template_profile_removed": true,
+              "remaining_owned_tasks": 0,
+              "remaining_observed_processes": []
+            }
+          ],
+          "scope": "owned process faults during acknowledged in-flight commands; local page; offline cache; fresh profiles; no personal processes",
+          "remaining_fixture_threads": []
+        }
+      },
+      "browser-proxy": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/chrome-px137j04/chrome-browser-proxy.json",
+          "sha256": "11bc6d0d1980f0306a8301dbcb746e7e42d68c69f548200dcb963b0a43a282d7"
+        },
+        "result": {
+          "status": "passed",
+          "browser": "chrome",
+          "scheme": "both",
+          "browser_version": "152.0.7977.76",
+          "driver_version": "152.0.7977.82",
+          "python": "3.13.12",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "elapsed_seconds": 0.7588237090385519,
+          "routing": {
+            "forwarded": 1,
+            "origin_hits": 2,
+            "rejected": 3,
+            "direct_rejected": 0,
+            "connects": 2,
+            "tls_origin_hits": 1,
+            "auth_rejected": 0,
+            "credential_leaks": 0,
+            "active_tunnels": 0,
+            "tunnel_bytes": 9577
+          },
+          "remaining_observed_processes": [],
+          "remaining_owned_tasks": 0,
+          "scope": "Browser package Proxy BOTH routing to exact loopback origins; browser proxy authentication is not claimed",
+          "browser_tls_trust": "Explicit test-only accept_insecure_certs capability; no system trust changes",
+          "remaining_fixture_threads": []
+        }
+      },
+      "manager-proxy-auth": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/chrome-px137j04/chrome-manager-proxy-auth.json",
+          "sha256": "1a74f1848cc52e0863d10014344d703c4be2634ae8feb803a6ac4e94c778963f"
+        },
+        "result": {
+          "status": "passed",
+          "client": "manager HTTPS transport",
+          "authentication_required": true,
+          "python": "3.13.12",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "elapsed_seconds": 0.02068758400855586,
+          "cases": {
+            "verified_tls_through_connect": "passed",
+            "direct_bypass_rejected": "passed",
+            "unallowlisted_connect_rejected": "passed",
+            "authenticated_connect": "passed",
+            "missing_credentials_rejected": "passed",
+            "wrong_credentials_rejected": "passed"
+          },
+          "proxy_authentication": "Basic credentials in explicit manager.proxy URL",
+          "tls_verification": "Certificate and IP hostname verified using test-only client-factory trust; system trust unchanged",
+          "routing": {
+            "forwarded": 0,
+            "origin_hits": 1,
+            "rejected": 1,
+            "direct_rejected": 1,
+            "connects": 1,
+            "tls_origin_hits": 1,
+            "auth_rejected": 2,
+            "credential_leaks": 0,
+            "active_tunnels": 0,
+            "tunnel_bytes": 4621
+          },
+          "closed_clients": 5,
+          "remaining_owned_tasks": 0,
+          "scope": "Actual package manager HTTPS transport and CONNECT proxy authentication; no browser proxy-authentication support is inferred",
+          "remaining_fixture_threads": []
+        }
+      },
+      "long-lived": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/chrome-px137j04/chrome-long-lived.json",
+          "sha256": "c18165e47e12333337f72590935e85fc0f9cc3b1c44db7a613703d0bffe91c62"
+        },
+        "result": {
+          "status": "passed",
+          "mode": "long-lived",
+          "browser": "chrome",
+          "session_id": "2c4f7579d78b1d8bea0a0989dd6201d8",
+          "last_sample": {
+            "iteration": 251,
+            "elapsed_seconds": 120.37842416600324,
+            "rss_bytes": 54607872,
+            "handles": 9,
+            "owned_rss_bytes": 1125613568,
+            "owned_processes": 8
+          },
+          "baseline": {
+            "rss_bytes": 54378496,
+            "handles": 9,
+            "owned_rss_bytes": 1013841920,
+            "owned_processes": 8
+          },
+          "browser_version": "152.0.7977.76",
+          "driver_version": "152.0.7977.82",
+          "python": "3.13.12",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "iterations": 251,
+          "controlled_native_script_timeouts": 26,
+          "requested_duration_seconds": 120,
+          "workload_elapsed_seconds": 120.42981395800598,
+          "resource_samples": [
+            {
+              "iteration": 1,
+              "elapsed_seconds": 0.5312361249816604,
+              "rss_bytes": 54378496,
+              "handles": 9,
+              "owned_rss_bytes": 1013841920,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 10,
+              "elapsed_seconds": 5.203540750022512,
+              "rss_bytes": 54427648,
+              "handles": 9,
+              "owned_rss_bytes": 1040334848,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 20,
+              "elapsed_seconds": 11.445211499987636,
+              "rss_bytes": 54394880,
+              "handles": 9,
+              "owned_rss_bytes": 1048870912,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 30,
+              "elapsed_seconds": 16.296431541035417,
+              "rss_bytes": 54411264,
+              "handles": 9,
+              "owned_rss_bytes": 1078001664,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 40,
+              "elapsed_seconds": 20.646418375021312,
+              "rss_bytes": 54427648,
+              "handles": 9,
+              "owned_rss_bytes": 1087029248,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 50,
+              "elapsed_seconds": 25.095459958014544,
+              "rss_bytes": 54460416,
+              "handles": 9,
+              "owned_rss_bytes": 1098137600,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 60,
+              "elapsed_seconds": 29.582957957987674,
+              "rss_bytes": 54460416,
+              "handles": 9,
+              "owned_rss_bytes": 1108000768,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 70,
+              "elapsed_seconds": 34.29247112502344,
+              "rss_bytes": 54476800,
+              "handles": 9,
+              "owned_rss_bytes": 1082015744,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 80,
+              "elapsed_seconds": 38.860721624980215,
+              "rss_bytes": 54542336,
+              "handles": 9,
+              "owned_rss_bytes": 1086799872,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 90,
+              "elapsed_seconds": 43.62405254098121,
+              "rss_bytes": 54558720,
+              "handles": 9,
+              "owned_rss_bytes": 1091813376,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 100,
+              "elapsed_seconds": 48.54532516602194,
+              "rss_bytes": 54558720,
+              "handles": 9,
+              "owned_rss_bytes": 1094860800,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 110,
+              "elapsed_seconds": 54.01355787500506,
+              "rss_bytes": 54575104,
+              "handles": 9,
+              "owned_rss_bytes": 1097089024,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 120,
+              "elapsed_seconds": 59.44255312503083,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 1102594048,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 130,
+              "elapsed_seconds": 64.5039683750365,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 1112276992,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 140,
+              "elapsed_seconds": 69.01490079099312,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 1113489408,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 150,
+              "elapsed_seconds": 73.39574429101776,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 1117159424,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 160,
+              "elapsed_seconds": 77.722690124996,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 1117978624,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 170,
+              "elapsed_seconds": 82.24309966602596,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 1123188736,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 180,
+              "elapsed_seconds": 87.00536329101305,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 1126367232,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 190,
+              "elapsed_seconds": 91.73362854099832,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 1130233856,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 200,
+              "elapsed_seconds": 96.46892345801461,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 1135902720,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 210,
+              "elapsed_seconds": 101.1261432080064,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 1136377856,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 220,
+              "elapsed_seconds": 105.79234375001397,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 1114619904,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 230,
+              "elapsed_seconds": 110.4926100409939,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 1117798400,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 240,
+              "elapsed_seconds": 115.16387758299243,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 1122304000,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 250,
+              "elapsed_seconds": 119.88552379101748,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 1125384192,
+              "owned_processes": 8
+            }
+          ],
+          "growth_limits": {
+            "python_rss_mib": 128,
+            "browser_tree_rss_mib": 512,
+            "handles": 32,
+            "processes": 8
+          },
+          "session_profile_removed": true,
+          "template_profile_removed": true,
+          "remaining_observed_processes": [],
+          "remaining_owned_tasks": 0,
+          "scope": "one sustained session; controlled data URLs; DOM/scripts/actions/windows/native-timeout recovery; post-warmup growth bounds; not unlimited stability certification"
+        }
+      }
+    },
+    "edge": {
+      "reliability": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/edge-ldd5cuz8/edge-reliability.json",
+          "sha256": "0a669e8d272768a26a118066ac05b65c96cc79b7fa27fda9d902faa32f61dd55"
+        },
+        "result": {
+          "status": "passed",
+          "browser": "edge",
+          "duration_seconds": 120,
+          "checks": {
+            "recovery": {
+              "status": "passed",
+              "exit_code": 0,
+              "report": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/edge-ldd5cuz8/edge-recovery.json"
+            },
+            "browser-proxy": {
+              "status": "passed",
+              "exit_code": 0,
+              "report": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/edge-ldd5cuz8/edge-browser-proxy.json"
+            },
+            "manager-proxy-auth": {
+              "status": "passed",
+              "exit_code": 0,
+              "report": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/edge-ldd5cuz8/edge-manager-proxy-auth.json"
+            },
+            "long-lived": {
+              "status": "passed",
+              "exit_code": 0,
+              "report": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/edge-ldd5cuz8/edge-long-lived.json"
+            }
+          }
+        }
+      },
+      "recovery": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/edge-ldd5cuz8/edge-recovery.json",
+          "sha256": "3e922f753489687ec78903386e74163f0c9fa52f55000c1c5a8ce023c45d94af"
+        },
+        "result": {
+          "status": "passed",
+          "browser": "edge",
+          "python": "3.13.12",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "scenarios": [
+            {
+              "scenario": "browser-crash",
+              "status": "passed",
+              "fault_session_id": "03b736e6b0bbc3d5bb5c33c574271eab",
+              "target": {
+                "pid": 36280,
+                "created": 1788541342.909864,
+                "owner_pid": 36276,
+                "service_pid": 36279
+              },
+              "target_executable": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+              "selected_launcher": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+              "command_acknowledged_before_fault": true,
+              "command_failure_type": "InvalidSessionError",
+              "failure_after_injection_seconds": 0.0080254590138793,
+              "library_cleanup_survivors": [],
+              "library_profile_removed": true,
+              "harness_emergency_cleanup": [],
+              "reacquisition": {
+                "session_id": "cbc02e3638705429fa1fb1de27ea7e1d",
+                "profile_removed": true
+              },
+              "browser_version": "152.0.4191.62",
+              "driver_version": "152.0.4191.62",
+              "template_profile_removed": true,
+              "remaining_owned_tasks": 0,
+              "remaining_observed_processes": []
+            },
+            {
+              "scenario": "driver-crash",
+              "status": "passed",
+              "fault_session_id": "391f432b736b277b76e83a95d1923b73",
+              "target": {
+                "pid": 36309,
+                "created": 1788541344.809295,
+                "owner_pid": 36276,
+                "service_pid": 36309
+              },
+              "target_executable": "/private/tmp/aselenium-release-acceptance.YzHcNV/cache/.aselenium/v2/c67dd3f68231dfb68c48848fa08e2e984f9c806b372595512be06e75b142629c/extracted/msedgedriver",
+              "selected_launcher": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+              "command_acknowledged_before_fault": true,
+              "command_failure_type": "SessionClientError",
+              "failure_after_injection_seconds": 0.001372167025692761,
+              "library_cleanup_survivors": [],
+              "library_profile_removed": true,
+              "harness_emergency_cleanup": [],
+              "reacquisition": {
+                "session_id": "2d21b9c29b5f760fdaccce1f6da1389e",
+                "profile_removed": true
+              },
+              "browser_version": "152.0.4191.62",
+              "driver_version": "152.0.4191.62",
+              "template_profile_removed": true,
+              "remaining_owned_tasks": 0,
+              "remaining_observed_processes": []
+            },
+            {
+              "scenario": "browser-hang",
+              "status": "passed",
+              "fault_session_id": "aaa633fc28035c4d069c8afaa53ec547",
+              "target": {
+                "pid": 36338,
+                "created": 1788541347.194445,
+                "owner_pid": 36276,
+                "service_pid": 36337
+              },
+              "target_executable": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+              "selected_launcher": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+              "command_acknowledged_before_fault": true,
+              "command_failure_type": "SessionTimeoutError",
+              "failure_after_injection_seconds": 4.963686666043941,
+              "library_cleanup_survivors": [],
+              "library_profile_removed": true,
+              "harness_emergency_cleanup": [],
+              "reacquisition": {
+                "session_id": "f354c855843aa41d0206dd44c2443c7a",
+                "profile_removed": true
+              },
+              "browser_version": "152.0.4191.62",
+              "driver_version": "152.0.4191.62",
+              "template_profile_removed": true,
+              "remaining_owned_tasks": 0,
+              "remaining_observed_processes": []
+            },
+            {
+              "scenario": "driver-hang",
+              "status": "passed",
+              "fault_session_id": "78a9ecfdad2f29a178b0d64cdf006b4f",
+              "target": {
+                "pid": 36519,
+                "created": 1788541355.403019,
+                "owner_pid": 36276,
+                "service_pid": 36519
+              },
+              "target_executable": "/private/tmp/aselenium-release-acceptance.YzHcNV/cache/.aselenium/v2/c67dd3f68231dfb68c48848fa08e2e984f9c806b372595512be06e75b142629c/extracted/msedgedriver",
+              "selected_launcher": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+              "command_acknowledged_before_fault": true,
+              "command_failure_type": "SessionTimeoutError",
+              "failure_after_injection_seconds": 4.891054208041169,
+              "library_cleanup_survivors": [],
+              "library_profile_removed": true,
+              "harness_emergency_cleanup": [],
+              "reacquisition": {
+                "session_id": "0386ef5cd87a6dae17c3ae6c9f3e7222",
+                "profile_removed": true
+              },
+              "browser_version": "152.0.4191.62",
+              "driver_version": "152.0.4191.62",
+              "template_profile_removed": true,
+              "remaining_owned_tasks": 0,
+              "remaining_observed_processes": []
+            }
+          ],
+          "scope": "owned process faults during acknowledged in-flight commands; local page; offline cache; fresh profiles; no personal processes",
+          "remaining_fixture_threads": []
+        }
+      },
+      "browser-proxy": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/edge-ldd5cuz8/edge-browser-proxy.json",
+          "sha256": "f827abcb6b7a65f223105889c1803e9096f28d9989f9f92f33c7cabe63e6f505"
+        },
+        "result": {
+          "status": "passed",
+          "browser": "edge",
+          "scheme": "both",
+          "browser_version": "152.0.4191.62",
+          "driver_version": "152.0.4191.62",
+          "python": "3.13.12",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "elapsed_seconds": 0.8118943750159815,
+          "routing": {
+            "forwarded": 1,
+            "origin_hits": 2,
+            "rejected": 5,
+            "direct_rejected": 0,
+            "connects": 2,
+            "tls_origin_hits": 1,
+            "auth_rejected": 0,
+            "credential_leaks": 0,
+            "active_tunnels": 0,
+            "tunnel_bytes": 9855
+          },
+          "remaining_observed_processes": [],
+          "remaining_owned_tasks": 0,
+          "scope": "Browser package Proxy BOTH routing to exact loopback origins; browser proxy authentication is not claimed",
+          "browser_tls_trust": "Explicit test-only accept_insecure_certs capability; no system trust changes",
+          "remaining_fixture_threads": []
+        }
+      },
+      "manager-proxy-auth": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/edge-ldd5cuz8/edge-manager-proxy-auth.json",
+          "sha256": "4ec94c6b70356d748d668e085b099c5fc7bf594e1c41bb71b34188af0e62a050"
+        },
+        "result": {
+          "status": "passed",
+          "client": "manager HTTPS transport",
+          "authentication_required": true,
+          "python": "3.13.12",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "elapsed_seconds": 0.019626291003078222,
+          "cases": {
+            "verified_tls_through_connect": "passed",
+            "direct_bypass_rejected": "passed",
+            "unallowlisted_connect_rejected": "passed",
+            "authenticated_connect": "passed",
+            "missing_credentials_rejected": "passed",
+            "wrong_credentials_rejected": "passed"
+          },
+          "proxy_authentication": "Basic credentials in explicit manager.proxy URL",
+          "tls_verification": "Certificate and IP hostname verified using test-only client-factory trust; system trust unchanged",
+          "routing": {
+            "forwarded": 0,
+            "origin_hits": 1,
+            "rejected": 1,
+            "direct_rejected": 1,
+            "connects": 1,
+            "tls_origin_hits": 1,
+            "auth_rejected": 2,
+            "credential_leaks": 0,
+            "active_tunnels": 0,
+            "tunnel_bytes": 4621
+          },
+          "closed_clients": 5,
+          "remaining_owned_tasks": 0,
+          "scope": "Actual package manager HTTPS transport and CONNECT proxy authentication; no browser proxy-authentication support is inferred",
+          "remaining_fixture_threads": []
+        }
+      },
+      "long-lived": {
+        "evidence": {
+          "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/verified-reliability/edge-ldd5cuz8/edge-long-lived.json",
+          "sha256": "b91208a77662b723be3f85becff8c951d837aabd2e8b75da03ea07dcfc9a5742"
+        },
+        "result": {
+          "status": "passed",
+          "mode": "long-lived",
+          "browser": "edge",
+          "session_id": "d4b0911a7907f3e90e281da2bd82e0ae",
+          "last_sample": {
+            "iteration": 250,
+            "elapsed_seconds": 120.08158212498529,
+            "rss_bytes": 54607872,
+            "handles": 9,
+            "owned_rss_bytes": 969555968,
+            "owned_processes": 7
+          },
+          "baseline": {
+            "rss_bytes": 54394880,
+            "handles": 9,
+            "owned_rss_bytes": 873562112,
+            "owned_processes": 7
+          },
+          "browser_version": "152.0.4191.62",
+          "driver_version": "152.0.4191.62",
+          "python": "3.13.12",
+          "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+          "iterations": 250,
+          "controlled_native_script_timeouts": 25,
+          "requested_duration_seconds": 120,
+          "workload_elapsed_seconds": 120.13368716603145,
+          "resource_samples": [
+            {
+              "iteration": 1,
+              "elapsed_seconds": 0.8648786660050973,
+              "rss_bytes": 54394880,
+              "handles": 9,
+              "owned_rss_bytes": 873562112,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 10,
+              "elapsed_seconds": 6.387737207987811,
+              "rss_bytes": 54427648,
+              "handles": 9,
+              "owned_rss_bytes": 971358208,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 20,
+              "elapsed_seconds": 11.168404790980276,
+              "rss_bytes": 54427648,
+              "handles": 9,
+              "owned_rss_bytes": 980746240,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 30,
+              "elapsed_seconds": 15.630785415996797,
+              "rss_bytes": 54427648,
+              "handles": 9,
+              "owned_rss_bytes": 989560832,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 40,
+              "elapsed_seconds": 20.101177665987052,
+              "rss_bytes": 54444032,
+              "handles": 9,
+              "owned_rss_bytes": 1027031040,
+              "owned_processes": 10
+            },
+            {
+              "iteration": 50,
+              "elapsed_seconds": 24.820975958020426,
+              "rss_bytes": 54476800,
+              "handles": 9,
+              "owned_rss_bytes": 1007599616,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 60,
+              "elapsed_seconds": 29.546782332996372,
+              "rss_bytes": 54476800,
+              "handles": 9,
+              "owned_rss_bytes": 1017397248,
+              "owned_processes": 8
+            },
+            {
+              "iteration": 70,
+              "elapsed_seconds": 34.226184832979925,
+              "rss_bytes": 54493184,
+              "handles": 9,
+              "owned_rss_bytes": 927940608,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 80,
+              "elapsed_seconds": 39.029977415979374,
+              "rss_bytes": 54525952,
+              "handles": 9,
+              "owned_rss_bytes": 932200448,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 90,
+              "elapsed_seconds": 44.168795333011076,
+              "rss_bytes": 54558720,
+              "handles": 9,
+              "owned_rss_bytes": 937525248,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 100,
+              "elapsed_seconds": 49.80422833299963,
+              "rss_bytes": 54558720,
+              "handles": 9,
+              "owned_rss_bytes": 940474368,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 110,
+              "elapsed_seconds": 55.3382855830132,
+              "rss_bytes": 54558720,
+              "handles": 9,
+              "owned_rss_bytes": 943013888,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 120,
+              "elapsed_seconds": 60.26000250002835,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 948977664,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 130,
+              "elapsed_seconds": 64.7456859999802,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 955498496,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 140,
+              "elapsed_seconds": 69.25394820800284,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 957710336,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 150,
+              "elapsed_seconds": 73.684032707999,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 960643072,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 160,
+              "elapsed_seconds": 78.43005991599057,
+              "rss_bytes": 54591488,
+              "handles": 9,
+              "owned_rss_bytes": 963067904,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 170,
+              "elapsed_seconds": 83.18733074999182,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 967655424,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 180,
+              "elapsed_seconds": 87.84802637499524,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 969392128,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 190,
+              "elapsed_seconds": 92.60909604100743,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 974258176,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 200,
+              "elapsed_seconds": 97.20076012500795,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 976453632,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 210,
+              "elapsed_seconds": 101.93444466602523,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 957906944,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 220,
+              "elapsed_seconds": 106.61409400001867,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 962707456,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 230,
+              "elapsed_seconds": 111.28796183300437,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 965296128,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 240,
+              "elapsed_seconds": 115.8883480830118,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 968867840,
+              "owned_processes": 7
+            },
+            {
+              "iteration": 250,
+              "elapsed_seconds": 120.08158212498529,
+              "rss_bytes": 54607872,
+              "handles": 9,
+              "owned_rss_bytes": 969555968,
+              "owned_processes": 7
+            }
+          ],
+          "growth_limits": {
+            "python_rss_mib": 128,
+            "browser_tree_rss_mib": 512,
+            "handles": 32,
+            "processes": 8
+          },
+          "session_profile_removed": true,
+          "template_profile_removed": true,
+          "remaining_observed_processes": [],
+          "remaining_owned_tasks": 0,
+          "scope": "one sustained session; controlled data URLs; DOM/scripts/actions/windows/native-timeout recovery; post-warmup growth bounds; not unlimited stability certification"
+        }
+      }
+    }
+  },
+  "quality_gates": {
+    "lint": "passed",
+    "formatting": {
+      "status": "passed",
+      "python_files": 122
+    },
+    "structural_api": {
+      "status": "passed",
+      "files": 121,
+      "functions": 2081,
+      "classes": 268,
+      "prompted_example_sections": 181
+    },
+    "example_contracts": "passed",
+    "verbatim_docstrings": {
+      "status": "passed",
+      "examples_executed": 38,
+      "test_cases": 39,
+      "scope": "Selected action, option, script, wait, timeout and profile examples; not every example has a native runtime fixture."
+    },
+    "mypy": {
+      "status": "passed",
+      "configured_source_modules": 19,
+      "whole_package_strict_claimed": false
+    },
+    "installed_public_typing": {
+      "status": "passed",
+      "positive_consumer": "passed",
+      "negative_controls": [
+        "optional lookup dereference rejected",
+        "invalid navigation argument rejected"
+      ]
+    },
+    "dependency_consistency": "pip check passed in installed wheel environment",
+    "package_metadata": "wheel and source distribution passed twine check --strict",
+    "distribution_tests": "Direct wheel, sdist and sdist-rebuilt wheel verified; acceptance scripts, test TLS material and public typing consumer included."
+  },
+  "targeted_fixes": [
+    {
+      "issue": "Safari discovery succeeds but acquisition calls missing version parsers",
+      "change": "Implement Safari browser and driver version parsers and typed invalid-version errors.",
+      "negative_control": "All 19 added Safari regression cases failed before implementation.",
+      "regression_tests": 19,
+      "native_proof": "Final installed-wheel Safari tour: 12 passed and 3 explicit facade exclusions."
+    },
+    {
+      "issue": "Abrupt driver death loses browser-process ancestry before teardown",
+      "change": "Capture original owned descendant identities after session handshake and refresh from retained living roots during teardown; no per-command process scan.",
+      "regression_tests": 18,
+      "negative_control": {
+        "path": "/private/tmp/aselenium-release-acceptance.YzHcNV/recovery-chrome.json",
+        "result": "Driver-crash scenario failed with seven surviving browser children; harness cleaned only its own identities and retained failed result."
+      },
+      "native_proof": "All four fault scenarios passed on final Chrome and Edge without harness emergency cleanup."
+    },
+    {
+      "issue": "Native browser timeout exceptions were relabelled as transport timeouts",
+      "change": "Preserve Aselenium exceptions before the outer command wrapper handles actual asyncio deadline expiry.",
+      "regression_tests": 2,
+      "negative_control": {
+        "tests": "Both real-loopback native timeout regressions failed before the fix.",
+        "native_chrome": "/private/tmp/aselenium-release-acceptance.YzHcNV/final-reliability/chrome-ehuzmr_o/chrome-long-lived.json",
+        "native_edge": "/private/tmp/aselenium-release-acceptance.YzHcNV/final-reliability/edge-fq80q4mb/edge-long-lived.json",
+        "result": "Both native sustained runs failed at iteration zero with SessionTimeoutError instead of JavaScriptTimeoutError; not accepted as passes."
+      },
+      "native_proof": "Final sustained runs preserved and recovered from 26 Chrome and 25 Edge controlled native JavaScript timeouts."
+    },
+    {
+      "issue": "Three docstring examples contained incorrect runtime instructions",
+      "change": "Await the session timeout property, not synchronous options; retrieve previously cached JavaScript instead of caching duplicate names.",
+      "native_or_runtime_proof": "38 selected actual docstrings execute in their original statement order; 39 tests pass including inventory check."
+    }
+  ],
+  "harness_safety": {
+    "controller_regression_tests": 124,
+    "owned_process_regression_tests": 35,
+    "rules": [
+      "A passing status alone is insufficient: required scenarios, browser/version identity, durations, resource budgets and cleanup fields are validated.",
+      "Malformed or non-object JSON fails its gate while later gates still run.",
+      "Outer timeout retains output and attempts bounded cleanup of only observed owned descendants.",
+      "PID and creation-time identity checks protect unrelated processes; no process-name or system-wide search is used.",
+      "A failed library teardown remains a failed acceptance even if fixture cleanup succeeds.",
+      "Installed tours use independent output directories to avoid collisions between concurrent runs."
+    ],
+    "limitation": "Cooperative process tracking is not a hostile-process sandbox: a descendant that forks and reparents entirely between polling samples can escape observation."
+  },
+  "ci": {
+    "status": "configured_and_locally_checked_not_remotely_executed",
+    "workflow": ".github/workflows/tests.yml",
+    "unit_matrix": "Linux Python 3.10-3.14; Windows/macOS Python 3.13; exact runtime minima on Linux Python 3.11.",
+    "native_matrix": [
+      "ubuntu-24.04 chrome",
+      "ubuntu-24.04 firefox",
+      "windows-2025 edge",
+      "macos-15 chrome",
+      "macos-15 firefox",
+      "macos-15 safari"
+    ],
+    "ordinary_sustained_seconds": 30,
+    "scheduled_sustained_seconds": 600,
+    "release_gate": "Existing release workflow depends on the reusable regression/native workflow; publication remains explicitly opt-in.",
+    "schedule_activated_locally": false,
+    "note": "A committed/default-branch workflow and successful remote execution are still required; configuration is not a CI pass."
+  },
+  "boundaries": [
+    "All native results here are macOS 26.6.2 ARM64 snapshots with the recorded browser/driver versions.",
+    "Safari skips exactly frames, W3C action chains and concurrent sessions because its current facade disables them; PNG is tested but Safari PDF printing is not claimed.",
+    "Firefox passed its full feature tour; the new crash/hang and long-lived fault harnesses target Chrome and Edge only.",
+    "Browser HTTPS proxy fixtures explicitly accept their test certificate; verified TLS/authenticated CONNECT claims apply to the manager transport, not native browser proxy credentials.",
+    "Local two-minute sustained observations and configured CI ten-minute runs are not certification of multi-hour or multi-day unattended operation.",
+    "Native Windows/Linux, alternate channels, standalone Chromium/CfT browser bundles and WebView2 require separate successful acceptance runs.",
+    "Physical casting devices and deployment-specific SOCKS/PAC/WPAD behavior remain unverified.",
+    "Public website/CAPTCHA behavior is not a deterministic release test.",
+    "No Safari automation settings, personal browser profiles, system trust stores or user development environment were changed.",
+    "Edge auto-updated during this work; the stale offline cache was correctly rejected and a matching official driver was provisioned before final acceptance."
+  ],
+  "raw_evidence_note": "Key measurements and native result bodies are preserved here. Absolute temporary paths identify original local artifacts, which may later be removed; hashes permit comparing retained copies.",
+  "production_source_sha256": {
+    "aselenium/__init__.py": "e893c6a97283ce30eff4d15e76908e5824d781b6f37162f6193d5b614401408b",
+    "aselenium/_async.py": "d7c7ed9c1a5e77b33ef14069f2a9bd2213dab8d277afb1f8167a8ca36acc2bff",
+    "aselenium/_output.py": "1dccdab68bd064f038663401570cf02306b4c987187306f0c113e0f674848972",
+    "aselenium/_profiles.py": "5080c9e0fac83952de331011fddd6a8341bdd48c3cd7a57f489af3e8f0a58dee",
+    "aselenium/_wait.py": "7b4535c3531ff46d688f9a44daff55eb3a40b7ebd48def98f367bd3e9f97c853",
+    "aselenium/actions.py": "5b34d774721dc11c05746aa04c57805fe881a894bc4d9e8baba00d635c266ccd",
+    "aselenium/alert.py": "6016244a61eeeb7835f15c6a5058dfa8b9ddf9c2b7ddbbef3ebb0776d56d51b6",
+    "aselenium/chrome/__init__.py": "ddb7db61e94a3bdf053ed02aae87e68d80c5d3551d4656910562f7b2a68dfe43",
+    "aselenium/chrome/options.py": "c119fc02303fbb26db0e87bc2a63ddcd21841b44584aa1f5f97c685052b086c6",
+    "aselenium/chrome/service.py": "e1a093454d8a5a83b67f3a7573002ee62a8c313ba3d8bd1f2f4f76fc7ece896c",
+    "aselenium/chrome/session.py": "19550f4d57cd7cd8ddf78843b289cb3fd6c2d38f11672daf0bc63a30ac3ce50a",
+    "aselenium/chrome/webdriver.py": "7a7b50e4e9c9d564943799c39b4b092799bff92c8d0122b3721230789d37e94e",
+    "aselenium/chromium/__init__.py": "65f0634993ec5c6d571b31ebf1996d78ae3efa6789d3beedc049a088316af88a",
+    "aselenium/chromium/options.py": "b759e5ad6066b771cd979a7e47bb1fb2c7b302dcf26afcd8af40e21f58ef2c3d",
+    "aselenium/chromium/service.py": "8b3112d720f9bcab9ee328e20ce40db7013f93ff039d260a1201210d63375e2e",
+    "aselenium/chromium/session.py": "8c7ac5a0dc3615d52976815961bbff4e18c2935d3569b78fcc7e74749b6f0174",
+    "aselenium/chromium/webdriver.py": "40177c99116f1d701ec57fdd74a261c7acf405975be67e6701f15078fedbf969",
+    "aselenium/command.py": "f066ce687cb9062285299b46e336b3aa37be956151d676c76270531c4ffc9483",
+    "aselenium/connection.py": "62dfc3b865ae540bb706725335c1c85be036cf1989e7f4439eb9b94735d465e4",
+    "aselenium/edge/__init__.py": "5ec12845893860965261bc6d5c26107fe0e87a147e73e247dc3664b7e9bf0561",
+    "aselenium/edge/options.py": "351fa66697226c47bac8300af189afbc210a270be9d5974b35f401037436ff8f",
+    "aselenium/edge/service.py": "c50aeb99348557a3b8a64daf94307073c69d7f323f204259223820235a8e996f",
+    "aselenium/edge/session.py": "d42fe28dd9f038095124b657f0d82666d8e2ebc2c8ad3f64104794b8376cab9e",
+    "aselenium/edge/webdriver.py": "c6d93a02a09b1a5a2b99834677d8d3d6518f5a25ffb71c6f38795348f9deb18f",
+    "aselenium/element.py": "da43fd6ce340f7273e4067b2e35a527554a8b4dd2fc8e6e416d682fd37a3e719",
+    "aselenium/errors.py": "ddea9aff8904bb0208b51a7927cfa6c42d05b7d7b1468b904c7fc6952a957b80",
+    "aselenium/firefox/__init__.py": "28b7b575be47d2e5972fa3170341dfc6e3e77e19d0aeff740168674609ae9158",
+    "aselenium/firefox/options.py": "5b5251b86fa3653e46d4065bb76fec6dbb337db1e96e4c8f286b0b52aeb0211c",
+    "aselenium/firefox/service.py": "69baa463a341da8245beab36fb99ed6e25e866ea0018ed27bca8f9c4f816e150",
+    "aselenium/firefox/session.py": "609af5dc502b96f2e9ed3721af0573d36c6ec9b7a01478d97cf87501f75ad91b",
+    "aselenium/firefox/utils.py": "ba2fe0bb33344d268045cf11a5cbdfdf76c1bd5800abeacc607e4f83ce49ee08",
+    "aselenium/firefox/webdriver.py": "9a4e67ec036ac60beb425d5a0220a5bb502d24cc1b1291f79eeb4bbc7684cdbf",
+    "aselenium/javascript/__init__.py": "79b34c5cd59262419e922d89ffc3ceb454ecb0bd4a1fb4666f778a2e0d33d327",
+    "aselenium/logs.py": "6b9dac2ebda748d340a8c0ebaaf6470ed4cbdee4af2c26f0dffa707629329352",
+    "aselenium/manager/__init__.py": "d9739dd64da54b3359bdca97050c3194d9c8653a87bda1ded9ef5f5a74a3540e",
+    "aselenium/manager/_cache.py": "bd9684101bda4a5bde0b3fd56cda69524bd3848df403ed6d655b516281da44c0",
+    "aselenium/manager/_filesystem.py": "1d2326eba4cfe8d3de603577fe8a5bc08a949a7e53f888473f680027d49189cc",
+    "aselenium/manager/_http.py": "97d587cd27ff635b920333660034d1768b52e4f387a272933f54b6969dc111fc",
+    "aselenium/manager/_installation.py": "68f63e33c9b0f963cac4413f90f35fa394bfc4f5c6eb7fc5020051cd7c8db876",
+    "aselenium/manager/driver.py": "16f5be09bfeb9a52ef7295e19637e741369fbc99193bef95a5684f31a44c9858",
+    "aselenium/manager/file.py": "ff9b37fad3311f178c44b73df1331967cdb3ba0623ae99db72a0e3f8a25dbf48",
+    "aselenium/manager/geckodriver/compatibility.json": "b176009b4f3035b47d20b73c9e738b0ace4d36a66175ccb0395959c2f155f5f5",
+    "aselenium/manager/version.py": "20521a48fec6e3650fc74d2c85d77bc4d670096186be8f84332d8f56354ae57a",
+    "aselenium/options.py": "3dcb3bec966be97cc2d8173a242c2fa4c3ecf31a1bff67f6b22f02d909f61358",
+    "aselenium/safari/__init__.py": "b5ddf2cb7e6fb66c8e1b9d79eaa42b8c1d30685c7febf32fb162578481361fa1",
+    "aselenium/safari/options.py": "acb83e1836d91c2f1dc69175d16f8925adc3bac35704ef3ff6340c785e047b3d",
+    "aselenium/safari/service.py": "e69ebd9e21c40ab4590b8c0d1cf3c986bd2fdfeca52565b99dd8063bf3bae9f8",
+    "aselenium/safari/session.py": "a322a4546602ec3bb7c37aba2b661d990025bb44d33309701b23b46dfefad921",
+    "aselenium/safari/webdriver.py": "cbabf2956f4db0cff90c86fcb3f73d00c50ff612733e5010fafe18e3ecbb1cce",
+    "aselenium/service.py": "b2d3e059a22b1e5cd44c99bcb986b7a8191bb09d851ae7e6b50bf65c43dc0fd2",
+    "aselenium/session.py": "880f650a4d2bd3668b865666a13d4b0f927b862aa3771e0acabc54054a470d2a",
+    "aselenium/settings.py": "6dc116dfe5d25d63e0c13698af52df8c3c4a24d7b61859f965fad934689381e9",
+    "aselenium/shadow.py": "690199ce8e0b195896d4c217271d595c5a5275f201f7120681f3c2718e23d664",
+    "aselenium/utils.py": "83fb612da37144d12a0a3ea887dd78323db6968e0a0d46b6667a0894869722ac",
+    "aselenium/valuewrap.py": "819c5df05171573e2d69459cbb5fa04e084f7592b592dc36069b1dacc69937b7",
+    "aselenium/webdriver.py": "737e55a2bfdb0b7b54d25c3c93b0f53a6748e71ae90214e1c6061ec39a7a5973"
+  }
+}

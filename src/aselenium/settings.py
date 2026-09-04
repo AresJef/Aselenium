@@ -20,7 +20,12 @@
 
 
 # Default Timeouts
+"""Aselenium settings implementation and supporting types."""
+
+
 class DefaultTimeouts:
+    """Represent DefaultTimeouts using the inherited implementation."""
+
     IMPLICIT: int = 0
     PAGE_LOAD: int = 300_000
     SCRIPT: int = 30_000
@@ -28,6 +33,8 @@ class DefaultTimeouts:
 
 # Default Network Conditions
 class DefaultNetworkConditions:
+    """Default Chromium network emulation settings."""
+
     OFFLINE: bool = False
     LATENCY: int = 0
     DOWNLOAD_THROUGHPUT: int = -1
@@ -36,6 +43,8 @@ class DefaultNetworkConditions:
 
 # Constraint
 class Constraint:
+    """Allowed values used by browser-option and command validation."""
+
     PAGE_LOAD_STRATEGIES: set[str] = {"normal", "eager", "none"}
     UNHANDLED_PROMPT_BEHAVIORS: set[str] = {
         "dismiss",

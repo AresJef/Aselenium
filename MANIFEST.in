@@ -1,4 +1,19 @@
 include LICENSE
 include README.md
+include requirements.txt
+include src/quick_start.py
+include src/demo_local.py
+include src/demo_google.py
+include src/_demo_support.py
+recursive-include src/demo_assets *.html *.txt *.json *.js
 
-recursive-include src/aselenium *.py *.pxd *.pyx *.pyi
+recursive-include src/aselenium *.py
+recursive-include docs *.md *.json
+recursive-include scripts *.py
+recursive-include tests *.py
+recursive-include tests/fixtures/tls *.pem *.md
+include requirements-minimum.txt
+recursive-include .github/workflows *.yml
+include requirements-dev.txt
+include src/aselenium/manager/geckodriver/compatibility.json
+include src/aselenium/py.typed

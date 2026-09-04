@@ -16,8 +16,15 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any
+"""Aselenium options implementation and supporting types."""
+
+from __future__ import annotations
+
 from copy import deepcopy
+from typing import (
+    Any,
+)
+
 from aselenium.logs import logger
 from aselenium.options import BaseOptions
 
@@ -35,61 +42,114 @@ class SafariOptions(BaseOptions):
     "the default capabilities of the safari browser `dict[str, Any]`"
 
     def __init__(self) -> None:
+        """Initialize the instance."""
         super().__init__()
 
     # Caps: basic -------------------------------------------------------------------------
     def construct(self) -> dict[str, Any]:
-        """Construct the final capabilities for the browser."""
+        """Construct the final capabilities for the browser.
+
+        Returns:
+            A mapping containing the construct data.
+        """
         return deepcopy(self._capabilities)
 
     # Caps: automatic inspection ----------------------------------------------------------
     @property
     def automatic_inspection(self) -> bool:
-        """Access whether to enable automatic inspection of web views `<bool>`."""
+        """Return whether to enable automatic inspection of web views.
+
+        Returns:
+            True if to enable automatic inspection of web views; otherwise False.
+        """
         return self._capabilities.get("safari:automaticInspection", False)
 
     @automatic_inspection.setter
     def automatic_inspection(self, value: bool) -> None:
+        """Set the automatic inspection.
+
+        Args:
+            value: New automatic inspection value.
+
+        Raises:
+            InvalidOptionsError: If value is not a bool.
+        """
+        value = self._validate_bool(value, "automatic_inspection")
         if not value:
             self._capabilities.pop("safari:automaticInspection", None)
         else:
             self._capabilities["safari:automaticInspection"] = True
+        self._caps_changed()
 
     # Caps: automatic profiling ----------------------------------------------------------
     @property
     def automatic_profiling(self) -> bool:
-        """Access whether to enable automatic profiling of web views `<bool>`."""
+        """Return whether to enable automatic profiling of web views.
+
+        Returns:
+            True if to enable automatic profiling of web views; otherwise False.
+        """
         return self._capabilities.get("safari:automaticProfiling", False)
 
     @automatic_profiling.setter
     def automatic_profiling(self, value: bool) -> None:
+        """Set the automatic profiling.
+
+        Args:
+            value: New automatic profiling value.
+
+        Raises:
+            InvalidOptionsError: If value is not a bool.
+        """
+        value = self._validate_bool(value, "automatic_profiling")
         if not value:
             self._capabilities.pop("safari:automaticProfiling", None)
         else:
             self._capabilities["safari:automaticProfiling"] = True
+        self._caps_changed()
 
     # Caps: technology preview -----------------------------------------------------------
     @property
     def technology_preview(self) -> bool:
-        """Access whether to use Safari Technology Preview `<bool>`."""
+        """Return whether to use Safari Technology Preview.
+
+        Returns:
+            True if to use Safari Technology Preview; otherwise False.
+        """
         return self._capabilities["browserName"] == "Safari Technology Preview"
 
     @technology_preview.setter
     def technology_preview(self, value: bool) -> None:
+        """Set the technology preview.
+
+        Args:
+            value: New technology preview value.
+
+        Raises:
+            InvalidOptionsError: If value is not a bool.
+        """
+        value = self._validate_bool(value, "technology_preview")
         if value:
             self._capabilities["browserName"] = "Safari Technology Preview"
         else:
             self._capabilities["browserName"] = "safari"
+        self._caps_changed()
 
     # Caps: proxy ------------------------------------------------------------------------
     @property
     def proxy(self) -> None:
-        """Access browser proxy configurations `<Proxy>`."""
+        """Return browser proxy configurations."""
         return None
 
     @proxy.setter
     def proxy(self, value: str | None) -> None:
+        """Set the proxy.
+
+        Args:
+            value: New proxy value. None is handled according to the property's reset/ignore semantics.
+        """
         logger.warning(
-            "<{}>\nSafari does not support custom proxy "
-            "configurations.".format(self.__class__.__name__)
+            "<{}>\nSafari does not support custom proxy configurations.".format(
+                self.__class__.__name__
+            )
         )

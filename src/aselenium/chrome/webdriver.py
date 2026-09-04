@@ -16,14 +16,24 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any, Literal
+"""Aselenium webdriver implementation and supporting types."""
+
+from __future__ import annotations
+
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+)
+
 from aselenium.chrome.options import ChromeOptions
 from aselenium.chrome.service import ChromeService
 from aselenium.chrome.session import ChromeSession
-from aselenium.manager.version import ChromiumVersion
 from aselenium.manager.driver import ChromeDriverManager
 from aselenium.webdriver import ChromiumBaseWebDriver, SessionContext
 
+if TYPE_CHECKING:
+    from aselenium.manager.version import ChromiumVersion
 
 __all__ = ["Chrome"]
 
@@ -35,6 +45,11 @@ class ChromeSessionContext(SessionContext):
     _SESSION_CLS: type[ChromeSession] = ChromeSession
 
     async def __aenter__(self) -> ChromeSession:
+        """Start the owned asynchronous context and return its managed value.
+
+        Returns:
+            The ChromeSession value produced by this operation.
+        """
         return await self.start()
 
 
@@ -53,6 +68,18 @@ class Chrome(ChromiumBaseWebDriver):
         *service_args: Any,
         **service_kwargs: Any,
     ) -> None:
+        """Initialize the instance with the supplied configuration.
+
+        Args:
+            directory: Cache parent directory; None uses the default per-user cache location.
+            max_cache_size: Maximum retained artifact count; None leaves retention unbounded.
+            request_timeout: Positive timeout in seconds for vendor metadata requests.
+            download_timeout: Positive total timeout in seconds for an artifact download.
+            proxy: Explicit provisioning proxy URL, or None for a direct connection.
+            service_timeout: Positive timeout in seconds for service startup and shutdown.
+            *service_args: Additional positional arguments forwarded to the service constructor.
+            **service_kwargs: Additional keyword arguments forwarded to the service constructor.
+        """
         super().__init__(
             ChromeDriverManager,
             ChromeService,
@@ -71,80 +98,57 @@ class Chrome(ChromiumBaseWebDriver):
     # Properties ------------------------------------------------------------------
     @property
     def manager(self) -> ChromeDriverManager:
-        """Access the driver manager `<ChromeDriverManager>`."""
+        """Return the driver manager.
+
+        Returns:
+            The facade's browser-specific driver manager.
+        """
         return self._manager
 
     @property
     def options(self) -> ChromeOptions:
-        """Access the webdriver options for the browser `<ChromeOptions>`."""
+        """Return the webdriver options for the browser.
+
+        Returns:
+            The browser options owned by this facade or session.
+        """
         return self._options
 
     # Acquire ---------------------------------------------------------------------
     def acquire(
         self,
-        version: ChromiumVersion | Literal["major", "build", "patch"] = "build",
+        version: ChromiumVersion | str = "build",
         channel: Literal["stable", "beta", "dev", "cft"] = "stable",
         binary: str | None = None,
     ) -> ChromeSessionContext:
-        """Acquire a new Chrome session `<ChromeSession>`.
+        """Create a single-use context for a new Chrome session.
 
-        ### Standard usage
+        Options are snapshotted when this method is called. Provisioning and browser
+        startup occur on entering the context, whose exit awaits owned cleanup.
+        Concurrent tasks should acquire separate contexts.
 
-        :param version: `<str>` Defaults to `'build'`. Accepts the following values:
-            - `'major'`: Install webdriver that has the same major version as the browser.
-            - `'build'`: Install webdriver that has the same major & build version as the browser.
-            - `'patch'`: Install webdriver that has the same major, build & patch version as the browser.
-            - `'118.0.5982.0'`: Install the excat webdriver version regardless of the browser version.
-            - `'cft'`: For more information, please refer to the `[Chrome for Testing]` section below.
+        Args:
+            version: A ChromiumVersion, numeric version string, or resolution selector.
+                The default ``"build"`` matches the installed browser's build;
+                ``"major"`` allows the same major version and ``"patch"`` requests
+                its exact version. ``"offline"`` uses only available local artifacts.
+                With ``channel="cft"``, supply a numeric version, not ``"build"``.
+            channel: Installed Chrome channel: stable, beta, or dev. The special cft
+                channel provisions both Chrome for Testing and its matching driver.
+            binary: Explicit installed-browser executable, or None for discovery.
+                Ignored for cft, which resolves its own browser binary.
 
-        :param channel: `<str>` Defaults to `'stable'`. Accepts the following values:
-            - `'stable'`: Locate the `STABLE` (normal) browser binary in the system
-                          and use it to determine the webdriver version.
-            - `'beta'`:   Locate the `BETA` browser binary in the system and use it to
-                          determine the webdriver version.
-            - `'dev'`:    Locate the `DEV` browser binary in the system and use it to
-                          determine the webdriver version.
+        Returns:
+            A context yielding ChromeSession after successful startup.
 
-        :param binary: `<str>` The path to a specific browser binary. Defaults to `None`.
-            If specified, will use this given browser binary to determine
-            the webdriver version and start the session.
-
-        ### Example:
-        >>> from aselenium import Chrome
-            driver = Chrome(
-                # optional: the directory to store the webdrivers.
-                directory="/path/to/driver/cache/directory"
-                # optional: the maximum amount of webdrivers (and CTF browsers) to maintain.
-                max_cache_size=10
-            )
-        >>> # . acquire a chrome session
-            async with driver.acquire("build", "dev") as session:
-                # explain: install webdriver that has the same major & build
-                # version as the Chrome [dev] browser installed in the system,
-                # and start a new session with the dev browser.
-                await session.load("https://www.google.com")
-                # . do some automated tasks
-                ...
-
-        ### Chrome for Testing
-
-        :param version: `<str>` A valid Chrome for Testing version. e.g. `'113.0.5672.0'`, `'120'`, etc.
-        :param channel: `<str>` Must set to `'cft'` (Chrome for Testing).
-        :param binary: `<str>` This argument will be ignored once `channel='cft'`.
-
-        - Notice: The installation of a fresh Chrome for Testing browser will
-          take much longer time than the installation of a webdriver. Please
-          wait for the installation to complete with some patience.
-
-        ### Example:
-        >>> from aselenium import Chrome
-            driver = Chrome()
-        >>> # . acquire a Chrome for Testing session
-            async with driver.acquire("119.0.6045", "cft") as session:
-                # explain: install both the webdriver and CFT browser with the same build
-                # version '119.0.6045', and start a new session with the CFT browser.
-                await session.load("https://www.google.com")
-                # . do some automated tasks
-                ...
+        Example:
+            >>> from aselenium import Chrome
+            >>> driver = Chrome()
+            >>> driver.options.set_timeouts(implicit=0, pageLoad=20, script=5)
+            >>> try:
+            ...     async with driver.acquire(version="build") as session:
+            ...         await session.load("https://example.com")
+            ... finally:
+            ...     driver.options.close()
         """
         return super().acquire(version=version, channel=channel, binary=binary)

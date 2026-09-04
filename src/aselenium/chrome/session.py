@@ -16,24 +16,40 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+"""Aselenium session implementation and supporting types."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from aselenium.session import ChromiumBaseSession
-from aselenium.chrome.options import ChromeOptions
-from aselenium.chrome.service import ChromeService
+
+if TYPE_CHECKING:
+    from aselenium.chrome.options import ChromeOptions
+    from aselenium.chrome.service import ChromeService
 
 __all__ = ["ChromeSession"]
 
 
 # Chrome Session ----------------------------------------------------------------------------------
 class ChromeSession(ChromiumBaseSession):
-    """Represents a session of the Chrome browser."""
+    """Represent a session of the Chrome browser."""
 
     # Basic -------------------------------------------------------------------------------
     @property
     def options(self) -> ChromeOptions:
-        """Access the Chrome options `<ChromeOptions>`."""
+        """Return the Chrome options.
+
+        Returns:
+            The browser options owned by this facade or session.
+        """
         return self._options
 
     @property
     def service(self) -> ChromeService:
-        """Access the Chrome service `<ChromeService>`."""
+        """Return the Chrome service.
+
+        Returns:
+            The driver service owned by the session.
+        """
         return self._service

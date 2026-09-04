@@ -16,7 +16,14 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Any
+"""Aselenium options implementation and supporting types."""
+
+from __future__ import annotations
+
+from typing import (
+    Any,
+)
+
 from aselenium import errors
 from aselenium.options import ChromiumBaseOptions
 
@@ -32,12 +39,17 @@ class EdgeOptions(ChromiumBaseOptions):
     KEY: str = "ms:edgeOptions"
 
     def __init__(self) -> None:
+        """Initialize the instance."""
         super().__init__()
         self._use_webview: bool = False
 
     # Caps: basic -------------------------------------------------------------------------
     def construct(self) -> dict[str, Any]:
-        """Construct the final capabilities for the browser."""
+        """Construct the final capabilities for the browser.
+
+        Returns:
+            A mapping containing the construct data.
+        """
         caps = super().construct()
         if self._use_webview:
             caps["browserName"] = "webview2"
@@ -46,15 +58,26 @@ class EdgeOptions(ChromiumBaseOptions):
     # Caps: web view ----------------------------------------------------------------------
     @property
     def use_webview(self) -> bool:
-        """Access whether to use the WebView2 browser instead
-        of the default Edge browser `<bool>`.
+        """Return whether to use the WebView2 browser instead of the default Edge browser.
+
+        Returns:
+            True if to use the WebView2 browser instead of the default Edge browser; otherwise False.
         """
         return self._use_webview
 
     @use_webview.setter
     def use_webview(self, value: bool) -> None:
+        """Select WebView2 or regular Edge for subsequent session capabilities.
+
+        Args:
+            value: True selects WebView2; False selects regular Edge.
+
+        Raises:
+            InvalidOptionsError: If value is not a bool.
+        """
         if not isinstance(value, bool):
             raise errors.InvalidOptionsError(
                 f"<{self.__class__.__name__}>\n`use_webview` must be type of `<bool>`."
             )
         self._use_webview = value
+        self._caps_changed()

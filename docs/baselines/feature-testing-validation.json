@@ -1,0 +1,4641 @@
+{
+  "recorded_at_utc": "2026-09-04T15:55:02.486026+00:00",
+  "scope": "Locally feasible testing expansion; no runtime production fixes; expected failures remain release blockers",
+  "release": {
+    "version": "1.0.5",
+    "published": false
+  },
+  "test_runs": {
+    "python_313": {
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "dependencies": {
+        "aiohttp": "3.14.3",
+        "orjson": "3.12.0",
+        "psutil": "7.2.2",
+        "pytest": "9.1.1",
+        "pytest-asyncio": "1.4.0",
+        "coverage": "7.16.0",
+        "hypothesis": "6.167.1"
+      },
+      "counts": {
+        "passed": 2072,
+        "expected_failure": 23,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0
+      },
+      "collected": 2095,
+      "duration_seconds": 12.345,
+      "asyncio_debug": true,
+      "loopback_included": true,
+      "junit_sha256": "b7afbfa0d218a11d72288789ffe3239915c6929075ec0c338129dba507fa0e1b",
+      "temporary_junit_path": "/private/tmp/aselenium-feature-tests.Op4418/py313.xml",
+      "by_test_module": {
+        "tests.manager.test_archive_safety": {
+          "passed": 86
+        },
+        "tests.manager.test_cache_v2": {
+          "passed": 13
+        },
+        "tests.manager.test_compatibility": {
+          "passed": 2
+        },
+        "tests.manager.test_discovery": {
+          "passed": 9
+        },
+        "tests.manager.test_discovery_paths": {
+          "passed": 120
+        },
+        "tests.manager.test_files": {
+          "passed": 21
+        },
+        "tests.manager.test_filesystem_safety": {
+          "passed": 69
+        },
+        "tests.manager.test_installation": {
+          "passed": 17
+        },
+        "tests.manager.test_installation_results": {
+          "passed": 6
+        },
+        "tests.manager.test_probe_safety": {
+          "passed": 27
+        },
+        "tests.manager.test_public_api": {
+          "passed": 21
+        },
+        "tests.manager.test_requests": {
+          "passed": 37
+        },
+        "tests.manager.test_resolution_policies": {
+          "passed": 70
+        },
+        "tests.manager.test_resources": {
+          "passed": 23
+        },
+        "tests.manager.test_safari_discovery": {
+          "passed": 32
+        },
+        "tests.manager.test_versions": {
+          "passed": 22
+        },
+        "tests.test_api_quality": {
+          "passed": 312
+        },
+        "tests.test_browser_features": {
+          "passed": 130,
+          "expected_failure": 14
+        },
+        "tests.test_current_only": {
+          "passed": 76
+        },
+        "tests.test_demo_google": {
+          "passed": 53
+        },
+        "tests.test_demo_local": {
+          "passed": 77
+        },
+        "tests.test_distribution": {
+          "passed": 10
+        },
+        "tests.test_dom_features": {
+          "passed": 302,
+          "expected_failure": 1
+        },
+        "tests.test_examples": {
+          "passed": 80
+        },
+        "tests.test_feature_inventory": {
+          "passed": 3
+        },
+        "tests.test_generated_inputs": {
+          "passed": 3
+        },
+        "tests.test_input_features": {
+          "passed": 38
+        },
+        "tests.test_lifecycle_features": {
+          "passed": 34
+        },
+        "tests.test_production_readiness": {
+          "passed": 43
+        },
+        "tests.test_proxy_harness": {
+          "passed": 28
+        },
+        "tests.test_release_configuration": {
+          "passed": 11
+        },
+        "tests.test_runtime": {
+          "passed": 58
+        },
+        "tests.test_second_pass": {
+          "passed": 34
+        },
+        "tests.test_session_features": {
+          "passed": 152,
+          "expected_failure": 6
+        },
+        "tests.test_transport_loopback": {
+          "passed": 28
+        },
+        "tests.test_value_features": {
+          "passed": 25,
+          "expected_failure": 2
+        }
+      },
+      "expected_failures": [
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[None]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[7]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[invalid]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[value3]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[value4]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[None]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[7]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[value3]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response0]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response1]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response2]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response3]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_edge_webview_change_invalidates_cached_capabilities",
+          "reason": "EdgeOptions.use_webview does not invalidate cached capabilities after the first read"
+        },
+        {
+          "test": "tests.test_dom_features.test_element_screenshot_rejects_empty_path_before_request",
+          "reason": "Empty screenshot path becomes cwd plus .png instead of being rejected"
+        },
+        {
+          "test": "tests.test_session_features.test_negative_navigation_retry_rejected[load-arguments0]",
+          "reason": "Known defect: negative navigation retry silently issues no request instead of rejecting input."
+        },
+        {
+          "test": "tests.test_session_features.test_negative_navigation_retry_rejected[refresh-arguments1]",
+          "reason": "Known defect: negative navigation retry silently issues no request instead of rejecting input."
+        },
+        {
+          "test": "tests.test_session_features.test_uncached_script_object_execution[execute_script]",
+          "reason": "Known defect: uncached JavaScript objects reach transport without typed rejection or conversion to a string payload."
+        },
+        {
+          "test": "tests.test_session_features.test_uncached_script_object_execution[execute_async_script]",
+          "reason": "Known defect: uncached JavaScript objects reach transport without typed rejection or conversion to a string payload."
+        },
+        {
+          "test": "tests.test_session_features.test_uncached_cdp_object_execution",
+          "reason": "Known defect: an uncached DevToolsCMD reaches transport without typed rejection or conversion to a string payload."
+        },
+        {
+          "test": "tests.test_session_features.test_cookie_collection_shape_validation",
+          "reason": "Known defect: non-list cookie collections leak TypeError instead of InvalidResponseError."
+        },
+        {
+          "test": "tests.test_value_features.test_validated_relative_paths_match_documented_absolute_contract[file]",
+          "reason": "PATH-001: validate_file/validate_dir promise absolute paths but preserve relative inputs"
+        },
+        {
+          "test": "tests.test_value_features.test_validated_relative_paths_match_documented_absolute_contract[directory]",
+          "reason": "PATH-001: validate_file/validate_dir promise absolute paths but preserve relative inputs"
+        }
+      ]
+    },
+    "python_311": {
+      "python": "3.11.15",
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "dependencies": {
+        "aiohttp": "3.14.3",
+        "orjson": "3.12.0",
+        "psutil": "7.2.2",
+        "pytest": "9.1.1",
+        "pytest-asyncio": "1.4.0",
+        "coverage": "7.16.0",
+        "hypothesis": "6.167.1"
+      },
+      "counts": {
+        "passed": 2072,
+        "expected_failure": 23,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0
+      },
+      "collected": 2095,
+      "duration_seconds": 9.153,
+      "asyncio_debug": true,
+      "loopback_included": true,
+      "junit_sha256": "15b54301ccf2a6eeaaef104656f2099f209e7922e0f6828813de4c3f542a01d8",
+      "temporary_junit_path": "/private/tmp/aselenium-feature-tests.Op4418/py311.xml",
+      "by_test_module": {
+        "tests.manager.test_archive_safety": {
+          "passed": 86
+        },
+        "tests.manager.test_cache_v2": {
+          "passed": 13
+        },
+        "tests.manager.test_compatibility": {
+          "passed": 2
+        },
+        "tests.manager.test_discovery": {
+          "passed": 9
+        },
+        "tests.manager.test_discovery_paths": {
+          "passed": 120
+        },
+        "tests.manager.test_files": {
+          "passed": 21
+        },
+        "tests.manager.test_filesystem_safety": {
+          "passed": 69
+        },
+        "tests.manager.test_installation": {
+          "passed": 17
+        },
+        "tests.manager.test_installation_results": {
+          "passed": 6
+        },
+        "tests.manager.test_probe_safety": {
+          "passed": 27
+        },
+        "tests.manager.test_public_api": {
+          "passed": 21
+        },
+        "tests.manager.test_requests": {
+          "passed": 37
+        },
+        "tests.manager.test_resolution_policies": {
+          "passed": 70
+        },
+        "tests.manager.test_resources": {
+          "passed": 23
+        },
+        "tests.manager.test_safari_discovery": {
+          "passed": 32
+        },
+        "tests.manager.test_versions": {
+          "passed": 22
+        },
+        "tests.test_api_quality": {
+          "passed": 312
+        },
+        "tests.test_browser_features": {
+          "passed": 130,
+          "expected_failure": 14
+        },
+        "tests.test_current_only": {
+          "passed": 76
+        },
+        "tests.test_demo_google": {
+          "passed": 53
+        },
+        "tests.test_demo_local": {
+          "passed": 77
+        },
+        "tests.test_distribution": {
+          "passed": 10
+        },
+        "tests.test_dom_features": {
+          "passed": 302,
+          "expected_failure": 1
+        },
+        "tests.test_examples": {
+          "passed": 80
+        },
+        "tests.test_feature_inventory": {
+          "passed": 3
+        },
+        "tests.test_generated_inputs": {
+          "passed": 3
+        },
+        "tests.test_input_features": {
+          "passed": 38
+        },
+        "tests.test_lifecycle_features": {
+          "passed": 34
+        },
+        "tests.test_production_readiness": {
+          "passed": 43
+        },
+        "tests.test_proxy_harness": {
+          "passed": 28
+        },
+        "tests.test_release_configuration": {
+          "passed": 11
+        },
+        "tests.test_runtime": {
+          "passed": 58
+        },
+        "tests.test_second_pass": {
+          "passed": 34
+        },
+        "tests.test_session_features": {
+          "passed": 152,
+          "expected_failure": 6
+        },
+        "tests.test_transport_loopback": {
+          "passed": 28
+        },
+        "tests.test_value_features": {
+          "passed": 25,
+          "expected_failure": 2
+        }
+      },
+      "expected_failures": [
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[None]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[7]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[invalid]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[value3]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[value4]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[None]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[7]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[value3]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response0]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response1]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response2]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response3]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_edge_webview_change_invalidates_cached_capabilities",
+          "reason": "EdgeOptions.use_webview does not invalidate cached capabilities after the first read"
+        },
+        {
+          "test": "tests.test_dom_features.test_element_screenshot_rejects_empty_path_before_request",
+          "reason": "Empty screenshot path becomes cwd plus .png instead of being rejected"
+        },
+        {
+          "test": "tests.test_session_features.test_negative_navigation_retry_rejected[load-arguments0]",
+          "reason": "Known defect: negative navigation retry silently issues no request instead of rejecting input."
+        },
+        {
+          "test": "tests.test_session_features.test_negative_navigation_retry_rejected[refresh-arguments1]",
+          "reason": "Known defect: negative navigation retry silently issues no request instead of rejecting input."
+        },
+        {
+          "test": "tests.test_session_features.test_uncached_script_object_execution[execute_script]",
+          "reason": "Known defect: uncached JavaScript objects reach transport without typed rejection or conversion to a string payload."
+        },
+        {
+          "test": "tests.test_session_features.test_uncached_script_object_execution[execute_async_script]",
+          "reason": "Known defect: uncached JavaScript objects reach transport without typed rejection or conversion to a string payload."
+        },
+        {
+          "test": "tests.test_session_features.test_uncached_cdp_object_execution",
+          "reason": "Known defect: an uncached DevToolsCMD reaches transport without typed rejection or conversion to a string payload."
+        },
+        {
+          "test": "tests.test_session_features.test_cookie_collection_shape_validation",
+          "reason": "Known defect: non-list cookie collections leak TypeError instead of InvalidResponseError."
+        },
+        {
+          "test": "tests.test_value_features.test_validated_relative_paths_match_documented_absolute_contract[file]",
+          "reason": "PATH-001: validate_file/validate_dir promise absolute paths but preserve relative inputs"
+        },
+        {
+          "test": "tests.test_value_features.test_validated_relative_paths_match_documented_absolute_contract[directory]",
+          "reason": "PATH-001: validate_file/validate_dir promise absolute paths but preserve relative inputs"
+        }
+      ]
+    },
+    "exact_runtime_minima_311": {
+      "python": "3.11.15",
+      "platform": "macOS-26.6.2-arm64-arm-64bit",
+      "dependencies": {
+        "aiohttp": "3.14.3",
+        "orjson": "3.11.6",
+        "psutil": "5.8.0",
+        "pytest": "9.1.1",
+        "pytest-asyncio": "1.4.0",
+        "coverage": "7.16.0",
+        "hypothesis": "6.167.1"
+      },
+      "counts": {
+        "passed": 2072,
+        "expected_failure": 23,
+        "failed": 0,
+        "error": 0,
+        "skipped": 0
+      },
+      "collected": 2095,
+      "duration_seconds": 8.549,
+      "asyncio_debug": true,
+      "loopback_included": true,
+      "junit_sha256": "e28c3655cf98dae7edb15b2f417b2619d538732ed6b614c5fd923cb9797dad2f",
+      "temporary_junit_path": "/private/tmp/aselenium-feature-tests.Op4418/minimums-py311.xml",
+      "by_test_module": {
+        "tests.manager.test_archive_safety": {
+          "passed": 86
+        },
+        "tests.manager.test_cache_v2": {
+          "passed": 13
+        },
+        "tests.manager.test_compatibility": {
+          "passed": 2
+        },
+        "tests.manager.test_discovery": {
+          "passed": 9
+        },
+        "tests.manager.test_discovery_paths": {
+          "passed": 120
+        },
+        "tests.manager.test_files": {
+          "passed": 21
+        },
+        "tests.manager.test_filesystem_safety": {
+          "passed": 69
+        },
+        "tests.manager.test_installation": {
+          "passed": 17
+        },
+        "tests.manager.test_installation_results": {
+          "passed": 6
+        },
+        "tests.manager.test_probe_safety": {
+          "passed": 27
+        },
+        "tests.manager.test_public_api": {
+          "passed": 21
+        },
+        "tests.manager.test_requests": {
+          "passed": 37
+        },
+        "tests.manager.test_resolution_policies": {
+          "passed": 70
+        },
+        "tests.manager.test_resources": {
+          "passed": 23
+        },
+        "tests.manager.test_safari_discovery": {
+          "passed": 32
+        },
+        "tests.manager.test_versions": {
+          "passed": 22
+        },
+        "tests.test_api_quality": {
+          "passed": 312
+        },
+        "tests.test_browser_features": {
+          "passed": 130,
+          "expected_failure": 14
+        },
+        "tests.test_current_only": {
+          "passed": 76
+        },
+        "tests.test_demo_google": {
+          "passed": 53
+        },
+        "tests.test_demo_local": {
+          "passed": 77
+        },
+        "tests.test_distribution": {
+          "passed": 10
+        },
+        "tests.test_dom_features": {
+          "passed": 302,
+          "expected_failure": 1
+        },
+        "tests.test_examples": {
+          "passed": 80
+        },
+        "tests.test_feature_inventory": {
+          "passed": 3
+        },
+        "tests.test_generated_inputs": {
+          "passed": 3
+        },
+        "tests.test_input_features": {
+          "passed": 38
+        },
+        "tests.test_lifecycle_features": {
+          "passed": 34
+        },
+        "tests.test_production_readiness": {
+          "passed": 43
+        },
+        "tests.test_proxy_harness": {
+          "passed": 28
+        },
+        "tests.test_release_configuration": {
+          "passed": 11
+        },
+        "tests.test_runtime": {
+          "passed": 58
+        },
+        "tests.test_second_pass": {
+          "passed": 34
+        },
+        "tests.test_session_features": {
+          "passed": 152,
+          "expected_failure": 6
+        },
+        "tests.test_transport_loopback": {
+          "passed": 28
+        },
+        "tests.test_value_features": {
+          "passed": 25,
+          "expected_failure": 2
+        }
+      },
+      "expected_failures": [
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[None]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[7]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[invalid]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[value3]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_context_rejects_malformed_wire_value[value4]",
+          "reason": "FirefoxSession.context returns arbitrary value fields without checking content/chrome"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[None]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[7]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_firefox_addon_rejects_invalid_returned_id[value3]",
+          "reason": "FirefoxSession.install_addons accepts non-string or empty returned add-on IDs"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response0]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response1]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response2]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_safari_permissions_rejects_malformed_values[response3]",
+          "reason": "SafariSession.permissions does not validate mapping shape or boolean permission values"
+        },
+        {
+          "test": "tests.test_browser_features.test_edge_webview_change_invalidates_cached_capabilities",
+          "reason": "EdgeOptions.use_webview does not invalidate cached capabilities after the first read"
+        },
+        {
+          "test": "tests.test_dom_features.test_element_screenshot_rejects_empty_path_before_request",
+          "reason": "Empty screenshot path becomes cwd plus .png instead of being rejected"
+        },
+        {
+          "test": "tests.test_session_features.test_negative_navigation_retry_rejected[load-arguments0]",
+          "reason": "Known defect: negative navigation retry silently issues no request instead of rejecting input."
+        },
+        {
+          "test": "tests.test_session_features.test_negative_navigation_retry_rejected[refresh-arguments1]",
+          "reason": "Known defect: negative navigation retry silently issues no request instead of rejecting input."
+        },
+        {
+          "test": "tests.test_session_features.test_uncached_script_object_execution[execute_script]",
+          "reason": "Known defect: uncached JavaScript objects reach transport without typed rejection or conversion to a string payload."
+        },
+        {
+          "test": "tests.test_session_features.test_uncached_script_object_execution[execute_async_script]",
+          "reason": "Known defect: uncached JavaScript objects reach transport without typed rejection or conversion to a string payload."
+        },
+        {
+          "test": "tests.test_session_features.test_uncached_cdp_object_execution",
+          "reason": "Known defect: an uncached DevToolsCMD reaches transport without typed rejection or conversion to a string payload."
+        },
+        {
+          "test": "tests.test_session_features.test_cookie_collection_shape_validation",
+          "reason": "Known defect: non-list cookie collections leak TypeError instead of InvalidResponseError."
+        },
+        {
+          "test": "tests.test_value_features.test_validated_relative_paths_match_documented_absolute_contract[file]",
+          "reason": "PATH-001: validate_file/validate_dir promise absolute paths but preserve relative inputs"
+        },
+        {
+          "test": "tests.test_value_features.test_validated_relative_paths_match_documented_absolute_contract[directory]",
+          "reason": "PATH-001: validate_file/validate_dir promise absolute paths but preserve relative inputs"
+        }
+      ]
+    }
+  },
+  "test_growth": {
+    "previous_passed": 1332,
+    "new_cases": 763,
+    "additional_passed": 740,
+    "new_expected_failure_cases": 23,
+    "new_test_files": 9,
+    "known_issue_families": 10
+  },
+  "coverage": {
+    "scope": "full Python 3.13 suite with loopback TCP; excludes native demos/proxy/soaks; includes expected-failure execution",
+    "totals": {
+      "covered_lines": 6509,
+      "num_statements": 7155,
+      "percent_covered": 88.77630553390492,
+      "percent_covered_display": "89",
+      "missing_lines": 646,
+      "excluded_lines": 72,
+      "percent_statements_covered": 90.97134870719776,
+      "percent_statements_covered_display": "91",
+      "num_branches": 1826,
+      "num_partial_branches": 222,
+      "covered_branches": 1464,
+      "missing_branches": 362,
+      "percent_branches_covered": 80.17524644030668,
+      "percent_branches_covered_display": "80"
+    },
+    "previous_totals": {
+      "covered_lines": 4758,
+      "num_statements": 7155,
+      "percent_covered": 63.01080057900011,
+      "percent_covered_display": "63",
+      "missing_lines": 2397,
+      "excluded_lines": 72,
+      "percent_statements_covered": 66.49895178197065,
+      "percent_statements_covered_display": "66",
+      "num_branches": 1826,
+      "num_partial_branches": 299,
+      "covered_branches": 901,
+      "missing_branches": 925,
+      "percent_branches_covered": 49.34282584884995,
+      "percent_branches_covered_display": "49"
+    },
+    "modules": {
+      "src/aselenium/__init__.py": {
+        "summary": {
+          "covered_lines": 17,
+          "num_statements": 17,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/_async.py": {
+        "summary": {
+          "covered_lines": 28,
+          "num_statements": 32,
+          "percent_covered": 86.84210526315789,
+          "percent_covered_display": "87",
+          "missing_lines": 4,
+          "excluded_lines": 0,
+          "percent_statements_covered": 87.5,
+          "percent_statements_covered_display": "88",
+          "num_branches": 6,
+          "num_partial_branches": 1,
+          "covered_branches": 5,
+          "missing_branches": 1,
+          "percent_branches_covered": 83.33333333333333,
+          "percent_branches_covered_display": "83"
+        },
+        "missing_lines": [
+          36,
+          37,
+          38,
+          39
+        ],
+        "missing_branches": [
+          [
+            40,
+            42
+          ]
+        ]
+      },
+      "src/aselenium/_output.py": {
+        "summary": {
+          "covered_lines": 23,
+          "num_statements": 23,
+          "percent_covered": 96.0,
+          "percent_covered_display": "96",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 2,
+          "num_partial_branches": 1,
+          "covered_branches": 1,
+          "missing_branches": 1,
+          "percent_branches_covered": 50.0,
+          "percent_branches_covered_display": "50"
+        },
+        "missing_lines": [],
+        "missing_branches": [
+          [
+            35,
+            -12
+          ]
+        ]
+      },
+      "src/aselenium/_profiles.py": {
+        "summary": {
+          "covered_lines": 24,
+          "num_statements": 26,
+          "percent_covered": 85.0,
+          "percent_covered_display": "85",
+          "missing_lines": 2,
+          "excluded_lines": 2,
+          "percent_statements_covered": 92.3076923076923,
+          "percent_statements_covered_display": "92",
+          "num_branches": 14,
+          "num_partial_branches": 2,
+          "covered_branches": 10,
+          "missing_branches": 4,
+          "percent_branches_covered": 71.42857142857143,
+          "percent_branches_covered_display": "71"
+        },
+        "missing_lines": [
+          32,
+          33
+        ],
+        "missing_branches": [
+          [
+            30,
+            32
+          ],
+          [
+            32,
+            29
+          ],
+          [
+            32,
+            33
+          ],
+          [
+            52,
+            51
+          ]
+        ]
+      },
+      "src/aselenium/_wait.py": {
+        "summary": {
+          "covered_lines": 50,
+          "num_statements": 53,
+          "percent_covered": 92.0,
+          "percent_covered_display": "92",
+          "missing_lines": 3,
+          "excluded_lines": 0,
+          "percent_statements_covered": 94.33962264150944,
+          "percent_statements_covered_display": "94",
+          "num_branches": 22,
+          "num_partial_branches": 3,
+          "covered_branches": 19,
+          "missing_branches": 3,
+          "percent_branches_covered": 86.36363636363636,
+          "percent_branches_covered_display": "86"
+        },
+        "missing_lines": [
+          75,
+          81,
+          86
+        ],
+        "missing_branches": [
+          [
+            74,
+            75
+          ],
+          [
+            79,
+            81
+          ],
+          [
+            85,
+            86
+          ]
+        ]
+      },
+      "src/aselenium/actions.py": {
+        "summary": {
+          "covered_lines": 190,
+          "num_statements": 199,
+          "percent_covered": 94.02390438247012,
+          "percent_covered_display": "94",
+          "missing_lines": 9,
+          "excluded_lines": 2,
+          "percent_statements_covered": 95.47738693467336,
+          "percent_statements_covered_display": "95",
+          "num_branches": 52,
+          "num_partial_branches": 4,
+          "covered_branches": 46,
+          "missing_branches": 6,
+          "percent_branches_covered": 88.46153846153847,
+          "percent_branches_covered_display": "88"
+        },
+        "missing_lines": [
+          391,
+          806,
+          807,
+          845,
+          872,
+          873,
+          874,
+          875,
+          878
+        ],
+        "missing_branches": [
+          [
+            361,
+            363
+          ],
+          [
+            694,
+            696
+          ],
+          [
+            838,
+            845
+          ],
+          [
+            872,
+            873
+          ],
+          [
+            872,
+            875
+          ],
+          [
+            877,
+            878
+          ]
+        ]
+      },
+      "src/aselenium/alert.py": {
+        "summary": {
+          "covered_lines": 43,
+          "num_statements": 45,
+          "percent_covered": 95.74468085106383,
+          "percent_covered_display": "96",
+          "missing_lines": 2,
+          "excluded_lines": 2,
+          "percent_statements_covered": 95.55555555555556,
+          "percent_statements_covered_display": "96",
+          "num_branches": 2,
+          "num_partial_branches": 0,
+          "covered_branches": 2,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [
+          117,
+          118
+        ],
+        "missing_branches": []
+      },
+      "src/aselenium/chrome/__init__.py": {
+        "summary": {
+          "covered_lines": 5,
+          "num_statements": 5,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/chrome/options.py": {
+        "summary": {
+          "covered_lines": 7,
+          "num_statements": 7,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/chrome/service.py": {
+        "summary": {
+          "covered_lines": 3,
+          "num_statements": 3,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/chrome/session.py": {
+        "summary": {
+          "covered_lines": 11,
+          "num_statements": 11,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 3,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/chrome/webdriver.py": {
+        "summary": {
+          "covered_lines": 22,
+          "num_statements": 23,
+          "percent_covered": 95.65217391304348,
+          "percent_covered_display": "96",
+          "missing_lines": 1,
+          "excluded_lines": 2,
+          "percent_statements_covered": 95.65217391304348,
+          "percent_statements_covered_display": "96",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [
+          53
+        ],
+        "missing_branches": []
+      },
+      "src/aselenium/chromium/__init__.py": {
+        "summary": {
+          "covered_lines": 5,
+          "num_statements": 5,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/chromium/options.py": {
+        "summary": {
+          "covered_lines": 7,
+          "num_statements": 7,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/chromium/service.py": {
+        "summary": {
+          "covered_lines": 3,
+          "num_statements": 3,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/chromium/session.py": {
+        "summary": {
+          "covered_lines": 11,
+          "num_statements": 11,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 3,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/chromium/webdriver.py": {
+        "summary": {
+          "covered_lines": 22,
+          "num_statements": 23,
+          "percent_covered": 95.65217391304348,
+          "percent_covered_display": "96",
+          "missing_lines": 1,
+          "excluded_lines": 2,
+          "percent_statements_covered": 95.65217391304348,
+          "percent_statements_covered_display": "96",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [
+          52
+        ],
+        "missing_branches": []
+      },
+      "src/aselenium/command.py": {
+        "summary": {
+          "covered_lines": 90,
+          "num_statements": 90,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/connection.py": {
+        "summary": {
+          "covered_lines": 115,
+          "num_statements": 124,
+          "percent_covered": 91.55844155844156,
+          "percent_covered_display": "92",
+          "missing_lines": 9,
+          "excluded_lines": 0,
+          "percent_statements_covered": 92.74193548387096,
+          "percent_statements_covered_display": "93",
+          "num_branches": 30,
+          "num_partial_branches": 4,
+          "covered_branches": 26,
+          "missing_branches": 4,
+          "percent_branches_covered": 86.66666666666667,
+          "percent_branches_covered_display": "87"
+        },
+        "missing_lines": [
+          128,
+          196,
+          197,
+          229,
+          242,
+          288,
+          328,
+          336,
+          347
+        ],
+        "missing_branches": [
+          [
+            122,
+            128
+          ],
+          [
+            223,
+            229
+          ],
+          [
+            239,
+            288
+          ],
+          [
+            241,
+            242
+          ]
+        ]
+      },
+      "src/aselenium/edge/__init__.py": {
+        "summary": {
+          "covered_lines": 5,
+          "num_statements": 5,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/edge/options.py": {
+        "summary": {
+          "covered_lines": 24,
+          "num_statements": 25,
+          "percent_covered": 93.10344827586206,
+          "percent_covered_display": "93",
+          "missing_lines": 1,
+          "excluded_lines": 0,
+          "percent_statements_covered": 96.0,
+          "percent_statements_covered_display": "96",
+          "num_branches": 4,
+          "num_partial_branches": 1,
+          "covered_branches": 3,
+          "missing_branches": 1,
+          "percent_branches_covered": 75.0,
+          "percent_branches_covered_display": "75"
+        },
+        "missing_lines": [
+          55
+        ],
+        "missing_branches": [
+          [
+            54,
+            55
+          ]
+        ]
+      },
+      "src/aselenium/edge/service.py": {
+        "summary": {
+          "covered_lines": 3,
+          "num_statements": 3,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/edge/session.py": {
+        "summary": {
+          "covered_lines": 11,
+          "num_statements": 11,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 3,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/edge/webdriver.py": {
+        "summary": {
+          "covered_lines": 22,
+          "num_statements": 23,
+          "percent_covered": 95.65217391304348,
+          "percent_covered_display": "96",
+          "missing_lines": 1,
+          "excluded_lines": 2,
+          "percent_statements_covered": 95.65217391304348,
+          "percent_statements_covered_display": "96",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [
+          53
+        ],
+        "missing_branches": []
+      },
+      "src/aselenium/element.py": {
+        "summary": {
+          "covered_lines": 525,
+          "num_statements": 530,
+          "percent_covered": 98.6024844720497,
+          "percent_covered_display": "99",
+          "missing_lines": 5,
+          "excluded_lines": 4,
+          "percent_statements_covered": 99.05660377358491,
+          "percent_statements_covered_display": "99",
+          "num_branches": 114,
+          "num_partial_branches": 0,
+          "covered_branches": 110,
+          "missing_branches": 4,
+          "percent_branches_covered": 96.49122807017544,
+          "percent_branches_covered_display": "96"
+        },
+        "missing_lines": [
+          1638,
+          1639,
+          1643,
+          1644,
+          1648
+        ],
+        "missing_branches": [
+          [
+            1638,
+            1639
+          ],
+          [
+            1638,
+            1643
+          ],
+          [
+            1643,
+            1644
+          ],
+          [
+            1643,
+            1648
+          ]
+        ]
+      },
+      "src/aselenium/errors.py": {
+        "summary": {
+          "covered_lines": 150,
+          "num_statements": 162,
+          "percent_covered": 86.84210526315789,
+          "percent_covered_display": "87",
+          "missing_lines": 12,
+          "excluded_lines": 0,
+          "percent_statements_covered": 92.5925925925926,
+          "percent_statements_covered_display": "93",
+          "num_branches": 28,
+          "num_partial_branches": 7,
+          "covered_branches": 15,
+          "missing_branches": 13,
+          "percent_branches_covered": 53.57142857142857,
+          "percent_branches_covered_display": "54"
+        },
+        "missing_lines": [
+          211,
+          213,
+          612,
+          618,
+          627,
+          629,
+          630,
+          631,
+          632,
+          633,
+          634,
+          636
+        ],
+        "missing_branches": [
+          [
+            210,
+            211
+          ],
+          [
+            212,
+            213
+          ],
+          [
+            611,
+            612
+          ],
+          [
+            617,
+            618
+          ],
+          [
+            626,
+            627
+          ],
+          [
+            628,
+            629
+          ],
+          [
+            629,
+            630
+          ],
+          [
+            629,
+            631
+          ],
+          [
+            631,
+            632
+          ],
+          [
+            631,
+            633
+          ],
+          [
+            633,
+            634
+          ],
+          [
+            633,
+            637
+          ],
+          [
+            635,
+            636
+          ]
+        ]
+      },
+      "src/aselenium/firefox/__init__.py": {
+        "summary": {
+          "covered_lines": 5,
+          "num_statements": 5,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/firefox/options.py": {
+        "summary": {
+          "covered_lines": 86,
+          "num_statements": 86,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 2,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 12,
+          "num_partial_branches": 0,
+          "covered_branches": 12,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/firefox/service.py": {
+        "summary": {
+          "covered_lines": 34,
+          "num_statements": 34,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 2,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 6,
+          "num_partial_branches": 0,
+          "covered_branches": 6,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/firefox/session.py": {
+        "summary": {
+          "covered_lines": 119,
+          "num_statements": 123,
+          "percent_covered": 96.5034965034965,
+          "percent_covered_display": "97",
+          "missing_lines": 4,
+          "excluded_lines": 4,
+          "percent_statements_covered": 96.7479674796748,
+          "percent_statements_covered_display": "97",
+          "num_branches": 20,
+          "num_partial_branches": 1,
+          "covered_branches": 19,
+          "missing_branches": 1,
+          "percent_branches_covered": 95.0,
+          "percent_branches_covered_display": "95"
+        },
+        "missing_lines": [
+          290,
+          311,
+          312,
+          321
+        ],
+        "missing_branches": [
+          [
+            285,
+            290
+          ]
+        ]
+      },
+      "src/aselenium/firefox/utils.py": {
+        "summary": {
+          "covered_lines": 64,
+          "num_statements": 67,
+          "percent_covered": 93.10344827586206,
+          "percent_covered_display": "93",
+          "missing_lines": 3,
+          "excluded_lines": 0,
+          "percent_statements_covered": 95.5223880597015,
+          "percent_statements_covered_display": "96",
+          "num_branches": 20,
+          "num_partial_branches": 3,
+          "covered_branches": 17,
+          "missing_branches": 3,
+          "percent_branches_covered": 85.0,
+          "percent_branches_covered_display": "85"
+        },
+        "missing_lines": [
+          145,
+          150,
+          154
+        ],
+        "missing_branches": [
+          [
+            144,
+            145
+          ],
+          [
+            147,
+            150
+          ],
+          [
+            153,
+            154
+          ]
+        ]
+      },
+      "src/aselenium/firefox/webdriver.py": {
+        "summary": {
+          "covered_lines": 22,
+          "num_statements": 23,
+          "percent_covered": 95.65217391304348,
+          "percent_covered_display": "96",
+          "missing_lines": 1,
+          "excluded_lines": 2,
+          "percent_statements_covered": 95.65217391304348,
+          "percent_statements_covered_display": "96",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [
+          52
+        ],
+        "missing_branches": []
+      },
+      "src/aselenium/javascript/__init__.py": {
+        "summary": {
+          "covered_lines": 17,
+          "num_statements": 17,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/logs.py": {
+        "summary": {
+          "covered_lines": 4,
+          "num_statements": 4,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/manager/__init__.py": {
+        "summary": {
+          "covered_lines": 3,
+          "num_statements": 3,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/manager/_cache.py": {
+        "summary": {
+          "covered_lines": 285,
+          "num_statements": 324,
+          "percent_covered": 85.14851485148515,
+          "percent_covered_display": "85",
+          "missing_lines": 39,
+          "excluded_lines": 2,
+          "percent_statements_covered": 87.96296296296296,
+          "percent_statements_covered_display": "88",
+          "num_branches": 80,
+          "num_partial_branches": 13,
+          "covered_branches": 59,
+          "missing_branches": 21,
+          "percent_branches_covered": 73.75,
+          "percent_branches_covered_display": "74"
+        },
+        "missing_lines": [
+          55,
+          100,
+          101,
+          107,
+          115,
+          116,
+          158,
+          317,
+          353,
+          378,
+          383,
+          401,
+          402,
+          403,
+          404,
+          405,
+          410,
+          411,
+          412,
+          413,
+          414,
+          415,
+          416,
+          424,
+          425,
+          426,
+          429,
+          430,
+          450,
+          451,
+          452,
+          453,
+          647,
+          713,
+          723,
+          724,
+          725,
+          726,
+          730
+        ],
+        "missing_branches": [
+          [
+            54,
+            55
+          ],
+          [
+            99,
+            100
+          ],
+          [
+            106,
+            107
+          ],
+          [
+            114,
+            115
+          ],
+          [
+            157,
+            158
+          ],
+          [
+            316,
+            317
+          ],
+          [
+            352,
+            353
+          ],
+          [
+            377,
+            378
+          ],
+          [
+            382,
+            383
+          ],
+          [
+            399,
+            401
+          ],
+          [
+            405,
+            410
+          ],
+          [
+            405,
+            411
+          ],
+          [
+            411,
+            412
+          ],
+          [
+            411,
+            416
+          ],
+          [
+            425,
+            426
+          ],
+          [
+            425,
+            430
+          ],
+          [
+            426,
+            425
+          ],
+          [
+            426,
+            429
+          ],
+          [
+            646,
+            647
+          ],
+          [
+            712,
+            713
+          ],
+          [
+            727,
+            730
+          ]
+        ]
+      },
+      "src/aselenium/manager/_filesystem.py": {
+        "summary": {
+          "covered_lines": 149,
+          "num_statements": 158,
+          "percent_covered": 92.56198347107438,
+          "percent_covered_display": "93",
+          "missing_lines": 9,
+          "excluded_lines": 0,
+          "percent_statements_covered": 94.30379746835443,
+          "percent_statements_covered_display": "94",
+          "num_branches": 84,
+          "num_partial_branches": 7,
+          "covered_branches": 75,
+          "missing_branches": 9,
+          "percent_branches_covered": 89.28571428571429,
+          "percent_branches_covered_display": "89"
+        },
+        "missing_lines": [
+          61,
+          111,
+          188,
+          189,
+          190,
+          222,
+          256,
+          275,
+          298
+        ],
+        "missing_branches": [
+          [
+            45,
+            61
+          ],
+          [
+            110,
+            111
+          ],
+          [
+            187,
+            188
+          ],
+          [
+            188,
+            189
+          ],
+          [
+            188,
+            190
+          ],
+          [
+            221,
+            222
+          ],
+          [
+            236,
+            256
+          ],
+          [
+            267,
+            298
+          ],
+          [
+            274,
+            275
+          ]
+        ]
+      },
+      "src/aselenium/manager/_http.py": {
+        "summary": {
+          "covered_lines": 142,
+          "num_statements": 158,
+          "percent_covered": 87.5,
+          "percent_covered_display": "88",
+          "missing_lines": 16,
+          "excluded_lines": 2,
+          "percent_statements_covered": 89.87341772151899,
+          "percent_statements_covered_display": "90",
+          "num_branches": 50,
+          "num_partial_branches": 8,
+          "covered_branches": 40,
+          "missing_branches": 10,
+          "percent_branches_covered": 80.0,
+          "percent_branches_covered_display": "80"
+        },
+        "missing_lines": [
+          79,
+          80,
+          81,
+          82,
+          83,
+          193,
+          249,
+          256,
+          281,
+          304,
+          318,
+          322,
+          323,
+          326,
+          330,
+          342
+        ],
+        "missing_branches": [
+          [
+            189,
+            -172
+          ],
+          [
+            192,
+            193
+          ],
+          [
+            246,
+            344
+          ],
+          [
+            248,
+            249
+          ],
+          [
+            255,
+            256
+          ],
+          [
+            280,
+            281
+          ],
+          [
+            303,
+            304
+          ],
+          [
+            312,
+            314
+          ],
+          [
+            322,
+            323
+          ],
+          [
+            322,
+            326
+          ]
+        ]
+      },
+      "src/aselenium/manager/_installation.py": {
+        "summary": {
+          "covered_lines": 138,
+          "num_statements": 159,
+          "percent_covered": 86.15384615384616,
+          "percent_covered_display": "86",
+          "missing_lines": 21,
+          "excluded_lines": 4,
+          "percent_statements_covered": 86.79245283018868,
+          "percent_statements_covered_display": "87",
+          "num_branches": 36,
+          "num_partial_branches": 2,
+          "covered_branches": 30,
+          "missing_branches": 6,
+          "percent_branches_covered": 83.33333333333333,
+          "percent_branches_covered_display": "83"
+        },
+        "missing_lines": [
+          133,
+          200,
+          202,
+          359,
+          360,
+          361,
+          363,
+          366,
+          367,
+          369,
+          372,
+          373,
+          375,
+          376,
+          377,
+          382,
+          383,
+          384,
+          385,
+          387,
+          388
+        ],
+        "missing_branches": [
+          [
+            132,
+            133
+          ],
+          [
+            300,
+            306
+          ],
+          [
+            360,
+            361
+          ],
+          [
+            360,
+            363
+          ],
+          [
+            383,
+            384
+          ],
+          [
+            383,
+            385
+          ]
+        ]
+      },
+      "src/aselenium/manager/driver.py": {
+        "summary": {
+          "covered_lines": 797,
+          "num_statements": 979,
+          "percent_covered": 77.80355761794277,
+          "percent_covered_display": "78",
+          "missing_lines": 182,
+          "excluded_lines": 2,
+          "percent_statements_covered": 81.40960163432074,
+          "percent_statements_covered_display": "81",
+          "num_branches": 314,
+          "num_partial_branches": 51,
+          "covered_branches": 209,
+          "missing_branches": 105,
+          "percent_branches_covered": 66.56050955414013,
+          "percent_branches_covered_display": "67"
+        },
+        "missing_lines": [
+          248,
+          354,
+          376,
+          377,
+          383,
+          384,
+          385,
+          389,
+          390,
+          398,
+          447,
+          489,
+          490,
+          491,
+          492,
+          497,
+          498,
+          503,
+          560,
+          565,
+          594,
+          659,
+          718,
+          756,
+          769,
+          781,
+          796,
+          797,
+          802,
+          803,
+          804,
+          807,
+          876,
+          913,
+          915,
+          921,
+          937,
+          956,
+          962,
+          978,
+          1005,
+          1020,
+          1021,
+          1026,
+          1027,
+          1028,
+          1031,
+          1051,
+          1078,
+          1095,
+          1096,
+          1098,
+          1191,
+          1205,
+          1234,
+          1317,
+          1341,
+          1390,
+          1427,
+          1545,
+          1570,
+          1652,
+          1677,
+          1683,
+          1684,
+          1687,
+          1690,
+          1691,
+          1692,
+          1693,
+          1705,
+          1708,
+          1709,
+          1710,
+          1713,
+          1811,
+          1812,
+          1897,
+          1898,
+          1899,
+          1900,
+          1901,
+          1903,
+          1906,
+          1909,
+          1910,
+          1911,
+          1912,
+          1926,
+          1927,
+          1933,
+          1934,
+          1935,
+          1938,
+          1950,
+          1952,
+          1958,
+          1959,
+          1960,
+          2067,
+          2090,
+          2102,
+          2149,
+          2154,
+          2176,
+          2177,
+          2178,
+          2179,
+          2180,
+          2181,
+          2182,
+          2185,
+          2186,
+          2199,
+          2202,
+          2203,
+          2204,
+          2207,
+          2216,
+          2495,
+          2509,
+          2522,
+          2548,
+          2593,
+          2603,
+          2604,
+          2606,
+          2607,
+          2608,
+          2610,
+          2620,
+          2621,
+          2623,
+          2624,
+          2627,
+          2628,
+          2629,
+          2630,
+          2633,
+          2634,
+          2635,
+          2636,
+          2639,
+          2640,
+          2643,
+          2656,
+          2657,
+          2664,
+          2665,
+          2666,
+          2669,
+          2683,
+          2684,
+          2687,
+          2688,
+          2689,
+          2690,
+          2691,
+          2693,
+          2694,
+          2695,
+          2696,
+          2697,
+          2698,
+          2700,
+          2702,
+          2703,
+          2704,
+          2705,
+          2706,
+          2707,
+          2709,
+          2800,
+          2801,
+          2827,
+          2828,
+          2835,
+          2869,
+          2966,
+          2982,
+          3041,
+          3042
+        ],
+        "missing_branches": [
+          [
+            246,
+            248
+          ],
+          [
+            353,
+            354
+          ],
+          [
+            374,
+            376
+          ],
+          [
+            376,
+            377
+          ],
+          [
+            376,
+            383
+          ],
+          [
+            383,
+            384
+          ],
+          [
+            383,
+            385
+          ],
+          [
+            385,
+            389
+          ],
+          [
+            385,
+            390
+          ],
+          [
+            395,
+            398
+          ],
+          [
+            446,
+            447
+          ],
+          [
+            448,
+            -444
+          ],
+          [
+            484,
+            489
+          ],
+          [
+            497,
+            498
+          ],
+          [
+            497,
+            503
+          ],
+          [
+            555,
+            560
+          ],
+          [
+            564,
+            565
+          ],
+          [
+            593,
+            594
+          ],
+          [
+            717,
+            718
+          ],
+          [
+            768,
+            769
+          ],
+          [
+            875,
+            876
+          ],
+          [
+            912,
+            913
+          ],
+          [
+            914,
+            915
+          ],
+          [
+            920,
+            921
+          ],
+          [
+            936,
+            937
+          ],
+          [
+            952,
+            962
+          ],
+          [
+            955,
+            956
+          ],
+          [
+            958,
+            952
+          ],
+          [
+            960,
+            958
+          ],
+          [
+            973,
+            978
+          ],
+          [
+            974,
+            973
+          ],
+          [
+            976,
+            974
+          ],
+          [
+            1050,
+            1051
+          ],
+          [
+            1075,
+            1078
+          ],
+          [
+            1093,
+            1095
+          ],
+          [
+            1095,
+            1096
+          ],
+          [
+            1095,
+            1098
+          ],
+          [
+            1389,
+            1390
+          ],
+          [
+            1544,
+            1545
+          ],
+          [
+            1569,
+            1570
+          ],
+          [
+            1651,
+            1652
+          ],
+          [
+            1709,
+            1710
+          ],
+          [
+            1709,
+            1713
+          ],
+          [
+            1723,
+            1731
+          ],
+          [
+            1898,
+            1899
+          ],
+          [
+            1898,
+            1900
+          ],
+          [
+            1900,
+            1901
+          ],
+          [
+            1900,
+            1903
+          ],
+          [
+            1934,
+            1935
+          ],
+          [
+            1934,
+            1938
+          ],
+          [
+            1948,
+            1960
+          ],
+          [
+            1949,
+            1950
+          ],
+          [
+            1951,
+            1952
+          ],
+          [
+            1954,
+            1958
+          ],
+          [
+            2066,
+            2067
+          ],
+          [
+            2089,
+            2090
+          ],
+          [
+            2101,
+            2102
+          ],
+          [
+            2146,
+            2154
+          ],
+          [
+            2148,
+            2149
+          ],
+          [
+            2169,
+            2176
+          ],
+          [
+            2182,
+            2185
+          ],
+          [
+            2182,
+            2186
+          ],
+          [
+            2203,
+            2204
+          ],
+          [
+            2203,
+            2207
+          ],
+          [
+            2494,
+            2495
+          ],
+          [
+            2508,
+            2509
+          ],
+          [
+            2521,
+            2522
+          ],
+          [
+            2547,
+            2548
+          ],
+          [
+            2603,
+            2604
+          ],
+          [
+            2603,
+            2606
+          ],
+          [
+            2620,
+            2621
+          ],
+          [
+            2620,
+            2623
+          ],
+          [
+            2639,
+            2640
+          ],
+          [
+            2639,
+            2643
+          ],
+          [
+            2665,
+            2666
+          ],
+          [
+            2665,
+            2669
+          ],
+          [
+            2683,
+            2684
+          ],
+          [
+            2683,
+            2687
+          ],
+          [
+            2687,
+            2688
+          ],
+          [
+            2687,
+            2694
+          ],
+          [
+            2688,
+            2689
+          ],
+          [
+            2688,
+            2693
+          ],
+          [
+            2689,
+            2690
+          ],
+          [
+            2689,
+            2691
+          ],
+          [
+            2694,
+            2695
+          ],
+          [
+            2694,
+            2702
+          ],
+          [
+            2695,
+            2696
+          ],
+          [
+            2695,
+            2700
+          ],
+          [
+            2696,
+            2697
+          ],
+          [
+            2696,
+            2698
+          ],
+          [
+            2702,
+            2703
+          ],
+          [
+            2702,
+            2709
+          ],
+          [
+            2703,
+            2704
+          ],
+          [
+            2703,
+            2705
+          ],
+          [
+            2705,
+            2706
+          ],
+          [
+            2705,
+            2707
+          ],
+          [
+            2778,
+            -2761
+          ],
+          [
+            2827,
+            2828
+          ],
+          [
+            2827,
+            2835
+          ],
+          [
+            2855,
+            2869
+          ],
+          [
+            2965,
+            2966
+          ],
+          [
+            2981,
+            2982
+          ],
+          [
+            3040,
+            3041
+          ],
+          [
+            3041,
+            3042
+          ],
+          [
+            3041,
+            3045
+          ]
+        ]
+      },
+      "src/aselenium/manager/file.py": {
+        "summary": {
+          "covered_lines": 209,
+          "num_statements": 226,
+          "percent_covered": 88.9261744966443,
+          "percent_covered_display": "89",
+          "missing_lines": 17,
+          "excluded_lines": 0,
+          "percent_statements_covered": 92.47787610619469,
+          "percent_statements_covered_display": "92",
+          "num_branches": 72,
+          "num_partial_branches": 14,
+          "covered_branches": 56,
+          "missing_branches": 16,
+          "percent_branches_covered": 77.77777777777777,
+          "percent_branches_covered_display": "78"
+        },
+        "missing_lines": [
+          123,
+          184,
+          205,
+          222,
+          249,
+          256,
+          265,
+          273,
+          274,
+          303,
+          323,
+          325,
+          326,
+          327,
+          367,
+          373,
+          446
+        ],
+        "missing_branches": [
+          [
+            117,
+            130
+          ],
+          [
+            122,
+            123
+          ],
+          [
+            181,
+            184
+          ],
+          [
+            204,
+            205
+          ],
+          [
+            221,
+            222
+          ],
+          [
+            248,
+            249
+          ],
+          [
+            255,
+            256
+          ],
+          [
+            264,
+            265
+          ],
+          [
+            272,
+            273
+          ],
+          [
+            302,
+            303
+          ],
+          [
+            322,
+            323
+          ],
+          [
+            324,
+            325
+          ],
+          [
+            325,
+            326
+          ],
+          [
+            325,
+            327
+          ],
+          [
+            366,
+            367
+          ],
+          [
+            372,
+            373
+          ]
+        ]
+      },
+      "src/aselenium/manager/version.py": {
+        "summary": {
+          "covered_lines": 155,
+          "num_statements": 160,
+          "percent_covered": 95.63106796116504,
+          "percent_covered_display": "96",
+          "missing_lines": 5,
+          "excluded_lines": 0,
+          "percent_statements_covered": 96.875,
+          "percent_statements_covered_display": "97",
+          "num_branches": 46,
+          "num_partial_branches": 4,
+          "covered_branches": 42,
+          "missing_branches": 4,
+          "percent_branches_covered": 91.30434782608695,
+          "percent_branches_covered_display": "91"
+        },
+        "missing_lines": [
+          80,
+          239,
+          265,
+          278,
+          360
+        ],
+        "missing_branches": [
+          [
+            237,
+            239
+          ],
+          [
+            263,
+            265
+          ],
+          [
+            276,
+            278
+          ],
+          [
+            359,
+            360
+          ]
+        ]
+      },
+      "src/aselenium/options.py": {
+        "summary": {
+          "covered_lines": 613,
+          "num_statements": 666,
+          "percent_covered": 89.81693363844394,
+          "percent_covered_display": "90",
+          "missing_lines": 53,
+          "excluded_lines": 0,
+          "percent_statements_covered": 92.04204204204204,
+          "percent_statements_covered_display": "92",
+          "num_branches": 208,
+          "num_partial_branches": 28,
+          "covered_branches": 172,
+          "missing_branches": 36,
+          "percent_branches_covered": 82.6923076923077,
+          "percent_branches_covered_display": "83"
+        },
+        "missing_lines": [
+          148,
+          178,
+          420,
+          549,
+          550,
+          578,
+          604,
+          605,
+          632,
+          658,
+          659,
+          686,
+          726,
+          749,
+          757,
+          794,
+          795,
+          808,
+          814,
+          815,
+          823,
+          846,
+          847,
+          848,
+          858,
+          863,
+          881,
+          893,
+          904,
+          912,
+          918,
+          919,
+          921,
+          959,
+          1080,
+          1273,
+          1306,
+          1443,
+          1635,
+          1636,
+          1772,
+          1773,
+          1796,
+          1797,
+          1799,
+          1842,
+          1849,
+          2046,
+          2047,
+          2056,
+          2057,
+          2079,
+          2080
+        ],
+        "missing_branches": [
+          [
+            147,
+            148
+          ],
+          [
+            175,
+            178
+          ],
+          [
+            419,
+            420
+          ],
+          [
+            548,
+            549
+          ],
+          [
+            549,
+            -540
+          ],
+          [
+            549,
+            550
+          ],
+          [
+            577,
+            578
+          ],
+          [
+            603,
+            604
+          ],
+          [
+            604,
+            -595
+          ],
+          [
+            604,
+            605
+          ],
+          [
+            631,
+            632
+          ],
+          [
+            657,
+            658
+          ],
+          [
+            658,
+            -649
+          ],
+          [
+            658,
+            659
+          ],
+          [
+            685,
+            686
+          ],
+          [
+            742,
+            749
+          ],
+          [
+            807,
+            808
+          ],
+          [
+            822,
+            823
+          ],
+          [
+            857,
+            858
+          ],
+          [
+            862,
+            863
+          ],
+          [
+            867,
+            872
+          ],
+          [
+            917,
+            918
+          ],
+          [
+            958,
+            959
+          ],
+          [
+            1076,
+            1080
+          ],
+          [
+            1272,
+            1273
+          ],
+          [
+            1305,
+            1306
+          ],
+          [
+            1442,
+            1443
+          ],
+          [
+            1521,
+            1523
+          ],
+          [
+            1523,
+            1525
+          ],
+          [
+            1525,
+            1527
+          ],
+          [
+            1696,
+            -1669
+          ],
+          [
+            1701,
+            -1699
+          ],
+          [
+            1796,
+            1797
+          ],
+          [
+            1796,
+            1799
+          ],
+          [
+            1841,
+            1842
+          ],
+          [
+            1848,
+            1849
+          ]
+        ]
+      },
+      "src/aselenium/safari/__init__.py": {
+        "summary": {
+          "covered_lines": 5,
+          "num_statements": 5,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/safari/options.py": {
+        "summary": {
+          "covered_lines": 46,
+          "num_statements": 46,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 6,
+          "num_partial_branches": 0,
+          "covered_branches": 6,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/safari/service.py": {
+        "summary": {
+          "covered_lines": 7,
+          "num_statements": 7,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/safari/session.py": {
+        "summary": {
+          "covered_lines": 52,
+          "num_statements": 52,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 5,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/safari/webdriver.py": {
+        "summary": {
+          "covered_lines": 27,
+          "num_statements": 28,
+          "percent_covered": 96.66666666666667,
+          "percent_covered_display": "97",
+          "missing_lines": 1,
+          "excluded_lines": 3,
+          "percent_statements_covered": 96.42857142857143,
+          "percent_statements_covered_display": "96",
+          "num_branches": 2,
+          "num_partial_branches": 0,
+          "covered_branches": 2,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [
+          60
+        ],
+        "missing_branches": []
+      },
+      "src/aselenium/service.py": {
+        "summary": {
+          "covered_lines": 200,
+          "num_statements": 273,
+          "percent_covered": 71.12462006079028,
+          "percent_covered_display": "71",
+          "missing_lines": 73,
+          "excluded_lines": 2,
+          "percent_statements_covered": 73.26007326007326,
+          "percent_statements_covered_display": "73",
+          "num_branches": 56,
+          "num_partial_branches": 8,
+          "covered_branches": 34,
+          "missing_branches": 22,
+          "percent_branches_covered": 60.714285714285715,
+          "percent_branches_covered_display": "61"
+        },
+        "missing_lines": [
+          80,
+          81,
+          232,
+          233,
+          234,
+          235,
+          236,
+          237,
+          238,
+          253,
+          254,
+          255,
+          256,
+          257,
+          258,
+          260,
+          261,
+          262,
+          307,
+          308,
+          311,
+          312,
+          320,
+          321,
+          322,
+          323,
+          326,
+          327,
+          328,
+          329,
+          330,
+          336,
+          337,
+          344,
+          349,
+          350,
+          361,
+          362,
+          363,
+          364,
+          365,
+          380,
+          381,
+          385,
+          386,
+          387,
+          388,
+          389,
+          396,
+          399,
+          400,
+          432,
+          433,
+          436,
+          446,
+          447,
+          494,
+          500,
+          515,
+          516,
+          517,
+          518,
+          521,
+          522,
+          523,
+          524,
+          525,
+          526,
+          553,
+          561,
+          572,
+          579,
+          580
+        ],
+        "missing_branches": [
+          [
+            260,
+            261
+          ],
+          [
+            260,
+            262
+          ],
+          [
+            307,
+            308
+          ],
+          [
+            307,
+            311
+          ],
+          [
+            321,
+            322
+          ],
+          [
+            321,
+            323
+          ],
+          [
+            329,
+            330
+          ],
+          [
+            329,
+            336
+          ],
+          [
+            336,
+            337
+          ],
+          [
+            336,
+            344
+          ],
+          [
+            360,
+            361
+          ],
+          [
+            361,
+            362
+          ],
+          [
+            361,
+            365
+          ],
+          [
+            373,
+            372
+          ],
+          [
+            392,
+            394
+          ],
+          [
+            398,
+            399
+          ],
+          [
+            432,
+            433
+          ],
+          [
+            432,
+            436
+          ],
+          [
+            489,
+            494
+          ],
+          [
+            498,
+            518
+          ],
+          [
+            499,
+            500
+          ],
+          [
+            508,
+            517
+          ]
+        ]
+      },
+      "src/aselenium/session.py": {
+        "summary": {
+          "covered_lines": 1307,
+          "num_statements": 1454,
+          "percent_covered": 87.96992481203007,
+          "percent_covered_display": "88",
+          "missing_lines": 147,
+          "excluded_lines": 5,
+          "percent_statements_covered": 89.88995873452545,
+          "percent_statements_covered_display": "90",
+          "num_branches": 408,
+          "num_partial_branches": 51,
+          "covered_branches": 331,
+          "missing_branches": 77,
+          "percent_branches_covered": 81.12745098039215,
+          "percent_branches_covered_display": "81"
+        },
+        "missing_lines": [
+          91,
+          172,
+          181,
+          245,
+          246,
+          248,
+          256,
+          284,
+          293,
+          357,
+          358,
+          360,
+          368,
+          454,
+          479,
+          510,
+          514,
+          541,
+          545,
+          559,
+          575,
+          586,
+          658,
+          685,
+          699,
+          707,
+          718,
+          775,
+          786,
+          818,
+          842,
+          1049,
+          1103,
+          1104,
+          1114,
+          1116,
+          1164,
+          1183,
+          1497,
+          1498,
+          1940,
+          1994,
+          2012,
+          2013,
+          2044,
+          2045,
+          2065,
+          2133,
+          2134,
+          2159,
+          2160,
+          2195,
+          2201,
+          2269,
+          2271,
+          2272,
+          2273,
+          2276,
+          2277,
+          2282,
+          2283,
+          2323,
+          2324,
+          2326,
+          2327,
+          2330,
+          2332,
+          2399,
+          2409,
+          2410,
+          2411,
+          2412,
+          2415,
+          2416,
+          2417,
+          2418,
+          2420,
+          2421,
+          2422,
+          2433,
+          2434,
+          2438,
+          2439,
+          2455,
+          2456,
+          2487,
+          2488,
+          2489,
+          2490,
+          2492,
+          2610,
+          2611,
+          2612,
+          2613,
+          2614,
+          2627,
+          2628,
+          2633,
+          2634,
+          2727,
+          2733,
+          2788,
+          2844,
+          2850,
+          2905,
+          2953,
+          3071,
+          3170,
+          3171,
+          3208,
+          3260,
+          3261,
+          3302,
+          3618,
+          3621,
+          3622,
+          3623,
+          3624,
+          3663,
+          3664,
+          3665,
+          3666,
+          3671,
+          3672,
+          3692,
+          3693,
+          3694,
+          3695,
+          3700,
+          3701,
+          3708,
+          3709,
+          4172,
+          4173,
+          4177,
+          4178,
+          4182,
+          4425,
+          4426,
+          4486,
+          4487,
+          4488,
+          4489,
+          4496,
+          4577,
+          4579,
+          4889
+        ],
+        "missing_branches": [
+          [
+            90,
+            91
+          ],
+          [
+            169,
+            172
+          ],
+          [
+            178,
+            181
+          ],
+          [
+            243,
+            245
+          ],
+          [
+            245,
+            246
+          ],
+          [
+            245,
+            248
+          ],
+          [
+            281,
+            284
+          ],
+          [
+            290,
+            293
+          ],
+          [
+            355,
+            357
+          ],
+          [
+            357,
+            358
+          ],
+          [
+            357,
+            360
+          ],
+          [
+            453,
+            454
+          ],
+          [
+            478,
+            479
+          ],
+          [
+            509,
+            510
+          ],
+          [
+            513,
+            514
+          ],
+          [
+            540,
+            541
+          ],
+          [
+            544,
+            545
+          ],
+          [
+            657,
+            658
+          ],
+          [
+            684,
+            685
+          ],
+          [
+            772,
+            775
+          ],
+          [
+            783,
+            786
+          ],
+          [
+            839,
+            842
+          ],
+          [
+            1047,
+            1049
+          ],
+          [
+            1163,
+            1164
+          ],
+          [
+            1182,
+            1183
+          ],
+          [
+            1937,
+            1939
+          ],
+          [
+            1939,
+            1940
+          ],
+          [
+            1941,
+            1943
+          ],
+          [
+            1993,
+            1994
+          ],
+          [
+            2064,
+            2065
+          ],
+          [
+            2194,
+            2195
+          ],
+          [
+            2197,
+            2201
+          ],
+          [
+            2326,
+            2327
+          ],
+          [
+            2326,
+            2332
+          ],
+          [
+            2398,
+            2399
+          ],
+          [
+            2406,
+            2415
+          ],
+          [
+            2416,
+            2417
+          ],
+          [
+            2416,
+            2420
+          ],
+          [
+            2454,
+            2455
+          ],
+          [
+            2455,
+            2454
+          ],
+          [
+            2455,
+            2456
+          ],
+          [
+            2483,
+            2487
+          ],
+          [
+            2487,
+            2488
+          ],
+          [
+            2487,
+            2492
+          ],
+          [
+            2611,
+            2612
+          ],
+          [
+            2611,
+            2613
+          ],
+          [
+            2726,
+            2727
+          ],
+          [
+            2729,
+            2733
+          ],
+          [
+            2744,
+            -2697
+          ],
+          [
+            2787,
+            2788
+          ],
+          [
+            2843,
+            2844
+          ],
+          [
+            2846,
+            2850
+          ],
+          [
+            2861,
+            -2814
+          ],
+          [
+            2904,
+            2905
+          ],
+          [
+            2952,
+            2953
+          ],
+          [
+            3070,
+            3071
+          ],
+          [
+            3167,
+            3170
+          ],
+          [
+            3207,
+            3208
+          ],
+          [
+            3615,
+            3621
+          ],
+          [
+            3617,
+            3618
+          ],
+          [
+            3621,
+            3622
+          ],
+          [
+            3621,
+            3624
+          ],
+          [
+            3622,
+            3621
+          ],
+          [
+            3622,
+            3623
+          ],
+          [
+            4172,
+            4173
+          ],
+          [
+            4172,
+            4177
+          ],
+          [
+            4177,
+            4178
+          ],
+          [
+            4177,
+            4182
+          ],
+          [
+            4486,
+            4487
+          ],
+          [
+            4486,
+            4488
+          ],
+          [
+            4488,
+            4489
+          ],
+          [
+            4488,
+            4496
+          ],
+          [
+            4572,
+            4574
+          ],
+          [
+            4574,
+            4576
+          ],
+          [
+            4576,
+            4577
+          ],
+          [
+            4578,
+            4579
+          ],
+          [
+            4888,
+            4889
+          ]
+        ]
+      },
+      "src/aselenium/settings.py": {
+        "summary": {
+          "covered_lines": 18,
+          "num_statements": 18,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/shadow.py": {
+        "summary": {
+          "covered_lines": 199,
+          "num_statements": 204,
+          "percent_covered": 96.80851063829788,
+          "percent_covered_display": "97",
+          "missing_lines": 5,
+          "excluded_lines": 5,
+          "percent_statements_covered": 97.54901960784314,
+          "percent_statements_covered_display": "98",
+          "num_branches": 78,
+          "num_partial_branches": 0,
+          "covered_branches": 74,
+          "missing_branches": 4,
+          "percent_branches_covered": 94.87179487179488,
+          "percent_branches_covered_display": "95"
+        },
+        "missing_lines": [
+          660,
+          661,
+          665,
+          666,
+          670
+        ],
+        "missing_branches": [
+          [
+            660,
+            661
+          ],
+          [
+            660,
+            665
+          ],
+          [
+            665,
+            666
+          ],
+          [
+            665,
+            670
+          ]
+        ]
+      },
+      "src/aselenium/utils.py": {
+        "summary": {
+          "covered_lines": 264,
+          "num_statements": 264,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 26,
+          "num_partial_branches": 0,
+          "covered_branches": 26,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/valuewrap.py": {
+        "summary": {
+          "covered_lines": 21,
+          "num_statements": 21,
+          "percent_covered": 100.0,
+          "percent_covered_display": "100",
+          "missing_lines": 0,
+          "excluded_lines": 0,
+          "percent_statements_covered": 100.0,
+          "percent_statements_covered_display": "100",
+          "num_branches": 0,
+          "num_partial_branches": 0,
+          "covered_branches": 0,
+          "missing_branches": 0,
+          "percent_branches_covered": 100.0,
+          "percent_branches_covered_display": "100"
+        },
+        "missing_lines": [],
+        "missing_branches": []
+      },
+      "src/aselenium/webdriver.py": {
+        "summary": {
+          "covered_lines": 105,
+          "num_statements": 125,
+          "percent_covered": 79.73856209150327,
+          "percent_covered_display": "80",
+          "missing_lines": 20,
+          "excluded_lines": 7,
+          "percent_statements_covered": 84.0,
+          "percent_statements_covered_display": "84",
+          "num_branches": 28,
+          "num_partial_branches": 9,
+          "covered_branches": 17,
+          "missing_branches": 11,
+          "percent_branches_covered": 60.714285714285715,
+          "percent_branches_covered_display": "61"
+        },
+        "missing_lines": [
+          111,
+          112,
+          114,
+          142,
+          158,
+          163,
+          164,
+          165,
+          166,
+          167,
+          168,
+          177,
+          179,
+          180,
+          204,
+          219,
+          220,
+          221,
+          222,
+          223
+        ],
+        "missing_branches": [
+          [
+            110,
+            111
+          ],
+          [
+            113,
+            114
+          ],
+          [
+            131,
+            145
+          ],
+          [
+            136,
+            132
+          ],
+          [
+            141,
+            142
+          ],
+          [
+            157,
+            158
+          ],
+          [
+            176,
+            177
+          ],
+          [
+            178,
+            179
+          ],
+          [
+            193,
+            -190
+          ],
+          [
+            222,
+            -206
+          ],
+          [
+            222,
+            223
+          ]
+        ]
+      }
+    },
+    "public_inventory": {
+      "callables": 550,
+      "body_exercised": 550,
+      "with_named_test_context": 550,
+      "not_exercised": []
+    },
+    "public_inventory_path": "docs/baselines/feature-api-inventory.json",
+    "context_collection": "Full suite except tests/manager/test_files.py under dynamic test_function contexts; append that file without contexts because sqlite3.connect fault injection otherwise affects coverage database writes. No tests omitted from measured inventory.",
+    "limitations": [
+      "body execution is not correctness",
+      "not every input, branch or cross-feature sequence is tested",
+      "contexts identify exercising tests, not direct assertions on every line",
+      "inherited implementations counted once; private modules/helpers, constants and aliases excluded from public callable count"
+    ]
+  },
+  "native_demos": {
+    "chrome": {
+      "demo": "local-html",
+      "browser": "chrome",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "allow_download": false,
+      "selected_sections": [
+        "all"
+      ],
+      "output": "/private/tmp/aselenium-feature-tests.Op4418/local-chrome-j3utjerh",
+      "sections": [
+        {
+          "section": "driver-management",
+          "details": {
+            "request": {
+              "product": "Chrome",
+              "version": "build",
+              "channel": "stable",
+              "binary": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+              "driver": null,
+              "os_name": "mac",
+              "architecture": "64",
+              "arm": true,
+              "policy": "offline",
+              "validate_compatibility": true
+            },
+            "driver_location": "/private/tmp/aselenium-demo-validation.YyYti3/cache/.aselenium/v2/3a9ffa8791062c23a77304d089e2361d58ac76043a3d1a7b7405c76b7cce2805/extracted/chromedriver-mac-arm64/chromedriver",
+            "driver_version": "152.0.7977.82",
+            "browser_location": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+            "browser_version": "152.0.7977.76",
+            "channel": "stable"
+          },
+          "status": "passed",
+          "seconds": 0.037
+        },
+        {
+          "section": "options",
+          "details": {
+            "implicit_wait_seconds": 0,
+            "session_timeout_seconds": 30,
+            "defensive_capabilities": true,
+            "proxy": "serialization only; not enabled",
+            "profile": "empty template cloned per acquisition"
+          },
+          "status": "passed",
+          "seconds": 0.001
+        },
+        {
+          "section": "navigation",
+          "details": {
+            "page_width": 1200,
+            "page_height": 757,
+            "source_characters": 173,
+            "timeouts_ms": {
+              "implicit": 0,
+              "pageLoad": 20000,
+              "script": 5000
+            }
+          },
+          "status": "passed",
+          "seconds": 0.42
+        },
+        {
+          "section": "elements",
+          "details": {
+            "form": "submitted locally",
+            "upload": "one fixture file selected; no network upload",
+            "visibility": "hidden, zero-size, offscreen, covered, and shadow cases checked"
+          },
+          "status": "passed",
+          "seconds": 0.158
+        },
+        {
+          "section": "waits",
+          "details": {
+            "explicit_wait": "truthy result returned; zero-timeout missing lookup is falsey",
+            "current_conditions": [
+              "in_viewport",
+              "unobscured"
+            ]
+          },
+          "status": "passed",
+          "seconds": 0.234
+        },
+        {
+          "section": "cookies",
+          "details": {
+            "origin": "http://127.0.0.1:60970",
+            "cookie_deleted": true
+          },
+          "status": "passed",
+          "seconds": 0.023
+        },
+        {
+          "section": "windows",
+          "details": {
+            "temporary_tab_closed": true
+          },
+          "status": "passed",
+          "seconds": 0.047
+        },
+        {
+          "section": "frames",
+          "details": {
+            "default_frame_restored": true
+          },
+          "status": "passed",
+          "seconds": 0.02
+        },
+        {
+          "section": "alerts",
+          "details": {
+            "prompt_accepted": true
+          },
+          "status": "passed",
+          "seconds": 0.226
+        },
+        {
+          "section": "scripts",
+          "details": {
+            "script_cache": "created, executed, removed",
+            "application_payload_preserved": true
+          },
+          "status": "passed",
+          "seconds": 0.052
+        },
+        {
+          "section": "actions",
+          "details": {
+            "reusable_chain": true,
+            "remote_input_state_reset": true
+          },
+          "status": "passed",
+          "seconds": 0.302
+        },
+        {
+          "section": "artifacts",
+          "details": {
+            "files": [
+              "page.png",
+              "page.pdf"
+            ],
+            "notes": []
+          },
+          "status": "passed",
+          "seconds": 0.15
+        },
+        {
+          "section": "vendor",
+          "details": {
+            "cdp_product": "Chrome/152.0.7977.76",
+            "network_reset": true,
+            "permission_restored": true,
+            "log_counts": {
+              "browser": 0
+            },
+            "casting": "not invoked; requires explicit device selection"
+          },
+          "status": "passed",
+          "seconds": 0.02
+        },
+        {
+          "section": "concurrency",
+          "details": {
+            "independent_sessions": 2,
+            "captured_timeouts_seconds": [
+              11,
+              17
+            ],
+            "cookies_isolated": true,
+            "physical_clones_checked": true
+          },
+          "status": "passed",
+          "seconds": 1.252
+        },
+        {
+          "section": "cancellation",
+          "details": {
+            "cancelled_task_awaited": true,
+            "fresh_acquisition_succeeded": true
+          },
+          "status": "passed",
+          "seconds": 1.843
+        }
+      ],
+      "status": "passed",
+      "scope": "loopback pages; fresh or empty-template profiles; no casting",
+      "session": {
+        "browser_version": "152.0.7977.76",
+        "driver_version": "152.0.7977.82",
+        "acquisition": "offline"
+      },
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      }
+    },
+    "edge": {
+      "demo": "local-html",
+      "browser": "edge",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "allow_download": false,
+      "selected_sections": [
+        "all"
+      ],
+      "output": "/private/tmp/aselenium-feature-tests.Op4418/local-edge-gss5iyxz",
+      "sections": [
+        {
+          "section": "driver-management",
+          "details": {
+            "request": {
+              "product": "Edge",
+              "version": "build",
+              "channel": "stable",
+              "binary": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+              "driver": null,
+              "os_name": "mac",
+              "architecture": "64",
+              "arm": true,
+              "policy": "offline",
+              "validate_compatibility": true
+            },
+            "driver_location": "/private/tmp/aselenium-demo-validation.YyYti3/cache/.aselenium/v2/fe8825480aea415603f1fa09446b3e9151243a3cd5677a5f3ac612aaff057982/extracted/msedgedriver",
+            "driver_version": "151.0.4129.107",
+            "browser_location": "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+            "browser_version": "151.0.4129.93",
+            "channel": "stable"
+          },
+          "status": "passed",
+          "seconds": 0.073
+        },
+        {
+          "section": "options",
+          "details": {
+            "implicit_wait_seconds": 0,
+            "session_timeout_seconds": 30,
+            "defensive_capabilities": true,
+            "proxy": "serialization only; not enabled",
+            "profile": "empty template cloned per acquisition"
+          },
+          "status": "passed",
+          "seconds": 0.001
+        },
+        {
+          "section": "navigation",
+          "details": {
+            "page_width": 1192,
+            "page_height": 769,
+            "source_characters": 173,
+            "timeouts_ms": {
+              "implicit": 0,
+              "pageLoad": 20000,
+              "script": 5000
+            }
+          },
+          "status": "passed",
+          "seconds": 0.302
+        },
+        {
+          "section": "elements",
+          "details": {
+            "form": "submitted locally",
+            "upload": "one fixture file selected; no network upload",
+            "visibility": "hidden, zero-size, offscreen, covered, and shadow cases checked"
+          },
+          "status": "passed",
+          "seconds": 0.174
+        },
+        {
+          "section": "waits",
+          "details": {
+            "explicit_wait": "truthy result returned; zero-timeout missing lookup is falsey",
+            "current_conditions": [
+              "in_viewport",
+              "unobscured"
+            ]
+          },
+          "status": "passed",
+          "seconds": 0.234
+        },
+        {
+          "section": "cookies",
+          "details": {
+            "origin": "http://127.0.0.1:61133",
+            "cookie_deleted": true
+          },
+          "status": "passed",
+          "seconds": 0.022
+        },
+        {
+          "section": "windows",
+          "details": {
+            "temporary_tab_closed": true
+          },
+          "status": "passed",
+          "seconds": 0.056
+        },
+        {
+          "section": "frames",
+          "details": {
+            "default_frame_restored": true
+          },
+          "status": "passed",
+          "seconds": 0.024
+        },
+        {
+          "section": "alerts",
+          "details": {
+            "prompt_accepted": true
+          },
+          "status": "passed",
+          "seconds": 0.224
+        },
+        {
+          "section": "scripts",
+          "details": {
+            "script_cache": "created, executed, removed",
+            "application_payload_preserved": true
+          },
+          "status": "passed",
+          "seconds": 0.049
+        },
+        {
+          "section": "actions",
+          "details": {
+            "reusable_chain": true,
+            "remote_input_state_reset": true
+          },
+          "status": "passed",
+          "seconds": 0.301
+        },
+        {
+          "section": "artifacts",
+          "details": {
+            "files": [
+              "page.png",
+              "page.pdf"
+            ],
+            "notes": []
+          },
+          "status": "passed",
+          "seconds": 0.135
+        },
+        {
+          "section": "vendor",
+          "details": {
+            "cdp_product": "Edg/151.0.4129.93",
+            "network_reset": true,
+            "permission_restored": true,
+            "log_counts": {
+              "browser": 0
+            },
+            "casting": "not invoked; requires explicit device selection"
+          },
+          "status": "passed",
+          "seconds": 0.026
+        },
+        {
+          "section": "concurrency",
+          "details": {
+            "independent_sessions": 2,
+            "captured_timeouts_seconds": [
+              11,
+              17
+            ],
+            "cookies_isolated": true,
+            "physical_clones_checked": true
+          },
+          "status": "passed",
+          "seconds": 1.162
+        },
+        {
+          "section": "cancellation",
+          "details": {
+            "cancelled_task_awaited": true,
+            "fresh_acquisition_succeeded": true
+          },
+          "status": "passed",
+          "seconds": 1.741
+        }
+      ],
+      "status": "passed",
+      "scope": "loopback pages; fresh or empty-template profiles; no casting",
+      "session": {
+        "browser_version": "151.0.4129.93",
+        "driver_version": "151.0.4129.107",
+        "acquisition": "offline"
+      },
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      }
+    }
+  },
+  "native_proxy": {
+    "chrome": {
+      "status": "passed",
+      "browser": "chrome",
+      "browser_version": "152.0.7977.76",
+      "driver_version": "152.0.7977.82",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "elapsed_seconds": 0.6585080829681829,
+      "routing": {
+        "forwarded": 1,
+        "origin_hits": 1,
+        "rejected": 3,
+        "direct_rejected": 0
+      },
+      "remaining_observed_processes": [],
+      "remaining_owned_tasks": 0,
+      "scope": "HTTP routing through package Proxy; exact loopback origin only; HTTPS/CONNECT/authentication are not tested",
+      "remaining_fixture_threads": []
+    },
+    "edge": {
+      "status": "passed",
+      "browser": "edge",
+      "browser_version": "151.0.4129.93",
+      "driver_version": "151.0.4129.107",
+      "python": "3.13.12",
+      "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+      "elapsed_seconds": 0.5853292499668896,
+      "routing": {
+        "forwarded": 1,
+        "origin_hits": 1,
+        "rejected": 5,
+        "direct_rejected": 0
+      },
+      "remaining_observed_processes": [],
+      "remaining_owned_tasks": 0,
+      "scope": "HTTP routing through package Proxy; exact loopback origin only; HTTPS/CONNECT/authentication are not tested",
+      "remaining_fixture_threads": []
+    }
+  },
+  "soaks": {
+    "scope": "Summarized script stdout; each executes prompted Actions.send_keys example verbatim; local data URL, cached driver, fresh profiles; not hour/day stability or proof of no leaks",
+    "chrome": {
+      "status": "passed",
+      "cycles": 100,
+      "concurrency": 4,
+      "browser_version": "152.0.7977.76",
+      "driver_version": "152.0.7977.82",
+      "median_cycle_seconds": 1.4345622709952295,
+      "p95_cycle_seconds": 1.5440360000357032,
+      "observed_child_processes": 931,
+      "remaining_observed_processes": [],
+      "remaining_owned_tasks": 0,
+      "initial_rss_bytes": 49446912,
+      "final_rss_bytes": 56180736,
+      "initial_handles": 6,
+      "all_post_warmup_handles": 8,
+      "resource_sample_count": 26
+    },
+    "edge": {
+      "status": "passed",
+      "cycles": 100,
+      "concurrency": 4,
+      "browser_version": "151.0.4129.93",
+      "driver_version": "151.0.4129.107",
+      "median_cycle_seconds": 1.2798201460100245,
+      "p95_cycle_seconds": 1.4110059160157107,
+      "observed_child_processes": 847,
+      "remaining_observed_processes": [],
+      "remaining_owned_tasks": 0,
+      "initial_rss_bytes": 49184768,
+      "final_rss_bytes": 55853056,
+      "initial_handles": 6,
+      "all_post_warmup_handles": 8,
+      "resource_sample_count": 26
+    }
+  },
+  "quality_gates": {
+    "structural_audit": {
+      "files": 105,
+      "functions": 1829,
+      "classes": 252,
+      "examples": 178,
+      "issues": []
+    },
+    "ruff": "passed",
+    "ruff_format": "passed",
+    "example_contracts": "passed",
+    "configured_mypy": "passed: 19 modules; not whole package",
+    "pip_check_py313": "passed",
+    "whitespace": "passed excluding preexisting .gitignore EOF whitespace"
+  },
+  "unverified": [
+    "native Firefox, Safari, standalone Chromium, separate CfT bundles, beta/dev channels, Windows WebView2",
+    "Windows/Linux and Python 3.10/3.12/3.14 actual runners",
+    "physical casting and permission-dependent device behavior",
+    "authenticated proxy, HTTPS CONNECT, SOCKS, PAC/WPAD, corporate TLS",
+    "fresh vendor downloads and live third-party website acceptance",
+    "hour/day soak, antivirus interference, hardware power-loss, hostile/network-share caches",
+    "remote CI execution or release publication",
+    "execution of every browser-dependent docstring example"
+  ],
+  "change_boundary": {
+    "runtime_package_files_compared_to_backup": 57,
+    "changed_runtime_package_files": [],
+    "user_venv_modified": false,
+    "committed": false,
+    "pushed": false,
+    "personal_profiles_accessed": false,
+    "safari_permissions_changed": false
+  },
+  "source_sha256": {
+    ".github/workflows/tests.yml": "0f0376f8c8569dcf872de3ad39622b32425f11692f2f6628511c53686ea0b944",
+    "README.md": "63a3a9a7e2916d40fc32a28a6a1ccd1cdf6f04a7f27bcc5e6d2817c8e28991ae",
+    "docs/feature-testing.md": "2b4e31bd47169b78247bf9bed56fa5c32a2aecfa6f613f05244162d1b5fcfa1b",
+    "pyproject.toml": "1efa1ec48d49443bd7d264873ebff8442595d9db0a50b10d96c8fdc43b7651c6",
+    "scripts/benchmark_download.py": "e2bd18dbe0bddc16ce6f8b02ef407adfd2212dae097c86be9e794b3190277b37",
+    "scripts/benchmark_manager.py": "a56320d7d600822456101f2303ec3f31923a252e9cc2e8dc4a7d7030953b9ff1",
+    "scripts/check_api_quality.py": "ac69581842ef1dbda4750ce1a8babd4d2cfdc13d88ce09143db75ebf1d45d8bc",
+    "scripts/check_example_contracts.py": "9a1ecd83321e53c9f2c09980d25d054c458af46dfb135e357d55705e8e334c04",
+    "scripts/check_release.py": "0ea516ddc241d8ea6908b449400af7ddc11dd3a7efccd7b925f7db84df9cb2a4",
+    "scripts/report_feature_coverage.py": "ba13041420a55055d562e87a44e33ce837cc1cb5d9999b0d0ef55baccd6dc767",
+    "scripts/smoke_browser.py": "2e2b3ba75d651f51455d6b1c9eeb00fb063425f597adfc8c1b3d4a3c48bfb628",
+    "scripts/soak_browser.py": "cf8e31257baed55104341600df2e79e5472043e71b9495604026dd51b4f7597b",
+    "scripts/test_browser_proxy.py": "2f19cfce0a850037b53006e0c069cf1fe0822e98ccdb77e04526e1cf2b474f94",
+    "src/_demo_support.py": "cc7f183114e71990373935fd4f66c85d9e230af61ca63fafe9d1f952e427042f",
+    "src/aselenium/__init__.py": "e893c6a97283ce30eff4d15e76908e5824d781b6f37162f6193d5b614401408b",
+    "src/aselenium/_async.py": "d7c7ed9c1a5e77b33ef14069f2a9bd2213dab8d277afb1f8167a8ca36acc2bff",
+    "src/aselenium/_output.py": "1dccdab68bd064f038663401570cf02306b4c987187306f0c113e0f674848972",
+    "src/aselenium/_profiles.py": "5080c9e0fac83952de331011fddd6a8341bdd48c3cd7a57f489af3e8f0a58dee",
+    "src/aselenium/_wait.py": "7b4535c3531ff46d688f9a44daff55eb3a40b7ebd48def98f367bd3e9f97c853",
+    "src/aselenium/actions.py": "5b34d774721dc11c05746aa04c57805fe881a894bc4d9e8baba00d635c266ccd",
+    "src/aselenium/alert.py": "6016244a61eeeb7835f15c6a5058dfa8b9ddf9c2b7ddbbef3ebb0776d56d51b6",
+    "src/aselenium/chrome/__init__.py": "ddb7db61e94a3bdf053ed02aae87e68d80c5d3551d4656910562f7b2a68dfe43",
+    "src/aselenium/chrome/options.py": "c119fc02303fbb26db0e87bc2a63ddcd21841b44584aa1f5f97c685052b086c6",
+    "src/aselenium/chrome/service.py": "e1a093454d8a5a83b67f3a7573002ee62a8c313ba3d8bd1f2f4f76fc7ece896c",
+    "src/aselenium/chrome/session.py": "19550f4d57cd7cd8ddf78843b289cb3fd6c2d38f11672daf0bc63a30ac3ce50a",
+    "src/aselenium/chrome/webdriver.py": "7a7b50e4e9c9d564943799c39b4b092799bff92c8d0122b3721230789d37e94e",
+    "src/aselenium/chromium/__init__.py": "65f0634993ec5c6d571b31ebf1996d78ae3efa6789d3beedc049a088316af88a",
+    "src/aselenium/chromium/options.py": "b759e5ad6066b771cd979a7e47bb1fb2c7b302dcf26afcd8af40e21f58ef2c3d",
+    "src/aselenium/chromium/service.py": "8b3112d720f9bcab9ee328e20ce40db7013f93ff039d260a1201210d63375e2e",
+    "src/aselenium/chromium/session.py": "8c7ac5a0dc3615d52976815961bbff4e18c2935d3569b78fcc7e74749b6f0174",
+    "src/aselenium/chromium/webdriver.py": "40177c99116f1d701ec57fdd74a261c7acf405975be67e6701f15078fedbf969",
+    "src/aselenium/command.py": "f066ce687cb9062285299b46e336b3aa37be956151d676c76270531c4ffc9483",
+    "src/aselenium/connection.py": "b13cbfd13af244cd1267579925265135148c3ff7f5a63c90c3a124d68f29ed10",
+    "src/aselenium/edge/__init__.py": "5ec12845893860965261bc6d5c26107fe0e87a147e73e247dc3664b7e9bf0561",
+    "src/aselenium/edge/options.py": "441b359e8743bd7274cf6b26f12cda4d41a332d9f6bf251f0a5d64596ec0b941",
+    "src/aselenium/edge/service.py": "c50aeb99348557a3b8a64daf94307073c69d7f323f204259223820235a8e996f",
+    "src/aselenium/edge/session.py": "d42fe28dd9f038095124b657f0d82666d8e2ebc2c8ad3f64104794b8376cab9e",
+    "src/aselenium/edge/webdriver.py": "c6d93a02a09b1a5a2b99834677d8d3d6518f5a25ffb71c6f38795348f9deb18f",
+    "src/aselenium/element.py": "da43fd6ce340f7273e4067b2e35a527554a8b4dd2fc8e6e416d682fd37a3e719",
+    "src/aselenium/errors.py": "ddea9aff8904bb0208b51a7927cfa6c42d05b7d7b1468b904c7fc6952a957b80",
+    "src/aselenium/firefox/__init__.py": "28b7b575be47d2e5972fa3170341dfc6e3e77e19d0aeff740168674609ae9158",
+    "src/aselenium/firefox/options.py": "5b5251b86fa3653e46d4065bb76fec6dbb337db1e96e4c8f286b0b52aeb0211c",
+    "src/aselenium/firefox/service.py": "69baa463a341da8245beab36fb99ed6e25e866ea0018ed27bca8f9c4f816e150",
+    "src/aselenium/firefox/session.py": "7c5b06b243877148f07110e0830ef44f5f9f9d9d7861db70227654221060618e",
+    "src/aselenium/firefox/utils.py": "ba2fe0bb33344d268045cf11a5cbdfdf76c1bd5800abeacc607e4f83ce49ee08",
+    "src/aselenium/firefox/webdriver.py": "9a4e67ec036ac60beb425d5a0220a5bb502d24cc1b1291f79eeb4bbc7684cdbf",
+    "src/aselenium/javascript/__init__.py": "79b34c5cd59262419e922d89ffc3ceb454ecb0bd4a1fb4666f778a2e0d33d327",
+    "src/aselenium/logs.py": "6b9dac2ebda748d340a8c0ebaaf6470ed4cbdee4af2c26f0dffa707629329352",
+    "src/aselenium/manager/__init__.py": "d9739dd64da54b3359bdca97050c3194d9c8653a87bda1ded9ef5f5a74a3540e",
+    "src/aselenium/manager/_cache.py": "bd9684101bda4a5bde0b3fd56cda69524bd3848df403ed6d655b516281da44c0",
+    "src/aselenium/manager/_filesystem.py": "1d2326eba4cfe8d3de603577fe8a5bc08a949a7e53f888473f680027d49189cc",
+    "src/aselenium/manager/_http.py": "97d587cd27ff635b920333660034d1768b52e4f387a272933f54b6969dc111fc",
+    "src/aselenium/manager/_installation.py": "68f63e33c9b0f963cac4413f90f35fa394bfc4f5c6eb7fc5020051cd7c8db876",
+    "src/aselenium/manager/driver.py": "e281036f6ca20c37f5d84a406a459bf5a2c40b319dabf51dd6a72affdc3ed04f",
+    "src/aselenium/manager/file.py": "ff9b37fad3311f178c44b73df1331967cdb3ba0623ae99db72a0e3f8a25dbf48",
+    "src/aselenium/manager/version.py": "20521a48fec6e3650fc74d2c85d77bc4d670096186be8f84332d8f56354ae57a",
+    "src/aselenium/options.py": "3dcb3bec966be97cc2d8173a242c2fa4c3ecf31a1bff67f6b22f02d909f61358",
+    "src/aselenium/safari/__init__.py": "b5ddf2cb7e6fb66c8e1b9d79eaa42b8c1d30685c7febf32fb162578481361fa1",
+    "src/aselenium/safari/options.py": "acb83e1836d91c2f1dc69175d16f8925adc3bac35704ef3ff6340c785e047b3d",
+    "src/aselenium/safari/service.py": "e69ebd9e21c40ab4590b8c0d1cf3c986bd2fdfeca52565b99dd8063bf3bae9f8",
+    "src/aselenium/safari/session.py": "e451a34dd0b18e577d173411d1c2ef828a3a77b95df977898db520f5db1ebce7",
+    "src/aselenium/safari/webdriver.py": "cbabf2956f4db0cff90c86fcb3f73d00c50ff612733e5010fafe18e3ecbb1cce",
+    "src/aselenium/service.py": "162c1ddab5018413463c6347d610a0abb0e3dfb0d324e50a2c2bfa75f1bda923",
+    "src/aselenium/session.py": "3ec9018a885790666ce91a5d3bff80106b46719166dfaca4d4ac2e383ba9ce7d",
+    "src/aselenium/settings.py": "6dc116dfe5d25d63e0c13698af52df8c3c4a24d7b61859f965fad934689381e9",
+    "src/aselenium/shadow.py": "690199ce8e0b195896d4c217271d595c5a5275f201f7120681f3c2718e23d664",
+    "src/aselenium/utils.py": "ca9ef7e436d107b2de9e8791b5f174beee119f0f6ac6f2078cc081f4dfe90514",
+    "src/aselenium/valuewrap.py": "819c5df05171573e2d69459cbb5fa04e084f7592b592dc36069b1dacc69937b7",
+    "src/aselenium/webdriver.py": "737e55a2bfdb0b7b54d25c3c93b0f53a6748e71ae90214e1c6061ec39a7a5973",
+    "src/demo_google.py": "7abf2d09ea61dbcfe0f357ba672cf78a8d0fb0e621df3d57bbac648c677035f7",
+    "src/demo_local.py": "32298fbfd0c588ff4a5f51b19e83f31016e3e8abb732b454a1adf0a38cdba13f",
+    "src/quick_start.py": "81b329041aa5d215b00b8df125d2ee37f477fea9b0f560e42614214cc721d9ce",
+    "tests/conftest.py": "fa107ed6b38e7445cf675b7f3ba7f218046e0181ccb2a805ffc3aa9b1783df86",
+    "tests/manager/test_archive_safety.py": "330497354b95b32c0d2805d7ebaaea906fef6e65f2a2f30818105122c0247c3f",
+    "tests/manager/test_cache_v2.py": "c394a2ac0e1c4b8ba5e58bfcec89798d586b9fbe577e7cf41328ebfe53a965b9",
+    "tests/manager/test_compatibility.py": "d933ff22c8ca9b7e0fa05124d353886134debbee121e29a6b3030119c86dba7a",
+    "tests/manager/test_discovery.py": "c5ea96c3c63ef7d274b6fa92782de68474974e4fb907c406716ada11ccab2ea7",
+    "tests/manager/test_discovery_paths.py": "4bbea734d7d79a5a110e5ec6e33b82a3d1df96208adf27c10502b0122f18638c",
+    "tests/manager/test_files.py": "1f0ffd4b139383d9290f1c7dd847074ad4823f268149465fb6895882f445300b",
+    "tests/manager/test_filesystem_safety.py": "0db093e565423676989aa30e12fdf10bca23fea5ee5399554b1ba8cba6b54cdd",
+    "tests/manager/test_installation.py": "741c4f7a510409546ea63ab70bab4dbb7cca0d63cd7dffe3b3475523897402eb",
+    "tests/manager/test_installation_results.py": "5a938669f7ce5be2ca86660366a625b71b3adaddfab0eb370ec42a96132635e7",
+    "tests/manager/test_probe_safety.py": "61481dde3098013fa033cb795ec3175f92ac15d27a9c11a0d1ae9c1285f33155",
+    "tests/manager/test_public_api.py": "c9d978c1192074f0316a29a3e8a815d6aa263ce32bf4e748cea9aae14b0a26f4",
+    "tests/manager/test_requests.py": "e34ddde9c1199f694f156c3205f0c44cf946d3d6230410581390d82fabe5224e",
+    "tests/manager/test_resolution_policies.py": "9400342d99a24aa0e602081f46b3d2c647cb626d9f9b8367328827b8f1bb4ced",
+    "tests/manager/test_resources.py": "ebdaced9ed170049dbc00d789901ca3c5bf3466c9cd277c2b23bcab35e1ebd81",
+    "tests/manager/test_safari_discovery.py": "d9943affc693d74f1f68c7263b34dffbd2161bcb02d5c535b957419ab92e2e0c",
+    "tests/manager/test_versions.py": "a54baa09230afbaeec5a709ba2eb700e60c7865bdb9b66495b05782479e05162",
+    "tests/test_api_quality.py": "96030ce83052d4e7d2268234026d9ba59c6e6d904188c6da495efade089deece",
+    "tests/test_browser_features.py": "9744123e7e79bf4b852a471d0574aa42e19877b67e4fcd444d84b0e10338bf9f",
+    "tests/test_current_only.py": "3ffc711328cddc3561314f25b5ce12c5aa89a0d1f46171e8b1b7d0261f1aec07",
+    "tests/test_demo_google.py": "2035969f7510177e21f9d8eddeb63a046adb31d97cb489eea8b543439be73ca4",
+    "tests/test_demo_local.py": "8eef26f46c0c6d859d10de28f9e0c01babdb79e7387f4be7f3ca8621e994718a",
+    "tests/test_distribution.py": "cc807f487274c064d7aef814fce151744362f6fd7d62825ef16f85b6c72233ce",
+    "tests/test_dom_features.py": "87404ad3b85a23c36b4ff9df8c898c8c2bbc87131f7b748f253b67252bcb2687",
+    "tests/test_examples.py": "b46cd792826a77140b9db1d4f94f53d4c6032d08a65500c3716d05a3b359cb32",
+    "tests/test_feature_inventory.py": "83c538469746c744b0bd36ce310125cda689bbe90fd79ad3f42c312dcf5475f9",
+    "tests/test_generated_inputs.py": "2406f16ee72548ab15917d0729806d44b13d364799fbf9928c503ccbd7165b99",
+    "tests/test_input_features.py": "7ac2c9d98fa3d746e5b32ffbe1bac6d86d8c13be800763f3a4d2189201a79ebe",
+    "tests/test_lifecycle_features.py": "5a20317c67e6709a7f304accbf8ef4e29b41f7d91c7130db3f9ef40ab8bd808c",
+    "tests/test_production_readiness.py": "5a251ba5fbd64790f08f5741ce2a20c7fbfbbe0a614aa0997cc2d778cf1ed019",
+    "tests/test_proxy_harness.py": "c4a19d0cf0a502874145fa2dab4f6249f839ee68ea97c2aa5a011689bd14eb9d",
+    "tests/test_release_configuration.py": "b4ea7fb4fb501865b33970de3009d60c1a8d6abb5d3c2c129805c2d4711b5267",
+    "tests/test_runtime.py": "bd18cd2cab58f15f1a58113f4d4ee5616788ecf8f7881424283402062c6efd6d",
+    "tests/test_second_pass.py": "4c48e5e0b83ec70def789d78c8f7b8ab88cff984a59f9081699f38a9aa27ca90",
+    "tests/test_session_features.py": "f738ae258c5c1a2f468d5e0c7c4b6c7e993132e05a28c1e01e3b448334bc0d08",
+    "tests/test_transport_loopback.py": "b630d7162d1dce90f85cfc410df2f72261ca089b68dea7c6f1b987b72ba12496",
+    "tests/test_value_features.py": "e07ec9ebd028b7a9803f34a29f1dae9ecd543437db70f671567639d9cd60330b"
+  },
+  "before_testing_backup": "/private/tmp/aselenium-feature-tests.Op4418/before-tests.tar.gz"
+}

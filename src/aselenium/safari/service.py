@@ -16,6 +16,10 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+"""Aselenium service implementation and supporting types."""
+
+from __future__ import annotations
+
 from aselenium.service import BaseService
 
 __all__ = ["SafariService"]
@@ -23,13 +27,14 @@ __all__ = ["SafariService"]
 
 # Safari Service ----------------------------------------------------------------------------------
 class SafariService(BaseService):
-    "Safari Service"
+    """Safari Service."""
 
     # Socket ------------------------------------------------------------------------------
     @property
     def port_args(self) -> list[str]:
-        """Access the part arguments for the service Process constructor.
+        """Return the part arguments for the service Process constructor.
 
-        :return `<list[str]>`: `["-p", self.port_str]`
+        Returns:
+            `["-p", self.port_str]`
         """
         return ["-p", self.port_str]

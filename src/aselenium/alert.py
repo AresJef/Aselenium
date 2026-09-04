@@ -16,9 +16,16 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+"""Aselenium alert implementation and supporting types."""
+
 from __future__ import annotations
+
 from asyncio import sleep
-from typing import Any, TYPE_CHECKING
+from typing import (
+    TYPE_CHECKING,
+    Any,
+)
+
 from aselenium import errors
 from aselenium.command import Command
 
@@ -30,19 +37,24 @@ __all__ = ["Alert"]
 
 # Alert -------------------------------------------------------------------------------------------
 class Alert:
-    """Represents a JavaScript alert."""
+    """Represent a JavaScript alert."""
 
     def __init__(self, session: Session) -> None:
-        """The JavaScript alert.
+        """Initialize the instance with the supplied configuration.
 
-        :param session `<'Session'>`: The session the alert raises.
+        Args:
+            session: The session the alert raises.
         """
         self._session: Session = session
 
     # Properties --------------------------------------------------------------------------
     @property
     async def text(self) -> str | None:
-        """Access the text of the alert `<'str'>`."""
+        """Return the text of the alert.
+
+        Returns:
+            The text of the alert.
+        """
         try:
             res = await self._session.execute_command(Command.W3C_GET_ALERT_TEXT)
         except errors.InvalidMethodError:
@@ -51,17 +63,19 @@ class Alert:
             return res["value"]
         except KeyError as err:
             raise errors.InvalidResponseError(
-                "<{}>\nFailed to get the text message from alert: "
-                "{}".format(self.__class__.__name__, res)
+                "<{}>\nFailed to get the text message from alert: {}".format(
+                    self.__class__.__name__, res
+                )
             ) from err
 
     # Control ------------------------------------------------------------------------------
     async def dismiss(self, pause: int | float | None = None) -> None:
         """Dismiss the alert.
 
-        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
-            This can be useful to wait for the command to take effect,
-            before executing the next command. Defaults to `None` - no pause.
+        Args:
+            pause: The pause in seconds after execution. Defaults to `None`.
+                This can be useful to wait for the command to take effect,
+                before executing the next command. Defaults to `None` - no pause.
         """
         await self._session.execute_command(Command.W3C_DISMISS_ALERT)
         await self.pause(pause)
@@ -69,9 +83,10 @@ class Alert:
     async def accept(self, pause: int | float | None = None) -> None:
         """Accept the alert.
 
-        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
-            This can be useful to wait for the command to take effect,
-            before executing the next command. Defaults to `None` - no pause.
+        Args:
+            pause: The pause in seconds after execution. Defaults to `None`.
+                This can be useful to wait for the command to take effect,
+                before executing the next command. Defaults to `None` - no pause.
         """
         await self._session.execute_command(Command.W3C_ACCEPT_ALERT)
         await self.pause(pause)
@@ -82,21 +97,23 @@ class Alert:
         sep: str = " ",
         pause: int | float | None = None,
     ) -> None:
-        """Simulate typing or keyboard keys pressing into the alert.
+        """Send text to the currently open JavaScript prompt.
 
-        :param values `<'str'>`: The strings to be typed or keyboard keys to be pressed.
-        :param sep `<'str'>`: The separator between each values. Defaults to `' '`.
-        :param pause `<'int/float/None'>`: The pause in seconds after execution. Defaults to `None`.
-            This can be useful to wait for the command to take effect,
-            before executing the next command. Defaults to `None` - no pause.
+        This command supplies prompt text; it is not a keyboard action sequence.
+        Accept or dismiss the prompt separately after supplying its value.
 
-        ### Example:
-        >>> await alert.send("Hello", "world!")
-        ### -> "Hello world!"
+        Args:
+            *values: Values converted to strings and joined into the prompt text.
+            sep: Separator between values; defaults to one space.
+            pause: Optional delay in seconds after the command completes.
+
+        Example:
+            >>> await alert.send("Hello", "world!")
+            >>> await alert.accept()
         """
         # Validate
         try:
-            values = map(str, values)
+            text_values = [str(value) for value in values]
         except ValueError as err:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid 'values' to send to alert: {}".format(
@@ -104,11 +121,10 @@ class Alert:
                     ["%s %s" % (type(i), i) for i in values],
                 )
             ) from err
-        values = list(values)
         # Sent values
         await self._session.execute_command(
             Command.W3C_SET_ALERT_VALUE,
-            body={"text": sep.join(values), "value": values},
+            body={"text": sep.join(text_values), "value": text_values},
         )
         # Pause
         await self.pause(pause)
@@ -117,7 +133,8 @@ class Alert:
     async def pause(self, duration: int | float | None) -> None:
         """Pause the for a given duration.
 
-        :param duration `<'int/float/None'>`: The duration to pause in seconds.
+        Args:
+            duration: The duration to pause in seconds.
         """
         if duration is None:
             return None  # exit
@@ -132,6 +149,11 @@ class Alert:
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
+        """Return a diagnostic representation of this instance.
+
+        Returns:
+            A diagnostic representation of this instance.
+        """
         return "<%s (session='%s', service='%s')>" % (
             self.__class__.__name__,
             self._session._id,
@@ -139,10 +161,20 @@ class Alert:
         )
 
     def __hash__(self) -> int:
+        """Return the hash used by sets and dictionary keys.
+
+        Returns:
+            The hash used by sets and dictionary keys.
+        """
         return hash((self.__class__.__name__, hash(self._session)))
 
     def __eq__(self, __o: Any) -> bool:
-        return hash(self) == hash(__o) if isinstance(__o, Alert) else False
+        """Return whether this instance compares equal to another object.
 
-    def __del__(self):
-        self._session = None
+        Args:
+            __o: Object to compare with this instance.
+
+        Returns:
+            True if this instance compares equal to another object; otherwise False.
+        """
+        return hash(self) == hash(__o) if isinstance(__o, Alert) else False

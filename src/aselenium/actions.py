@@ -16,15 +16,24 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+"""Aselenium actions implementation and supporting types."""
+
 from __future__ import annotations
+
 from asyncio import sleep
-from typing import Any, Literal, TypedDict, TYPE_CHECKING
+from math import isfinite
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Literal,
+    TypedDict,
+)
+
 from aselenium import errors
 from aselenium.command import Command
+from aselenium.element import ELEMENT_KEY, Element
 from aselenium.settings import Constraint
-from aselenium.element import Element, ELEMENT_KEY
-from aselenium.utils import KeyboardKeys, MouseButtons
-from aselenium.utils import process_keys, prettify_dict
+from aselenium.utils import MouseButtons, process_keys
 
 if TYPE_CHECKING:
     from aselenium.session import Session
@@ -33,19 +42,12 @@ __all__ = ["Actions"]
 
 
 # Types -------------------------------------------------------------------------------------------
-class PointerActions(TypedDict):
-    """The pointer (mouse) actions to perform `<dict>`.
+class PointerActions(TypedDict, total=False):
+    """The pointer (mouse) actions to perform.
 
-    Expected format:
-    >>> {
-            "type": "pointer",
-            "parameters": {"pointerType": "mouse"},
-            "id": "mouse",
-            "actions": [
-                {'type': 'pointerDown', 'duration': 0, 'button': 0},
-                ...
-            ],
-        }
+    Example:
+        >>> payload = {"type": "pointer", "parameters": {"pointerType": "mouse"},
+        ...            "id": "mouse", "actions": [{"type": "pointerDown", "button": 0}]}
     """
 
     type: str
@@ -54,18 +56,12 @@ class PointerActions(TypedDict):
     actions: list[dict[str, Any]]
 
 
-class KeyActions(TypedDict):
-    """The keyboard actions to perform `<dict>`.
+class KeyActions(TypedDict, total=False):
+    """The keyboard actions to perform.
 
-    Expected format:
-    >>> {
-            "type": "key",
-            "id": "key",
-            "actions": [
-                {'type': 'keyDown', 'value': 'a'},
-                ...
-            ],
-        }
+    Example:
+        >>> payload = {"type": "key", "id": "key",
+        ...            "actions": [{"type": "keyDown", "value": "a"}]}
     """
 
     type: str
@@ -73,18 +69,13 @@ class KeyActions(TypedDict):
     actions: list[dict[str, Any]]
 
 
-class WheelActions(TypedDict):
-    """The wheel actions to perform `<dict>`.
+class WheelActions(TypedDict, total=False):
+    """The wheel actions to perform.
 
-    Expected format:
-    >>> {
-            "type": "wheel",
-            "id": "wheel",
-            "actions": [
-                {'type': 'scroll', 'x': 0, 'y': 0, 'duration': 0, 'origin': 'viewport'},
-                ...
-            ],
-        }
+    Example:
+        >>> payload = {"type": "wheel", "id": "wheel", "actions": [
+        ...     {"type": "scroll", "x": 0, "y": 0, "deltaX": 0, "deltaY": 100,
+        ...      "duration": 0, "origin": "viewport"}]}
     """
 
     type: str
@@ -93,14 +84,11 @@ class WheelActions(TypedDict):
 
 
 class ActionsChain(TypedDict):
-    """The complete actions chain to perform `<dict>`.
+    """The complete actions chain to perform.
 
-    Expected format:
-    >>> {
-            "pointer": {...},
-            "key": {...},
-            "wheel": {...},
-        }
+    Example:
+        >>> chain = session.actions().click()
+        >>> payload = chain.actions
     """
 
     pointer: PointerActions
@@ -110,10 +98,7 @@ class ActionsChain(TypedDict):
 
 # Actions -----------------------------------------------------------------------------------------
 class Actions:
-    """Represent an actions chain that peforms (automate) low
-    level interactions such as mouse movements, key presses,
-    and wheel scrolls.
-    """
+    """Represent an actions chain that performs (automate) low level interactions such as mouse movements, key presses, and wheel scrolls."""
 
     def __init__(
         self,
@@ -121,14 +106,13 @@ class Actions:
         pointer: Literal["mouse", "pen", "touch"] = "mouse",
         duration: int | float = 0.2,
     ) -> None:
-        """The actions chain that peforms (automate) low level
-        interactions such as mouse movements, key presses, and
-        wheel scrolls.
+        """Initialize the instance with the supplied configuration.
 
-        :param session `<'Session'>`: The session to perform the action chain.
-        :param pointer `<'str'>`: The pointer type to use. Defaults to `'mouse'`.
-            Available options: `"mouse"`, `"pen"`, `"touch"`.
-        :param duration `<'int/float'>`: The duration in seconds to perform a pointer move or wheel scroll action. Defaults to `0.2`.
+        Args:
+            session: The session to perform the action chain.
+            pointer: The pointer type to use. Defaults to `'mouse'`.
+                Available options: `"mouse"`, `"pen"`, `"touch"`.
+            duration: The duration in seconds to perform a pointer move or wheel scroll action. Defaults to `0.2`.
         """
         # Validate pointer
         if pointer not in Constraint.POINTER_TYPES:
@@ -141,7 +125,13 @@ class Actions:
             )
         self._pointer_type: str = pointer
         # Validate duration
-        if not isinstance(duration, (int, float)) or duration < 0:
+        if (
+            isinstance(duration, bool)
+            or not isinstance(duration, (int, float))
+            or not isfinite(duration)
+            or duration < 0
+            or not isfinite(duration * 1000)
+        ):
             raise errors.InvalidArgumentError(
                 "<{}>\nArgument 'duration' must be an integer or "
                 "float with value `> 0`. Instead of: {} {}.".format(
@@ -163,14 +153,14 @@ class Actions:
     # Properties --------------------------------------------------------------------------
     @property
     def actions(self) -> ActionsChain:
-        """Access all the actions to be performed `<'ActionsDict'>`.
+        """Return all the actions to be performed.
 
-        Expected format:
-        >>> {
-                "pointer": {...},
-                "key": {...},
-                "wheel": {...},
-            }
+        Example:
+            >>> chain = session.actions().click()
+            >>> payload = chain.actions
+
+        Returns:
+            All the actions to be performed.
         """
         return {
             "pointer": self._pointer_actions,
@@ -188,24 +178,26 @@ class Actions:
     ) -> Actions:
         """Move the pointer (mouse) to an element (or a location).
 
-        :param element `<'Element/None'>`: The Element to move to. Defaults to `None`.
-            - If specified, moves the pointer to the center of the element,
-              where 'x/y' are the offsets relative to the center.
-            - If not specified (`None`), moves the pointer to the given 'x/y'
-              coordinates of the viewport.
+        Args:
+            element: The Element to move to. Defaults to `None`.
+                - If specified, moves the pointer to the center of the element,
+                where 'x/y' are the offsets relative to the center.
+                - If not specified (`None`), moves the pointer to the given 'x/y'
+                coordinates of the viewport.
+            x: The x-coordinate of the viewport, `*OR*` the x-offset to the center of an 'element'. Defaults to `0`.
+            y: The y-coordinate of the viewport, `*OR*` the y-offset to the center of an 'element'. Defaults to `0`.
+            pause: Total seconds to pause after the action. Defaults to `None`.
 
-        :param x `<'int'>`: The x-coordinate of the viewport, `*OR*` the x-offset to the center of an 'element'. Defaults to `0`.
-        :param y `<'int'>`: The y-coordinate of the viewport, `*OR*` the y-offset to the center of an 'element'. Defaults to `0`.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
+        Returns:
+            The actions chain.
 
-        ### Example:
-        >>> # . move the pointer to x/y coordinates of the viewport
-            await session.actions().move_to(x=100, y=100).perform()
+        Example:
+            >>> # . move the pointer to x/y coordinates of the viewport
+            >>> await session.actions().move_to(x=100, y=100).perform()
 
-        >>> # . move the pointer to the center of an element
-            element = await session.find_element("#element")
-            await session.actions().move_to(element=element).perform()
+            >>> # . move the pointer to the center of an element
+            >>> element = await session.find_element("#element")
+            >>> await session.actions().move_to(element=element).perform()
         """
         if isinstance(element, Element):
             self._pointer_move(x=x, y=y, origin=element)
@@ -221,14 +213,17 @@ class Actions:
     ) -> Actions:
         """Move the pointer (mouse) by the given offsets.
 
-        :param x `<'int'>`: The x-coordinate offset relative to the pointer. Defaults to `0`.
-        :param y `<'int'>`: The y-coordinate offset relative to the pointer. Defaults to `0`.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
+        Args:
+            x: The x-coordinate offset relative to the pointer. Defaults to `0`.
+            y: The y-coordinate offset relative to the pointer. Defaults to `0`.
+            pause: Total seconds to pause after the action. Defaults to `None`.
 
-        ### Example:
-        >>> # . move the pointer by x/y offset relative to its origin
-            await session.actions().move_by(x=100, y=100).perform()
+        Returns:
+            The actions chain.
+
+        Example:
+            >>> # . move the pointer by x/y offset relative to its origin
+            >>> await session.actions().move_by(x=100, y=100).perform()
         """
         self._pointer_move(x=x, y=y, origin="pointer")
         return self.pause(pause)
@@ -242,22 +237,25 @@ class Actions:
     ) -> Actions:
         """Click a button of the pointer (mouse).
 
-        :param button `<'int'>`: The button to click. Defaults to `MouseButtons.LEFT`.
-        :param hold `<'bool'>`: Whether to hold the button down after clicked. Defaults to `False`.
-        :param double `<'bool'>`: Whether to perform a double click (ignored when `hold=True`). Defaults to `False`.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
+        Args:
+            button: The button to click. Defaults to `MouseButtons.LEFT`.
+            hold: Whether to hold the button down after clicked. Defaults to `False`.
+            double: Whether to perform a double click (ignored when `hold=True`). Defaults to `False`.
+            pause: Total seconds to pause after the action. Defaults to `None`.
 
-        ### Example:
-        >>> # . click (press & release) the left button of the pointer
-            await session.actions().click().perform()
+        Returns:
+            The actions chain.
 
-        >>> # . press & hold the right button of the pointer
-            from aselenium import MouseButtons
-            await session.actions().click(MouseButtons.RIGHT, hold=True).perform()
+        Example:
+            >>> # . click (press & release) the left button of the pointer
+            >>> await session.actions().click().perform()
 
-        >>> # . double click the left button of the pointer
-            await session.actions().click(double=True).perform()
+            >>> # . press & hold the right button of the pointer
+            >>> from aselenium import MouseButtons
+            >>> await session.actions().click(MouseButtons.RIGHT, hold=True).perform()
+
+            >>> # . double click the left button of the pointer
+            >>> await session.actions().click(double=True).perform()
         """
         self._pointer_down(button)
         if hold:
@@ -273,21 +271,17 @@ class Actions:
         button: int = MouseButtons.LEFT,
         pause: int | float | None = None,
     ) -> Actions:
-        """Release a previously press & hold button of the pointer (mouse).
-        Use after the action `click(hold=True)`.
+        """Release a previously press & hold button of the pointer (mouse). Use after the action `click(hold=True)`.
 
-        :param button `<'int'>`: The button to release. Defaults to `MouseButtons.LEFT`.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
+        Args:
+            button: The button to release. Defaults to `MouseButtons.LEFT`.
+            pause: Total seconds to pause after the action. Defaults to `None`.
 
-        ### Example:
-        >>> # . press & hold & release the left button of the pointer
-            (
-                await session.actions().click(hold=True)
-                ...  # some actions
-                .release()
-                .perform()
-            )
+        Returns:
+            The actions chain.
+
+        Example:
+            >>> await session.actions().click(hold=True).release().perform()
         """
         self._pointer_up(button)
         return self.pause(pause)
@@ -304,16 +298,7 @@ class Actions:
     ) -> Actions:
         """Drag and drop an element (coordinates) to another element (coordinates).
 
-        :param drag `<'Element/None'>`: The source element to drag. Defaults to `None`.
-        :param drag_x `<'int'>`: The x-coordinate of the viewport, `*OR*` the x-offset to the center of a 'drag' element. Defaults to `0`.
-        :param drag_y `<'int'>`: The y-coordinate of the viewport, `*OR*` the y-offset to the center of a 'drag' element. Defaults to `0`.
-        :param drop `<'Element/None'>`: The destination element to drop. Defaults to `None`.
-        :param drop_x `<'int'>`: The x-coordinate of the viewport, `*OR*` the x-offset to the center of an 'drop' element. Defaults to `0`.
-        :param drop_y `<'int'>`: The y-coordinate of the viewport, `*OR*` the y-offset to the center of an 'drop' element. Defaults to `0`.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
-
-        ### Notice:
+        Notice:
         The `drag_and_drop` method eqvivalent to the following actions:
             - move_to(drag, drag_x, drag_y)
             - click(MouseButtons.LEFT, hold=True)
@@ -322,14 +307,24 @@ class Actions:
 
         Based on testing, drag and drop only works properly for Chromium based browsers.
 
-        ### Example:
-        >>> left_element = await session.find_element("#left_element")
-            right_element = await session.find_element("#right_element")
-            (
-                await session.actions()
-                .drag_and_drop(drag=left_element, drop=right_element)
-                .perform())
-            )
+        Args:
+            drag: The source element to drag. Defaults to `None`.
+            drag_x: The x-coordinate of the viewport, `*OR*` the x-offset to the center of a 'drag' element. Defaults to `0`.
+            drag_y: The y-coordinate of the viewport, `*OR*` the y-offset to the center of a 'drag' element. Defaults to `0`.
+            drop: The destination element to drop. Defaults to `None`.
+            drop_x: The x-coordinate of the viewport, `*OR*` the x-offset to the center of an 'drop' element. Defaults to `0`.
+            drop_y: The y-coordinate of the viewport, `*OR*` the y-offset to the center of an 'drop' element. Defaults to `0`.
+            pause: Total seconds to pause after the action. Defaults to `None`.
+
+        Returns:
+            The actions chain.
+
+        Example:
+            >>> left = await session.find_element("#left_element")
+            >>> right = await session.find_element("#right_element")
+            >>> if left is None or right is None:
+            ...     raise LookupError("Both drag targets must exist")
+            >>> await session.actions().drag_and_drop(drag=left, drop=right).perform()
         """
         self.move_to(element=drag, x=drag_x, y=drag_y)
         self._pointer_down(MouseButtons.LEFT)
@@ -343,9 +338,17 @@ class Actions:
         y: float = 0,
         origin: str | Element | None = None,
         duration: int | float | None = None,
-        **kwargs,
+        **kwargs: Any,
     ) -> None:
-        "(Internal) Move the pointer (mouse) to a location."
+        """Move the pointer (mouse) to a location.
+
+        Args:
+            x: X used by this operation.
+            y: Y used by this operation.
+            origin: Origin used by this operation.
+            duration: Duration used by this operation.
+            **kwargs: Keyword arguments forwarded to the wrapped operation.
+        """
         action = {
             "type": "pointerMove",
             "duration": self._adjust_duration(duration),
@@ -359,8 +362,13 @@ class Actions:
             action["origin"] = origin
         self._add_pointer_action(action)
 
-    def _pointer_down(self, button: int, **kwargs) -> None:
-        "(Internal) Press down a button of the pointer (mouse)."
+    def _pointer_down(self, button: int, **kwargs: Any) -> None:
+        """Press down a button of the pointer (mouse).
+
+        Args:
+            button: Button used by this operation.
+            **kwargs: Keyword arguments forwarded to the wrapped operation.
+        """
         self._add_pointer_action(
             {
                 "type": "pointerDown",
@@ -371,15 +379,23 @@ class Actions:
         )
 
     def _pointer_up(self, button: int) -> None:
-        "(Internal) Release a button of the pointer (mouse)."
+        """Release a button of the pointer (mouse).
+
+        Args:
+            button: Button used by this operation.
+        """
         self._add_pointer_action({"type": "pointerUp", "duration": 0, "button": button})
 
     def _pointer_cancel(self) -> None:
-        "(Internal) Cancel a pointer (mouse) action."
+        """Cancel a pointer (mouse) action."""
         self._add_pointer_action({"type": "pointerCancel"})
 
-    def _add_pointer_action(self, action: dict) -> None:
-        "(Internal) Add a pointer (mouse) action to the chain."
+    def _add_pointer_action(self, action: dict[str, Any]) -> None:
+        """Add a pointer (mouse) action to the chain.
+
+        Args:
+            action: Action used by this operation.
+        """
         if not self._pointer_actions:
             self._pointer_actions = {
                 "type": "pointer",
@@ -393,7 +409,11 @@ class Actions:
         self._add_wheel_pause(0)
 
     def _add_pointer_pause(self, duration: int | float) -> None:
-        "(Internal) Add a pause for the pointer (mouse) actions."
+        """Add a pause for the pointer (mouse) actions.
+
+        Args:
+            duration: Duration used by this operation.
+        """
         if not self._pointer_actions:
             self._pointer_actions = {
                 "type": "pointer",
@@ -409,26 +429,29 @@ class Actions:
     # Keyboard Actions --------------------------------------------------------------------
     def key_down(
         self,
-        key: str | KeyboardKeys,
+        key: str,
         pause: int | float | None = None,
     ) -> Actions:
         """Press down a keyboard KEY.
 
-        :param key `<'str/KeyboardKeys'>`: The KEY to press down.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
+        Args:
+            key: The KEY to press down.
+            pause: Total seconds to pause after the action. Defaults to `None`.
 
-        ### Example:
-        >>> # . control + a (select all)
-            From aselenium import KeyboardKeys
-            (
-                await session.actions()
-                .key_down(KeyboardKeys.CONTROL)
-                .key_down("a")
-                .key_up("a")
-                .key_up(KeyboardKeys.CONTROL)
-                .perform()
-            )
+        Returns:
+            The actions chain.
+
+        Example:
+            >>> from aselenium import KeyboardKeys
+
+            >>> await (
+            ...     session.actions()
+            ...     .key_down(KeyboardKeys.CONTROL)
+            ...     .key_down("a")
+            ...     .key_up("a")
+            ...     .key_up(KeyboardKeys.CONTROL)
+            ...     .perform()
+            ... )
         """
         self._key_down(key)
         return self.pause(pause)
@@ -436,52 +459,60 @@ class Actions:
     def key_up(self, key: str, pause: int | float | None = None) -> Actions:
         """Release a keyboard KEY.
 
-        :param key `<'str'>`: The KEY to release.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
+        Args:
+            key: The KEY to release.
+            pause: Total seconds to pause after the action. Defaults to `None`.
 
-        ### Example:
-        >>> # . control + a (select all)
-            From aselenium import KeyboardKeys
-            (
-                await session.actions()
-                .key_down(KeyboardKeys.CONTROL)
-                .key_down("a")
-                .key_up("a")
-                .key_up(KeyboardKeys.CONTROL)
-                .perform()
-            )
+        Returns:
+            The actions chain.
+
+        Example:
+            >>> from aselenium import KeyboardKeys
+
+            >>> await (
+            ...     session.actions()
+            ...     .key_down(KeyboardKeys.CONTROL)
+            ...     .key_down("a")
+            ...     .key_up("a")
+            ...     .key_up(KeyboardKeys.CONTROL)
+            ...     .perform()
+            ... )
         """
         self._key_up(key)
         return self.pause(pause)
 
     def send_keys(
         self,
-        *keys: str | KeyboardKeys,
+        *keys: str,
         pause: int | float | None = None,
     ) -> Actions:
-        """Simulate the action of typing keyboad keys.
+        """Simulate the action of typing keyboard keys.
 
-        ### Notice:
+        Notice:
         Different from the `send_key_combo()`, the `send_keys()` method simulates
         the actions of typing a series of keyboard keys, such as `Hello world!`.
         Each key is first pressed down and then released in the specified order.
 
-        :param keys `<'str/KeyboardKeys'>`: The keys to send.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
-
         Example:
-        >>> From aselenium import KeyboardKeys
-            inputbox = await session.find_element("#inputbox")
-            (
-                await session.actions()
-                .move_to(inputbox)
-                .click()
-                .send_keys("Hello world!")
-                .send_keys(KeyboardKeys.ENTER)
-                .perform()
-            )
+            >>> from aselenium import KeyboardKeys
+            >>> inputbox = await session.find_element("#inputbox")
+            >>> if inputbox is None:
+            ...     raise LookupError("The input field is missing")
+            >>> await (
+            ...     session.actions()
+            ...     .move_to(inputbox)
+            ...     .click()
+            ...     .send_keys("Hello world!")
+            ...     .send_keys(KeyboardKeys.ENTER)
+            ...     .perform()
+            ... )
+
+        Args:
+            pause: Total seconds to pause after the action. Defaults to `None`.
+            *keys: The keys to send.
+
+        Returns:
+            The actions chain.
         """
         for key in process_keys(*keys):
             self._key_down(key)
@@ -490,52 +521,73 @@ class Actions:
 
     def send_key_combo(
         self,
-        *keys: str | KeyboardKeys,
+        *keys: str,
         pause: int | float | None = None,
     ) -> Actions:
         """Simulates the action of pressing a combination of keys.
 
-        ### Notice:
+        Notice:
         Different from the `send_keys()`, the `send_key_combo()` method simulates
         the action of pressing a combination of keys, such as `ctrl + a` (select all),
         `ctrl + c` (copy), `ctrl + v` (paste), etc. Each key is first pressed down in
         the specified order, and then released in the reverse order.
 
-        :param keys `<'str/KeyboardKeys'>`: The keys combinations to send.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
+        Args:
+            pause: Total seconds to pause after the action. Defaults to `None`.
+            *keys: The keys combinations to send.
 
-        ### Example:
-        >>> From aselenium import KeyboardKeys
-            inputbox = await session.find_element("#inputbox")
-            (
-                await session.actions()
-                .move_to(inputbox)
-                .click()
-                .send_keys("Hello world!")
-                .send_key_combo(KeyboardKeys.CONTROL, "a")
-                .send_key_combo(KeyboardKeys.CONTROL, "x")
-                .send_key_combo(KeyboardKeys.CONTROL, "v")
-                .perform()
-            )
+        Returns:
+            The actions chain.
+
+        Example:
+            >>> from aselenium import KeyboardKeys
+
+            >>> field = await session.find_element("#inputbox")
+            >>> if field is None:
+            ...     raise LookupError("The input field is missing")
+            >>> await (
+            ...     session.actions()
+            ...     .move_to(field)
+            ...     .click()
+            ...     .send_keys("Hello world!")
+            ...     .send_key_combo(KeyboardKeys.CONTROL, "a")
+            ...     .send_key_combo(KeyboardKeys.CONTROL, "x")
+            ...     .send_key_combo(KeyboardKeys.CONTROL, "v")
+            ...     .perform()
+            ... )
         """
-        keys = process_keys(*keys)
-        [self._key_down(key) for key in keys]
-        [self._key_up(key) for key in reversed(keys)]
+        processed_keys = process_keys(*keys)
+        for key in processed_keys:
+            self._key_down(key)
+        for key in reversed(processed_keys):
+            self._key_up(key)
         return self.pause(pause)
 
-    def _key_down(self, key: str, **kwargs) -> None:
-        "(Internal) Press down a keyboard KEY."
+    def _key_down(self, key: str, **kwargs: Any) -> None:
+        """Press down a keyboard KEY.
+
+        Args:
+            key: Lookup key used by the current operation.
+            **kwargs: Keyword arguments forwarded to the wrapped operation.
+        """
         self._add_key_action(
             {"type": "keyDown", "value": key, **self._adjust_kwargs(kwargs)}
         )
 
     def _key_up(self, key: str) -> None:
-        "(Internal) Release a keyboard KEY."
+        """Release a keyboard KEY.
+
+        Args:
+            key: Lookup key used by the current operation.
+        """
         self._add_key_action({"type": "keyUp", "value": key})
 
-    def _add_key_action(self, action: dict) -> None:
-        "(Internal) Add a keyboard action to the chain."
+    def _add_key_action(self, action: dict[str, Any]) -> None:
+        """Add a keyboard action to the chain.
+
+        Args:
+            action: Action used by this operation.
+        """
         if not self._key_actions:
             self._key_actions = {
                 "type": "key",
@@ -548,7 +600,11 @@ class Actions:
         self._add_wheel_pause(0)
 
     def _add_key_pause(self, duration: int | float) -> None:
-        "(Internal) Add a pause for the keyboard actions."
+        """Add a pause for the keyboard actions.
+
+        Args:
+            duration: Duration used by this operation.
+        """
         if not self._key_actions:
             self._key_actions = {
                 "type": "key",
@@ -568,11 +624,14 @@ class Actions:
     ) -> Actions:
         """Scroll the viewport to an element.
 
-        :param element `<'Element/None'>`: The Element to scroll to.
-        :param x `<'int'>`: The x-offset to the center of an 'element'. Defaults to `0`.
-        :param y `<'int'>`: The y-offset to the center of an 'element'. Defaults to `0`.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
+        Args:
+            element: The Element to scroll to.
+            x: The x-offset to the center of an 'element'. Defaults to `0`.
+            y: The y-offset to the center of an 'element'. Defaults to `0`.
+            pause: Total seconds to pause after the action. Defaults to `None`.
+
+        Returns:
+            The actions chain.
         """
         if not isinstance(element, Element):
             raise errors.InvalidArgumentError(
@@ -592,10 +651,13 @@ class Actions:
     ) -> Actions:
         """Scroll the viewport by the given offsets.
 
-        :param x `<'int'>`: The x-coordinate offset relative to current viewport position. Defaults to `0`.
-        :param y `<'int'>`: The y-coordinate offset relative to current viewport position. Defaults to `0`.
-        :param pause `<'int/float/None'>`: Total seconds to pause after the action. Defaults to `None`.
-        :returns `<'Actions'>`: The actions chain.
+        Args:
+            x: The x-coordinate offset relative to current viewport position. Defaults to `0`.
+            y: The y-coordinate offset relative to current viewport position. Defaults to `0`.
+            pause: Total seconds to pause after the action. Defaults to `None`.
+
+        Returns:
+            The actions chain.
         """
         self._wheel_scroll(x_delta=x, y_delta=y, origin="viewport")
         return self.pause(pause)
@@ -609,7 +671,16 @@ class Actions:
         origin: str | Element | None = None,
         duration: int | float | None = 0,
     ) -> None:
-        "(Internal) Scroll the viewport to a location."
+        """Scroll the viewport to a location.
+
+        Args:
+            x: X used by this operation.
+            y: Y used by this operation.
+            x_delta: X delta used by this operation.
+            y_delta: Y delta used by this operation.
+            origin: Origin used by this operation.
+            duration: Duration used by this operation.
+        """
         action = {
             "type": "scroll",
             "x": int(x),
@@ -624,8 +695,12 @@ class Actions:
             action["origin"] = origin
         self._add_wheel_action(action)
 
-    def _add_wheel_action(self, action: dict) -> None:
-        "(Internal) Add a wheel action to the chain."
+    def _add_wheel_action(self, action: dict[str, Any]) -> None:
+        """Add a wheel action to the chain.
+
+        Args:
+            action: Action used by this operation.
+        """
         if not self._wheel_actions:
             self._wheel_actions = {
                 "type": "wheel",
@@ -638,7 +713,11 @@ class Actions:
         self._add_key_pause(0)
 
     def _add_wheel_pause(self, duration: int | float) -> None:
-        "(Internal) Add a pause for the wheel actions."
+        """Add a pause for the wheel actions.
+
+        Args:
+            duration: Duration used by this operation.
+        """
         if not self._wheel_actions:
             self._wheel_actions = {
                 "type": "wheel",
@@ -654,18 +733,15 @@ class Actions:
     def pause(self, duration: int | float | None) -> Actions:
         """Pause the chain for a given duration.
 
-        :param duration `<'int/float/None'>`: The duration to pause in seconds.
-        :returns `<'Actions'>`: The actions chain.
+        Args:
+            duration: The duration to pause in seconds.
+
+        Returns:
+            The actions chain.
         """
         if duration is None:
             return self
-        try:
-            duration = int(duration * 1000)
-        except Exception as err:
-            raise errors.InvalidArgumentError(
-                "<{}>\nArgument 'duration' must be a positive `<'int/float'>`, "
-                "instead of: {}.".format(self.__class__.__name__, repr(duration))
-            ) from err
+        duration = self._adjust_duration(duration)
         self._add_pointer_pause(duration)
         self._add_key_pause(duration)
         self._add_wheel_pause(duration)
@@ -675,14 +751,25 @@ class Actions:
     async def perform(self, explicit_wait: int | float | None = None) -> None:
         """Perform (execute) the actions chain.
 
-        :param explicit_wait `<'int/float/None'>`: Total seconds to wait after sending the actions command. Defaults to `None`.
-            - For Chromium based browsers, this argument is usually not needed. The webdriver
-              itself will wait until all the actions are performed before returning a response.
-            - For Firefox, specifing an explicit wait is required in most cases, since the
-              webdriver will return a response immediately after receiving the actions command.
-              Without an explicit long enough block, the next line of code will be executed
-              while the browser is still performing the actions.
+        The dispatched queue is cleared even if the request fails, so an ambiguous
+        failure cannot cause queued input to be replayed automatically. Await this
+        call before reusing the chain to build a new sequence. Cancellation
+        propagates to the caller.
+
+        Args:
+            explicit_wait: Optional finite, nonnegative delay in seconds after the driver
+                responds. None adds no delay. This does not wait for a specific DOM state;
+                use a condition-based wait when a page updates after the input sequence.
         """
+        if explicit_wait is not None and (
+            isinstance(explicit_wait, bool)
+            or not isinstance(explicit_wait, (int, float))
+            or not isfinite(explicit_wait)
+            or explicit_wait < 0
+        ):
+            raise errors.InvalidArgumentError(
+                "explicit_wait must be a finite nonnegative number"
+            )
         # Perform the actions
         try:
             await self._session.execute_command(
@@ -706,7 +793,11 @@ class Actions:
                 "the pointer (mouse) or scoll the viewport out of the document."
             )
         finally:
-            self._collect_garbage()
+            # Clear dispatched input without losing the owning session. An
+            # ambiguous failure is not automatically replayed on another call.
+            self._pointer_actions = {}
+            self._key_actions = {}
+            self._wheel_actions = {}
 
         # Explicit wait
         if explicit_wait is None:
@@ -722,7 +813,11 @@ class Actions:
             ) from err
 
     async def reset(self) -> Actions:
-        """Reset the action chain."""
+        """Reset the action chain.
+
+        Returns:
+            The Actions value produced by this operation.
+        """
         await self._session.execute_command(Command.W3C_CLEAR_ACTIONS)
         self._pointer_actions = {}
         self._key_actions = {}
@@ -731,25 +826,50 @@ class Actions:
 
     # Utils -------------------------------------------------------------------------------
     def _adjust_duration(self, duration: int | float | None) -> int:
-        "(Internal) Adjust the duration to milliseconds."
+        """Adjust the duration to milliseconds.
+
+        Args:
+            duration: Duration used by this operation.
+
+        Returns:
+            Adjust the duration to milliseconds.
+        """
         if duration is None:
             return self._duration
-        elif isinstance(duration, int) and duration >= 0:
-            return duration * 1000
-        elif isinstance(duration, float) and duration >= 0:
-            return int(duration * 1000)
-        else:
+        if (
+            isinstance(duration, bool)
+            or not isinstance(duration, (int, float))
+            or not isfinite(duration)
+            or duration < 0
+            or not isfinite(duration * 1000)
+        ):
             raise errors.InvalidArgumentError(
                 "<{}>\nArgument 'duration' an integer or float "
                 "with value `> 0`. Instead of: {} {}.".format(
                     self.__class__.__name__, repr(duration), type(duration)
                 )
             )
+        return int(duration * 1000)
 
     def _adjust_kwargs(self, kwargs: dict[str, Any]) -> dict[str, Any]:
-        "(Internal) Adjust the keyword arguments."
+        """Adjust the keyword arguments.
+
+        Args:
+            kwargs: Keyword arguments forwarded to the wrapped operation.
+
+        Returns:
+            A mapping containing the adjust kwargs data.
+        """
 
         def adjust_key(key: str) -> str:
+            """Validate and normalize the key before adding it to the action sequence.
+
+            Args:
+                key: Lookup key used by the current operation.
+
+            Returns:
+                And normalize the key before adding it to the action sequence.
+            """
             if "_" in key:
                 key, *keys = key.split("_")
                 key += "".join([i.title() for i in keys])
@@ -762,27 +882,17 @@ class Actions:
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
-        return "<Actions:\n%s\n>" % (
-            "\n".join(
-                "%s Actions: %s" % (key.title(), prettify_dict(val))
-                for key, val in self.actions.items()
-                if val
-            ),
+        """Return a diagnostic representation of this instance.
+
+        Returns:
+            A diagnostic representation of this instance.
+        """
+        count = sum(
+            len(device.get("actions", []))
+            for device in (
+                self._pointer_actions,
+                self._key_actions,
+                self._wheel_actions,
+            )
         )
-
-    def __del__(self):
-        self._collect_garbage()
-
-    def _collect_garbage(self) -> None:
-        """(Internal) Release most of the memory occupied by the query variables."""
-        self._session = None
-        self._duration = None
-        # Device
-        self._pointer_type = None
-        self._pointer_id = None
-        self._key_id = None
-        self._wheel_id = None
-        # Chain
-        self._pointer_actions = None
-        self._key_actions = None
-        self._wheel_actions = None
+        return "<Actions (queued=%d, payload=<redacted>)>" % count

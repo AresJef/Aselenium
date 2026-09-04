@@ -1,0 +1,86 @@
+{
+  "validation_date": "2026-09-04",
+  "scope": "Rewritten source demo, local fixtures, documentation, CLI regression tests, and source-distribution inclusion",
+  "demo_source": "src/demo.py",
+  "demo_sha256_at_handoff": "dc7badc0e555d8897dcd98a4344db6ed5f98e04b1bc9a08345f3d7776b18168a",
+  "runtime": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "live_demo_python": "3.13.12",
+    "secondary_test_python": "3.11.15"
+  },
+  "offline_checks": [
+    {"command": ".venv/bin/python -m pytest tests/test_demo.py -q", "result": "77 passed"},
+    {"command": ".venv/bin/python -m pytest -q", "result": "765 passed", "python": "3.13.12"},
+    {"command": "/private/tmp/aselenium-py311.wnNkJd/venv/bin/python -m pytest -q", "result": "765 passed", "python": "3.11.15"},
+    {"command": ".venv/bin/ruff check src tests scripts", "result": "All checks passed"},
+    {"command": ".venv/bin/python -m mypy", "result": "Success: no issues found in 11 source files", "scope": "Existing configured infrastructure typing scope, not the entire package or demo"},
+    {"command": "git diff --check", "result": "passed"}
+  ],
+  "live_tours": [
+    {
+      "browser": "chrome",
+      "browser_version": "152.0.7977.76",
+      "driver_version": "152.0.7977.82",
+      "mode": "headless, empty source profile cloned separately for each acquisition",
+      "provisioning_policy": "offline",
+      "session_acquisition": "offline",
+      "passed_stages": 15,
+      "failed_stages": 0,
+      "skipped_stages": 0,
+      "report": "/private/tmp/aselenium-demo-validation.YyYti3/output/chrome-158f8xms/report.json",
+      "note": "Run preceded the final addition of status-count and not-run report fields; all feature chapters passed."
+    },
+    {
+      "browser": "chrome",
+      "browser_version": "152.0.7977.76",
+      "driver_version": "152.0.7977.82",
+      "mode": "headless, default fresh profiles",
+      "provisioning_policy": "offline",
+      "session_acquisition": "offline",
+      "passed_stages": 15,
+      "failed_stages": 0,
+      "skipped_stages": 0,
+      "report": "/private/tmp/aselenium-demo-validation.YyYti3/output/chrome-50a63bq_/report.json"
+    },
+    {
+      "browser": "edge",
+      "browser_version": "151.0.4129.93",
+      "driver_version": "151.0.4129.107",
+      "mode": "headless, empty source profile cloned separately for each acquisition",
+      "provisioning_policy": "compatible-build with explicit download opt-in",
+      "session_acquisition": "offline",
+      "passed_stages": 15,
+      "failed_stages": 0,
+      "skipped_stages": 0,
+      "report": "/private/tmp/aselenium-demo-validation.YyYti3/output/edge-ohdnjhxl/report.json"
+    }
+  ],
+  "additional_live_checks": [
+    "Standalone Chrome install command resolved full version 152.0.7977.82 offline and completed explicit pin and unpin operations in the disposable cache.",
+    "PNG and PDF outputs were saved and their magic signatures checked by every successful full tour.",
+    "Concurrent workers checked captured timeout values, different session IDs, and cookie isolation after both workers had written.",
+    "Cloned-profile concurrency checked distinct physical clone directories.",
+    "Cancellation awaited the cancelled worker, completed idempotent teardown, and opened a fresh acquisition successfully.",
+    "Post-run process inspection found no ChromeDriver/EdgeDriver or temporary validation-cache/profile processes; only the inspection shell and search command matched."
+  ],
+  "development_failures_fixed": [
+    "First-run cache parent was not created before facade construction; make_driver now creates the selected demo cache parent.",
+    "Cookie values must use dictionary-style access, not a nonexistent value attribute; corrected and covered by a regression test."
+  ],
+  "evidence_retention": "Raw run reports and PNG/PDF artifacts are in disposable system temporary storage and may be cleaned by the operating system. This compact record is retained in the source tree.",
+  "not_live_validated": [
+    "Firefox and its temporary add-on/full-page screenshot chapter",
+    "Safari and Safari Technology Preview",
+    "Standalone Chromium",
+    "Chrome for Testing download/run flow",
+    "Beta/dev channels, headed Chromium printing, other operating systems",
+    "Actual proxy connections, casting devices, privileged Firefox chrome context, legacy cache migration"
+  ],
+  "safety_boundaries": [
+    "Only loopback demo pages were visited; no personal browser profiles or logged-in accounts were used.",
+    "Driver vendor downloads were explicitly opted into and placed in a disposable demo cache.",
+    "Offline provisioning is not a browser network sandbox; browser-internal background requests are not guaranteed to be blocked.",
+    "The demo and assets are included in the sdist and excluded from the runtime wheel's package discovery.",
+    "No package version bump, commit, push, or publication was performed."
+  ]
+}

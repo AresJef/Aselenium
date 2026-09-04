@@ -1,0 +1,83 @@
+{
+  "validation_date": "2026-09-04",
+  "scope": "Named local HTML and real-world Google demos, shared provisioning, guides, regression tests, and distribution boundaries",
+  "entry_points": {
+    "local_html": "src/demo_local.py",
+    "google_real_world": "src/demo_google.py",
+    "legacy_local_launcher": "src/demo.py"
+  },
+  "runtime": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "live_demo_python": "3.13.12",
+    "offline_test_python": "3.11.15",
+    "chrome": "152.0.7977.76",
+    "chromedriver": "152.0.7977.82"
+  },
+  "offline_checks": [
+    {"command": "/private/tmp/aselenium-py311.wnNkJd/venv/bin/python -m pytest -q", "result": "883 passed", "includes": "77 local demo tests, 54 Google demo tests, README checks, and actual sdist/wheel builds"},
+    {"command": "/private/tmp/aselenium-py311.wnNkJd/venv/bin/python -m ruff check src tests scripts", "result": "All checks passed"},
+    {"command": "/private/tmp/aselenium-py311.wnNkJd/venv/bin/python -m mypy", "result": "Success: no issues found in 11 source files", "scope": "Existing configured infrastructure typing scope, not the entire package or demo"},
+    {"command": "git diff --check -- README.md MANIFEST.in src/demo.py src/demo_local.py src/demo_google.py src/_demo_support.py tests/test_demo_local.py tests/test_demo_google.py tests/test_distribution.py docs/demo.md docs/demo-local.md docs/demo-google.md docs/baselines/demo-google-validation.json", "result": "passed"}
+  ],
+  "live_runs": [
+    {
+      "demo": "google-real-world",
+      "mode": "headed, fresh profile, homepage only",
+      "target": "https://www.google.com/",
+      "query": null,
+      "status": "passed",
+      "exit_code": 0,
+      "homepage_title": "Google",
+      "search_box_ready": true,
+      "seconds_including_cleanup": 1.359,
+      "report": "/private/tmp/aselenium-google-demo.c123df/google-chrome-pzkrwg1z/report.json",
+      "artifacts": ["google-home.png"]
+    },
+    {
+      "demo": "google-real-world",
+      "mode": "headed, fresh profile, one optional search",
+      "query": "Aselenium Python",
+      "status": "needs-attention",
+      "reason": "challenge",
+      "exit_code": 2,
+      "seconds_including_cleanup": 3.669,
+      "report": "/private/tmp/aselenium-google-demo.c123df/google-chrome-9ao2ula5/report.json",
+      "artifacts": ["google-home.png", "google-attention.png"],
+      "visual_inspection": "Attention screenshot showed Google's unusual-traffic message and reCAPTCHA.",
+      "boundary": "One search was submitted. No retry, CAPTCHA solving, proxy rotation, personal profile, consent choice, or result-link click was used. A live normal-results page was not validated."
+    },
+    {
+      "demo": "local-html",
+      "entry_point": "src/demo_local.py",
+      "mode": "headless, fresh profiles, all sections",
+      "status": "passed",
+      "exit_code": 0,
+      "passed_sections": 15,
+      "failed_sections": 0,
+      "skipped_sections": 0,
+      "report": "/private/tmp/aselenium-google-demo.c123df/local-chrome-a5a7c6wo/report.json",
+      "artifacts": ["page.png", "page.pdf"]
+    }
+  ],
+  "live_run_configuration": {
+    "browser": "chrome",
+    "binary": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "cache_dir": "/private/tmp/aselenium-demo-validation.YyYti3/cache",
+    "output_dir": "/private/tmp/aselenium-google-demo.c123df",
+    "provisioning_policy": "offline",
+    "session_acquisition": "offline",
+    "google_hold_seconds": 0,
+    "google_wait_timeout_seconds": 15,
+    "overall_timeout_seconds": 120
+  },
+  "not_live_validated_in_this_change": [
+    "A normal Google search-results page, because Google challenged the single live search",
+    "Google in headless mode or browsers other than Chrome",
+    "Manual consent completion on the real website",
+    "Driver downloads; live checks reused already cached compatible drivers",
+    "Other operating systems"
+  ],
+  "evidence_retention": "Raw reports and screenshots are in disposable system temporary storage and may be cleaned by the operating system. This compact record is retained in the source tree. Captures may contain query text, network/IP diagnostics, and local paths; review before sharing.",
+  "environment_boundary": "The user's current .venv was used for live demos without installing or changing dependencies. Offline development checks used the existing provisioned Python 3.11 test environment. No full Python 3.13 test-suite run is claimed for this change.",
+  "safety_boundary": "The demos use fresh profiles. No core Aselenium runtime behavior, user quick-test script, package version, commit, push, or publication was changed by this demo-specific work."
+}

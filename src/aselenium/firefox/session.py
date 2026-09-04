@@ -16,28 +16,48 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
-from typing import Literal
+"""Aselenium session implementation and supporting types."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import (
+    TYPE_CHECKING,
+    Literal,
+)
 from zipfile import is_zipfile
+
 from aselenium import errors
-from aselenium.logs import logger
+from aselenium._async import run_blocking
+from aselenium._output import save_bytes
 from aselenium.command import Command
+from aselenium.firefox.utils import (
+    FirefoxAddon,
+    encode_dir_to_firefox_wire_protocol,
+    extract_firefox_addon_details,
+)
 from aselenium.session import Session
-from aselenium.manager.version import GeckoVersion, FirefoxVersion
-from aselenium.utils import validate_save_file_path
-from aselenium.utils import validate_file, is_path_file, is_path_dir
-from aselenium.firefox.options import FirefoxOptions
-from aselenium.firefox.service import FirefoxService
-from aselenium.firefox.utils import encode_dir_to_firefox_wire_protocol
-from aselenium.firefox.utils import FirefoxAddon, extract_firefox_addon_details
+from aselenium.utils import is_path_dir, is_path_file, validate_save_file_path
+
+if TYPE_CHECKING:
+    from aselenium.firefox.options import FirefoxOptions
+    from aselenium.firefox.service import FirefoxService
+    from aselenium.manager.version import GeckoVersion
 
 __all__ = ["FirefoxSession"]
 
 
 # Firefox Session ---------------------------------------------------------------------------------
 class FirefoxSession(Session):
-    """Represents a session of the Firefox browser."""
+    """Represent a session of the Firefox browser."""
 
     def __init__(self, options: FirefoxOptions, service: FirefoxService) -> None:
+        """Initialize the instance with the supplied configuration.
+
+        Args:
+            options: Options used by this operation.
+            service: Service used by this operation.
+        """
         super().__init__(options, service)
         # Add-ons
         self._addon_by_id: dict[str, FirefoxAddon] = {}
@@ -47,32 +67,50 @@ class FirefoxSession(Session):
     # Basic -------------------------------------------------------------------------------
     @property
     def options(self) -> FirefoxOptions:
-        """Access the Firefox options `<FirefoxOptions>`."""
+        """Return the Firefox options.
+
+        Returns:
+            The browser options owned by this facade or session.
+        """
         return self._options
 
     @property
-    def browser_version(self) -> FirefoxVersion:
-        """Access the browser binary version of the session `<FirefoxVersion>`."""
+    def browser_version(self) -> str | None:
+        """Return the browser version string recorded for this configuration or session.
+
+        Returns:
+            The version string, or None when no browser version has been recorded.
+            This property does not probe the browser or return a Version object.
+        """
         return super().browser_version
 
     @property
     def service(self) -> FirefoxService:
-        """Access the Firefox service `<FirefoxService>`."""
+        """Return the Firefox service.
+
+        Returns:
+            The driver service owned by the session.
+        """
         return self._service
 
     @property
     def driver_version(self) -> GeckoVersion:
-        """Access the webdriver binary version of the session `<GeckoVersion>`."""
+        """Return the webdriver binary version of the session.
+
+        Returns:
+            The webdriver binary version of the session.
+        """
         return super().driver_version
 
     # Information -------------------------------------------------------------------------
     async def take_full_screenshot(self) -> bytes:
-        """Take a FULL document screenshot of the active
-        page window `<bytes>`.
+        """Take a FULL document screenshot of the active page window.
 
-        ### Example:
-        >>> screenshot = await session.take_screenshot()
-            # b'iVBORw0KGgoAAAANSUhEUgAA...'
+        Returns:
+            Take a FULL document screenshot of the active page window.
+
+        Example:
+            >>> screenshot = await session.take_full_screenshot()
         """
         res = await self.execute_command(Command.FIREFOX_FULL_PAGE_SCREENSHOT)
         try:
@@ -84,20 +122,22 @@ class FirefoxSession(Session):
             ) from err
         except Exception as err:
             raise errors.InvalidResponseError(
-                "<{}>\nInvalid full document screenshot response: "
-                "{}".format(self.__class__.__name__, res)
+                "<{}>\nInvalid full document screenshot response: {}".format(
+                    self.__class__.__name__, res
+                )
             ) from err
 
     async def save_full_screenshot(self, path: str) -> bool:
-        """Take & save the FULL document screenshot of the active
-        page window into a local PNG file.
+        """Take & save the FULL document screenshot of the active page window into a local PNG file.
 
-        :param path: `<str>` The path to save the screenshot. e.g. `~/path/to/screenshot.png`.
-        :return `<bool>`: True if the screenshot has been saved, False if failed.
+        Args:
+            path: The path to save the screenshot. e.g. `~/path/to/screenshot.png`.
 
-        ### Example:
-        >>> await session.save_full_screenshot("~/path/to/screenshot.png")
-            # True / False
+        Returns:
+            True if the screenshot has been saved, False if failed.
+
+        Example:
+            >>> await session.save_full_screenshot("~/path/to/screenshot.png")
         """
         # Validate screenshot path
         try:
@@ -117,43 +157,41 @@ class FirefoxSession(Session):
             if not data:
                 return False
             # . save screenshot
-            try:
-                with open(path, "wb") as file:
-                    file.write(data)
-                return True
-            except Exception as err:
-                logger.error(
-                    "<{}> Failed to save FULL document screenshot: "
-                    "{}".format(self.__class__.__name__, err)
-                )
-                return False
+            return await save_bytes(path, data)
         finally:
             del data
 
     # Firefox - Context -------------------------------------------------------------------
     @property
     async def context(self) -> Literal["content", "chrome"]:
-        """Access the current context of the session `<str>`.
-        Expected values: `'content'` or `'chrome'`.
+        """Return the current context of the session. Expected values: `'content'` or `'chrome'`.
 
-        ### Notice:
+        Notice:
         Different from Selenium, the 'context' in this module is not a context
         manager, but an async property to access the current context of the
         session. For more information on how to switch context, please refer
         to the `set_context()` and `reset_context()` methods.
 
-        ### Example:
-        >>> await session.context  # "content" / "chrome"
+        Returns:
+            The current context, either "content" or "chrome".
+
+        Raises:
+            InvalidResponseError: If GeckoDriver returns a missing or unsupported context.
+
+        Example:
+            >>> await session.context  # "content" / "chrome"
         """
         res = await self.execute_command(Command.FIREFOX_GET_CONTEXT)
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse context from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+        context = res.get("value") if isinstance(res, dict) else None
+        if isinstance(context, str):
+            if context == "content":
+                return "content"
+            if context == "chrome":
+                return "chrome"
+        raise errors.InvalidResponseError(
+            f"<{self.__class__.__name__}>\nFirefox context response must contain "
+            "value='content' or value='chrome'."
+        )
 
     async def set_context(
         self,
@@ -161,15 +199,17 @@ class FirefoxSession(Session):
     ) -> Literal["content", "chrome"]:
         """Set the context of the session.
 
-        :param context: `<str>` The context to set. Accepts either `'content'` or `'chrome'`.
-        :return `<str>`: The context of the session after update.
+        Args:
+            context: The context to set. Accepts either `'content'` or `'chrome'`.
 
-        ### Example:
-        >>> await session.set_context("chrome")  # "chrome"
-            # ... do stuff in chrome context ...
+        Returns:
+            The context of the session after update.
 
-        >>> await session.reset_context()  # "content"
-            # Reset context back to "content"
+        Example:
+            >>> await session.set_context("chrome")  # "chrome"
+            >>> # ... do stuff in chrome context ...
+
+            >>> await session.reset_context()  # "content"
         """
         if context not in ("content", "chrome"):
             raise errors.InvalidArgumentError(
@@ -184,14 +224,14 @@ class FirefoxSession(Session):
     async def reset_context(self) -> Literal["content"]:
         """Reset the context of the session back to `'content'`.
 
-        :return `<str>`: The context of the session after update.
+        Returns:
+            The context of the session after update.
 
-        ### Example:
-        >>> await session.set_context("chrome")  # "chrome"
-            # ... do stuff in chrome context ...
+        Example:
+            >>> await session.set_context("chrome")  # "chrome"
+            >>> # ... do stuff in chrome context ...
 
-        >>> await session.reset_context()  # "content"
-            # Reset context back to "content"
+            >>> await session.reset_context()  # "content"
         """
         await self.execute_command(
             Command.FIREFOX_SET_CONTEXT, body={"context": "content"}
@@ -201,13 +241,14 @@ class FirefoxSession(Session):
     # Firefox - Addons --------------------------------------------------------------------
     @property
     def addons(self) -> list[FirefoxAddon]:
-        """Access the details of the installed add-ons `<list[FirefoxAddon]>`.
-        `(NOT an asyncronous attribute)`.
+        """Return the details of the installed add-ons. `(NOT an asynchronous attribute)`.
 
-        ### Example:
-        >>> await session.install_addons("~/path/to/addon.xpi")
-            addons = session.addons
-            # [<FirefoxAddon (id='addon1@id', name='Addon 1', version='1.0.0', unpack=False)>]
+        Returns:
+            The details of the installed add-ons. `(not an asynchronous attribute)`.
+
+        Example:
+            >>> await session.install_addons("~/path/to/addon.xpi")
+            >>> addons = session.addons
         """
         return list(self._addon_by_id.values())
 
@@ -216,26 +257,41 @@ class FirefoxSession(Session):
         *paths: str,
         temporary: bool = False,
     ) -> list[FirefoxAddon]:
-        """Install Firefox add-ons.
+        r"""Install Firefox add-ons.
 
-        :param paths: `<str>` The paths to the add-on files (\\*.xpi) or unpacked folders.
-        :param temporary: `<bool>` Whether to install the add-ons temporarily. Defaults to `False`.
-        :return `<list[FirefoxAddon]>`: The details of the installed add-ons.
+        Args:
+            temporary: Whether to install the add-ons temporarily. Defaults to `False`.
+            *paths: The paths to the add-on files (\*.xpi) or unpacked folders.
 
-        ### Example:
-        >>> # Install add-ons
-            addons = await session.install_addons(
-                "~/path/to/addon1.xpi",
-                "~/path/to/addon2",
-            )
-            # [
-            #   <FirefoxAddon (id='addon1@id', name='Addon 1', version='1.0.0', unpack=False)>,
-            #   <FirefoxAddon (id='addon2@id', name='Addon 2', version='1.0.0', unpack=False)>
-            # ]
+        Returns:
+            Metadata for add-ons installed by this call, excluding already-known IDs.
+            Successfully confirmed installations remain cached if a later add-on fails.
+
+        Raises:
+            InvalidArgumentError: If temporary is not a bool.
+            InvalidExtensionError: If an add-on cannot be read, encoded, or installed.
+            InvalidResponseError: If GeckoDriver does not return a non-blank string ID.
+                The remote installation may have succeeded even when its response is
+                invalid; this method does not cache an unconfirmed add-on ID.
+
+        Example:
+            >>> # Install add-ons
+            >>> addons = await session.install_addons(
+            ...     "~/path/to/addon1.xpi",
+            ...     "~/path/to/addon2",
+            ... )
         """
 
         def encode_addon(path: str) -> str:
             # . unpacked add-on folder
+            """Read and base64-encode the validated local Firefox add-on archive.
+
+            Args:
+                path: Filesystem path to inspect or operate on.
+
+            Returns:
+                The base64-encoded archive string sent to GeckoDriver.
+            """
             if is_path_dir(path):
                 return encode_dir_to_firefox_wire_protocol(path)
             # . packed add-on file
@@ -249,11 +305,15 @@ class FirefoxSession(Session):
                     "an unpacked folder".format(self.__class__.__name__, repr(path))
                 )
 
+        if not isinstance(temporary, bool):
+            raise errors.InvalidArgumentError("temporary must be a bool")
         addons = []
         for path in paths:
             # . Validate add-on path
             try:
-                path = validate_file(path)
+                path = str(Path(path).expanduser().absolute())
+                if not (is_path_dir(path) or is_path_file(path)):
+                    raise errors.InvalidExtensionError("Add-on path does not exist")
             except Exception as err:
                 raise errors.InvalidExtensionError(
                     "<{}>\nExtension 'path' error: {}".format(
@@ -262,7 +322,7 @@ class FirefoxSession(Session):
                 ) from err
             # . extract add-on details
             try:
-                details = extract_firefox_addon_details(path)
+                details = await run_blocking(extract_firefox_addon_details, path)
             except Exception as err:
                 raise errors.InvalidExtensionError(
                     f"<{self.__class__.__name__}>\n{err}"
@@ -271,13 +331,14 @@ class FirefoxSession(Session):
                 continue
             # . encode add-on data
             try:
-                addon = encode_addon(path)
+                addon = await run_blocking(encode_addon, path)
             except errors.InvalidExtensionError:
                 raise
             except Exception as err:
                 raise errors.InvalidExtensionError(
-                    "<{}>\nFailed to encode add-on: {}\n"
-                    "Error: {}".format(self.__class__.__name__, repr(path), err)
+                    "<{}>\nFailed to encode add-on: {}\nError: {}".format(
+                        self.__class__.__name__, repr(path), err
+                    )
                 ) from err
             # . install add-on
             try:
@@ -288,18 +349,17 @@ class FirefoxSession(Session):
                 )
             except Exception as err:
                 raise errors.InvalidExtensionError(
-                    "<{}>\nFailed to install add-on: {}\n"
-                    "Error: {}".format(self.__class__.__name__, repr(path), err)
+                    "<{}>\nFailed to install add-on: {}\nError: {}".format(
+                        self.__class__.__name__, repr(path), err
+                    )
                 )
             # . parse add-on ID
-            try:
-                addon_id = res["value"]
-            except KeyError as err:
+            addon_id = res.get("value") if isinstance(res, dict) else None
+            if not isinstance(addon_id, str) or not addon_id.strip():
                 raise errors.InvalidResponseError(
-                    "<{}>\nFailed to parse add-on ID from response: {}".format(
-                        self.__class__.__name__, res
-                    )
-                ) from err
+                    f"<{self.__class__.__name__}>\nFirefox add-on installation "
+                    "response must contain a non-blank string value ID."
+                )
             # . cache add-on details
             details.id = addon_id
             self._addon_by_id[addon_id] = details
@@ -311,25 +371,28 @@ class FirefoxSession(Session):
     async def uninstall_addon(self, addon: str | FirefoxAddon) -> bool:
         """Uninstall a previously installed add-on.
 
-        :param addon: `<str/FirefoxAddon>` The add-on to uninstall, accepts both add-on ID and `<FirefoxAddon>` instance.
-        :return `<bool>`: True if the add-on has been uninstalled, False if add-on not exists.
+        Args:
+            addon: The add-on to uninstall, accepts both add-on ID and  instance.
 
-        ### Example:
-        >>> # Install add-ons
-            addons = await session.install_addons(
-                "~/path/to/addon1.xpi",
-                "~/path/to/addon2",
-            )
-            # [
-            #   <FirefoxAddon (id='addon1@id', name='Addon 1', version='1.0.0', unpack=False)>,
-            #   <FirefoxAddon (id='addon2@id', name='Addon 2', version='1.0.0', unpack=False)>
-            # ]
+        Returns:
+            True if the add-on has been uninstalled, False if add-on not exists.
 
-        >>> # Uninstall add-on by ID
-            await session.uninstall_addon("addon1@id")  # True
+        Example:
+            >>> # Install add-ons
+            >>> addons = await session.install_addons(
+            ...     "~/path/to/addon1.xpi",
+            ...     "~/path/to/addon2",
+            ... )
+            >>> # [
+            >>> #   <FirefoxAddon (id='addon1@id', name='Addon 1', version='1.0.0')>,
+            >>> #   <FirefoxAddon (id='addon2@id', name='Addon 2', version='1.0.0')>
+            >>> # ]
 
-        >>> # Uninstall add-on by instance
-            await session.uninstall_addon(addons[1])  # True
+            >>> # Uninstall add-on by ID
+            >>> await session.uninstall_addon("addon1@id")  # True
+
+            >>> # Uninstall add-on by instance
+            >>> await session.uninstall_addon(addons[1])  # True
         """
         # Validate add-on
         if isinstance(addon, str):
@@ -355,7 +418,7 @@ class FirefoxSession(Session):
 
     # Special methods ---------------------------------------------------------------------
     def _collect_garbage(self) -> None:
-        """(Internal) Collect garbage."""
+        """Collect garbage."""
         super()._collect_garbage()
         # Add-ons
         self._addon_by_id = None

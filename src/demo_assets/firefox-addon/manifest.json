@@ -1,0 +1,8 @@
+{
+  "manifest_version": 2,
+  "name": "Aselenium local demo marker",
+  "version": "1.0.0",
+  "description": "Marks only the loopback demo page, without background tasks or external requests.",
+  "browser_specific_settings": {"gecko": {"id": "local-demo@aselenium.invalid"}},
+  "content_scripts": [{"matches": ["http://127.0.0.1/*"], "js": ["marker.js"]}]
+}

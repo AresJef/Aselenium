@@ -1,8 +1,10 @@
 # -*- coding: UTF-8 -*-
+"""Public exports for the aselenium.manager package."""
+
 from aselenium.manager.driver import (
-    EdgeDriverManager,
     ChromeDriverManager,
     ChromiumDriverManager,
+    EdgeDriverManager,
     FirefoxDriverManager,
     SafariDriverManager,
 )

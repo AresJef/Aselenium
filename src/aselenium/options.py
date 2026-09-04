@@ -16,19 +16,32 @@
 # under the License.
 
 # -*- coding: UTF-8 -*-
+"""Aselenium options implementation and supporting types."""
+
 from __future__ import annotations
-from copy import deepcopy
-from platform import system
-from tempfile import mkdtemp
+
 from base64 import b64encode
-from typing import Any, Literal
+from copy import deepcopy
+from math import isfinite
 from os import chmod
 from os.path import join as join_path
+from pathlib import Path
+from platform import system
 from shutil import copytree, ignore_patterns, rmtree
+from tempfile import mkdtemp
+from typing import (
+    Any,
+    Literal,
+    TypeVar,
+)
+
 from aselenium import errors
+from aselenium.manager._filesystem import checked_path, filesystem_operation
+from aselenium.manager.version import ChromiumVersion, Version
 from aselenium.settings import Constraint, DefaultTimeouts
-from aselenium.manager.version import Version, ChromiumVersion
-from aselenium.utils import validate_file, validate_dir, is_path_dir, prettify_dict
+from aselenium.utils import is_path_dir, validate_dir, validate_file
+
+O = TypeVar("O", bound="BaseOptions")
 
 __all__ = ["Proxy", "Timeouts", "ChromiumProfile"]
 
@@ -38,13 +51,19 @@ PROXY_TYPES: set[str] = {"DEFAULT", "AUTODETECT", "MANUAL", "PAC"}
 
 # Option Objects ----------------------------------------------------------------------------------
 class Proxy:
-    """Represents the proxy configuration for the browser."""
+    """Configure browser traffic independently of driver-provisioning requests.
+
+    Use keyword arguments with explicit URL schemes. A manual setting takes
+    precedence over PAC or autodetection when multiple modes are supplied.
+    ``to_capabilities()`` produces the WebDriver proxy capability; the browser
+    determines whether a particular authentication scheme is supported.
+    """
 
     def __init__(
         self,
+        *,
         auto_detect: bool = False,
         pac_url: str | None = None,
-        ftp_proxy: str | None = None,
         http_proxy: str | None = None,
         https_proxy: str | None = None,
         socks_proxy: str | None = None,
@@ -52,47 +71,42 @@ class Proxy:
         socks_password: str | None = None,
         no_proxy: str | list[str] | None = None,
     ) -> None:
-        """The proxy configuration for the browser.
+        """Initialize browser proxy settings without opening a connection.
 
-        ### Proxy Type: `'DEFAULT'`
-        If the Proxy is created with the default settings, the proxy
-        type will set to `'DEFAULT'`. On Windows, this means `'DIRECT'`
-        connection. On other platforms, this means use the `'SYSTEM'`
-        proxy settings.
+        With no settings, use a direct connection on Windows and the system
+        proxy configuration elsewhere. Credentials are redacted from repr(),
+        but remain present in the capability data sent to the driver.
 
-        ### Proxy Type: `'AUTODETECT'`
+        Args:
+            auto_detect: If `True`, the proxy type will be
+                set to `'AUTODETECT'`. This is often used when the system has its
+                own proxy settings that should be used. Defaults to `False`.
+            pac_url: The URL to the PAC (Proxy Auto-Configuration)
+                file. If `pac_url` is provided, the proxy type will be set to `'PAC'`.
+                This is often used when the network environment has a configuration
+                script to handle traffic routing. Defaults to `None`.
+            http_proxy: The proxy address to route the HTTP traffics. Defaults to `None`.
+            https_proxy: The proxy address to route the encrypted HTTPS traffics. Defaults to `None`.
+            socks_proxy: The proxy address to route the SOCKS traffics. Defaults to `None`.
+            socks_username: The username to use for SOCKS authentication. Defaults to `None`.
+            socks_password: The password to use for SOCKS authentication. Defaults to `None`.
+            no_proxy: The addresses that bypass the proxy configuration. Each address is
+                either a domain name, a hostname, or an IP address. Defaults to `None`.
 
-        :param auto_detect `<'bool'>`: If `True`, the proxy type will be 
-          set to `'AUTODETECT'`. This is often used when the system has its 
-          own proxy settings that should be used. Defaults to `False`.
+        Raises:
+            errors.InvalidProxyError: A proxy value has an unsupported type or scheme.
 
-        ### Proxy Type: `'PAC'`
-
-        :param pac_url `<'str/None'>`: The URL to the PAC (Proxy Auto-Configuration)
-          file. If `pac_url` is provided, the proxy type will be set to `'PAC'`.
-          This is often used when the network environment has a configuration
-          script to handle traffic routing. Defaults to `None`.
-
-        ### Proxy Type: `'MANUAL'`
-        If any of the following proxy properties is specified, the proxy type
-        will be set to `'MANUAL'`.
-
-        :param ftp_proxy `<'str/None'>`: The proxy address to route the FTP (File Transfer Protocol) traffics. Defaults to `None`.
-        :param http_proxy `<'str/None'>`: The proxy address to route the HTTP traffics. Defaults to `None`.
-        :param https_proxy `<'str/None'>`: The proxy address to route the encrypted HTTPS traffics. Defaults to `None`.
-        :param socks_proxy `<'str/None'>`: The proxy address to route the SOCKS traffics. Defaults to `None`.
-        :param socks_username `<'str/None'>`: The username to use for SOCKS authentication. Defaults to `None`.
-        :param socks_password `<'str/None'>`: The password to use for SOCKS authentication. Defaults to `None`.
-        :param no_proxy `<'str/list/None'>`: The addresses that bypass the proxy configuration. Each address is 
-          either a domain name, a hostname, or an IP address. Defaults to `None`.
+        Example:
+            >>> from aselenium import Proxy
+            >>> proxy = Proxy(http_proxy="http://localhost:8080", no_proxy=["localhost"])
+            >>> proxy.to_capabilities()
+            {'proxyType': 'manual', 'httpProxy': 'localhost:8080', 'noProxy': ['localhost']}
         """
         # Set proxy type
         self._proxy_type: str = "DEFAULT"
         # Proxy configuration
-        if auto_detect:
-            self.auto_detect = True
+        self.auto_detect = auto_detect
         self.pac_url = pac_url
-        self.ftp_proxy = ftp_proxy
         self.http_proxy = http_proxy
         self.https_proxy = https_proxy
         self.socks_proxy = socks_proxy
@@ -106,7 +120,7 @@ class Proxy:
     # Proxy: type ----------------------------------------------------------------------
     @property
     def proxy_type(self) -> str:
-        """Access the type of the proxy `<'str'>`.
+        """Return the type of the proxy.
 
         - `'DEFAULT'`: If the platform is windows, means direct connection
             `{"ff_value": 0, "string": "DIRECT"}`. On other platforms, this
@@ -121,10 +135,13 @@ class Proxy:
         - `'PAC'`: Proxy autoconfiguration from URL.
             `{"ff_value": 2, "string": "PAC"}`.
 
-        ### Notice
+        Notice
         The 'proxy_type' should not be adjusted manually. Changing
         other proxy properties will change this 'proxy_type' to
         the corresponding value automatically.
+
+        Returns:
+            The type of the proxy.
         """
         if self._proxy_type == "DEFAULT":
             return "DIRECT" if system() == "Windows" else "SYSTEM"
@@ -134,18 +151,25 @@ class Proxy:
     # Config: auto detect --------------------------------------------------------------
     @property
     def auto_detect(self) -> bool:
-        """Whether the proxy settings should be automatically
-        detected. This is often used when the system has its
-        own proxy settings or configurations `<'bool'>`.
+        """Whether the proxy settings should be automatically detected. This is often used when the system has its own proxy settings or configurations.
+
+        Returns:
+            True when the checked condition is satisfied; otherwise False.
         """
         return self._proxy_type == "AUTODETECT"
 
     @auto_detect.setter
     def auto_detect(self, value: bool) -> None:
+        """Set the auto detect.
+
+        Args:
+            value: New auto detect value.
+        """
         if not isinstance(value, bool):
             raise errors.InvalidProxyError(
-                "<{}>\nInvalid `auto_detect`, must be type of "
-                "`<'bool'>`.".format(self.__class__.__name__)
+                "<{}>\nInvalid `auto_detect`, must be type of `<'bool'>`.".format(
+                    self.__class__.__name__
+                )
             )
         if value:
             self._proxy_type = "AUTODETECT"
@@ -155,57 +179,49 @@ class Proxy:
 
     # Config: PAC ----------------------------------------------------------------------
     @property
-    def pac_url(self) -> str:
-        """The URL to the PAC (Proxy Auto-Configuration) file.
-        This is often used when the network environment has a
-        configuration script to handle traffic routing `<'str'>`.
+    def pac_url(self) -> str | None:
+        """The URL to the PAC (Proxy Auto-Configuration) file. This is often used when the network environment has a configuration script to handle traffic routing.
+
+        Returns:
+            The stored pac url.
         """
         return self._pac_url
 
     @pac_url.setter
     def pac_url(self, value: str | None) -> None:
+        """Set the pac url.
+
+        Args:
+            value: New pac url value. None is handled according to the property's reset/ignore semantics.
+        """
         if isinstance(value, str):
             self._proxy_type = "PAC"
         elif value is not None:
             raise errors.InvalidProxyError(
-                "<{}>\nInvalid `pac_url`, must be type of "
-                "`<'str'>` or `None`.".format(self.__class__.__name__)
+                "<{}>\nInvalid `pac_url`, must be type of `<'str'>` or `None`.".format(
+                    self.__class__.__name__
+                )
             )
         self._pac_url = value
         self.__status = 1
 
-    # Config: ftp ----------------------------------------------------------------------
-    @property
-    def ftp_proxy(self) -> str:
-        """The proxy address to route the FTP (File Transfer Protocol) traffics `<'str'>`."""
-        return self._ftp_proxy
-
-    @ftp_proxy.setter
-    def ftp_proxy(self, value: str | None) -> None:
-        if isinstance(value, str):
-            if not value.startswith("ftp://"):
-                raise errors.InvalidProxyError(
-                    "<{}>\n`ftp_proxy` must start with 'ftp://', "
-                    "instead got: {}.".format(self.__class__.__name__, repr(value))
-                )
-            value = value.split("://", 1)[1]
-            self._proxy_type = "MANUAL"
-        elif value is not None:
-            raise errors.InvalidProxyError(
-                "<{}>\nInvalid `ftp_proxy`, must be type of "
-                "`<'str'>` or `None`.".format(self.__class__.__name__)
-            )
-        self._ftp_proxy = value
-        self.__status = 1
-
     # Config: http ---------------------------------------------------------------------
     @property
-    def http_proxy(self) -> str:
-        """The proxy address to route the HTTP traffics `<'str'>`."""
+    def http_proxy(self) -> str | None:
+        """The proxy address to route the HTTP traffics.
+
+        Returns:
+            The stored http proxy.
+        """
         return self._http_proxy
 
     @http_proxy.setter
     def http_proxy(self, value: str | None) -> None:
+        """Set the http proxy.
+
+        Args:
+            value: New http proxy value. None is handled according to the property's reset/ignore semantics.
+        """
         if isinstance(value, str):
             if not value.startswith("http://") and not value.startswith("https://"):
                 raise errors.InvalidProxyError(
@@ -224,12 +240,21 @@ class Proxy:
 
     # Config: ssl ----------------------------------------------------------------------
     @property
-    def https_proxy(self) -> str:
-        """The proxy address to route the encrypted HTTPS traffics `<'str'>`."""
+    def https_proxy(self) -> str | None:
+        """The proxy address to route the encrypted HTTPS traffics.
+
+        Returns:
+            The stored https proxy.
+        """
         return self._https_proxy
 
     @https_proxy.setter
     def https_proxy(self, value: str | None) -> None:
+        """Set the https proxy.
+
+        Args:
+            value: New https proxy value. None is handled according to the property's reset/ignore semantics.
+        """
         if isinstance(value, str):
             if not value.startswith("https://") and not value.startswith("http://"):
                 raise errors.InvalidProxyError(
@@ -248,15 +273,24 @@ class Proxy:
 
     # Config: socks --------------------------------------------------------------------
     @property
-    def socks_proxy(self) -> str:
-        """The proxy address to route the SOCKS traffics `<'str'>`."""
+    def socks_proxy(self) -> str | None:
+        """The proxy address to route the SOCKS traffics.
+
+        Returns:
+            The stored socks proxy.
+        """
         return self._socks_proxy
 
     @socks_proxy.setter
     def socks_proxy(self, value: str | None) -> None:
+        """Set the socks proxy.
+
+        Args:
+            value: New socks proxy value. None is handled according to the property's reset/ignore semantics.
+        """
         if isinstance(value, str):
             if value.startswith("socks5://"):
-                self._socks_version = 5
+                self._socks_version: int | None = 5
             elif value.startswith("socks4://"):
                 self._socks_version = 4
             else:
@@ -268,8 +302,8 @@ class Proxy:
             self._proxy_type = "MANUAL"
         elif value is None:
             self._socks_version = None
-            self._socks_username = None
-            self._socks_password = None
+            self._socks_username: str | None = None
+            self._socks_password: str | None = None
         else:
             raise errors.InvalidProxyError(
                 "<{}>\nInvalid `socks_proxy`, must be type of "
@@ -279,12 +313,21 @@ class Proxy:
         self.__status = 1
 
     @property
-    def socks_username(self) -> str:
-        """The username to use for SOCKS authentication `<'str'>`."""
+    def socks_username(self) -> str | None:
+        """The username to use for SOCKS authentication.
+
+        Returns:
+            The stored socks username.
+        """
         return self._socks_username
 
     @socks_username.setter
     def socks_username(self, value: str | None) -> None:
+        """Set the socks username.
+
+        Args:
+            value: New socks username value. None is handled according to the property's reset/ignore semantics.
+        """
         if isinstance(value, str):
             self._proxy_type = "MANUAL"
         elif value is not None:
@@ -296,12 +339,21 @@ class Proxy:
         self.__status = 1
 
     @property
-    def socks_password(self) -> str:
-        """The password to use for SOCKS authentication `<'str'>`."""
+    def socks_password(self) -> str | None:
+        """The password to use for SOCKS authentication.
+
+        Returns:
+            The stored socks password.
+        """
         return self._socks_password
 
     @socks_password.setter
     def socks_password(self, value: str | None) -> None:
+        """Set the socks password.
+
+        Args:
+            value: New socks password value. None is handled according to the property's reset/ignore semantics.
+        """
         if isinstance(value, str):
             self._proxy_type = "MANUAL"
         elif value is not None:
@@ -314,14 +366,21 @@ class Proxy:
 
     # Config: no proxy -----------------------------------------------------------------
     @property
-    def no_proxy(self) -> str:
-        """The addresses that bypass the proxy configuration.
-        Each address is either a domain name, a hostname, or
-        an IP address, and separated by a comma `<'str'>`."""
+    def no_proxy(self) -> str | None:
+        """The addresses that bypass the proxy configuration. Each address is either a domain name, a hostname, or an IP address, and separated by a comma.
+
+        Returns:
+            The stored no proxy.
+        """
         return self._no_proxy
 
     @no_proxy.setter
     def no_proxy(self, value: str | list[str] | None) -> None:
+        """Set the no proxy.
+
+        Args:
+            value: New no proxy value. None is handled according to the property's reset/ignore semantics.
+        """
         if isinstance(value, str):
             self._proxy_type = "MANUAL"
         elif isinstance(value, list):
@@ -343,12 +402,14 @@ class Proxy:
 
     # Capabilities ---------------------------------------------------------------------
     def to_capabilities(self) -> dict[str, Any]:
-        """Create the capabilities representation of the
-        proxy configuration `<'dict[str, Any]'>`.
+        """Create the capabilities representation of the proxy configuration.
+
+        Returns:
+            A mapping containing the to capabilities data.
         """
         # Already converted
         if self.__caps and self.__status == 0:
-            return self.__caps.copy()
+            return deepcopy(self.__caps)
 
         # Convert to capabilities
         caps = {"proxyType": self.proxy_type.lower()}
@@ -358,14 +419,12 @@ class Proxy:
             pass
         # . AUTODETECT
         elif self._proxy_type == "AUTODETECT":
-            caps["autodetect"] = True
+            pass
         # . PAC
         elif self._proxy_type == "PAC":
             caps["proxyAutoconfigUrl"] = self._pac_url
         # . MANUAL
         else:
-            if self._ftp_proxy:
-                caps["ftpProxy"] = self._ftp_proxy
             if self._http_proxy:
                 caps["httpProxy"] = self._http_proxy
             if self._https_proxy:
@@ -378,23 +437,38 @@ class Proxy:
             if self._socks_password:
                 caps["socksPassword"] = self._socks_password
             if self._no_proxy:
-                caps["noProxy"] = self._no_proxy
+                caps["noProxy"] = [
+                    address.strip()
+                    for address in self._no_proxy.split(",")
+                    if address.strip()
+                ]
 
         # Set & return capabilities
         self.__caps = caps
         self.__status = 0
-        return self.__caps.copy()
+        return deepcopy(self.__caps)
 
     # Special methods ------------------------------------------------------------------
     def __repr__(self) -> str:
+        """Return a diagnostic representation of this instance.
+
+        Returns:
+            A diagnostic representation of this instance.
+        """
         return "<%s (config=%s)>" % (
             self.__class__.__name__,
-            prettify_dict(self.to_capabilities()),
+            "<redacted>",
         )
 
 
 class Timeouts:
-    """Represents the timeouts parameters for the browser."""
+    """Store WebDriver timeouts in milliseconds with seconds-based accessors.
+
+    The constructor defaults to milliseconds. Public option/session timeout
+    setters use seconds, so pass ``unit="s"`` when constructing this object
+    directly from seconds-based configuration. Encoded milliseconds must be
+    between zero and the WebDriver maximum safe integer, 2**53 - 1.
+    """
 
     def __init__(
         self,
@@ -403,24 +477,33 @@ class Timeouts:
         script: int | float | None = None,
         unit: Literal["s", "ms"] = "ms",
     ) -> None:
-        """The timeouts parameters for the browser.
+        """Initialize the instance with the supplied configuration.
 
-        :param implicit `<'int/float'>`: The time to wait when searching for
-          an element if not immediately present. If `None`, set to default
-          timeout value.
+        Args:
+            implicit: The time to wait when searching for
+                an element if not immediately present. If `None`, set to default
+                timeout value.
+            pageLoad: The time to wait for a page load to
+                complete. If `None`, set to default timeout value.
+            script: The time to wait for an asynchronous
+                script execution. If `None`, set to default timeout value.
+            unit: The unit of the timeouts, accepts `s` or `ms`.
+                Defaults to `'ms'`.
 
-        :param pageLoad `<'int/float'>`: The time to wait for a page load to
-          complete. If `None`, set to default timeout value.
+        Raises:
+            InvalidOptionsError: If the unit is unsupported or a timeout cannot
+                be represented within the protocol's safe millisecond range.
 
-        :param script `<'int/float'>`: The time to wait for an asynchronous
-          script execution. If `None`, set to default timeout value.
-
-        :param unit `<'str'>`: The unit of the timeouts, accepts `s` or `ms`. 
-          Defaults to `'ms'`.
+        Example:
+            >>> from aselenium import Timeouts
+            >>> Timeouts(implicit=0, pageLoad=20, script=5, unit="s").dict
+            {'implicit': 0, 'pageLoad': 20000, 'script': 5000}
         """
-        self._implicit: int = None
-        self._pageLoad: int = None
-        self._script: int = None
+        if not isinstance(unit, str) or unit not in ("s", "ms"):
+            raise errors.InvalidOptionsError("Timeout unit must be 's' or 'ms'")
+        self._implicit = DefaultTimeouts.IMPLICIT
+        self._pageLoad = DefaultTimeouts.PAGE_LOAD
+        self._script = DefaultTimeouts.SCRIPT
         if unit == "ms":
             self.implicit_ms = implicit
             self.pageLoad_ms = pageLoad
@@ -433,11 +516,13 @@ class Timeouts:
     # Dict --------------------------------------------------------------------------------
     @property
     def dict(self) -> dict[str, int]:
-        """Access the timeouts in miliseconds as
-        a dictionary `<'dict[str, int]'>`.
+        """Return the timeouts in milliseconds as a dictionary.
 
-        Excepted format:
+        Expected format:
         >>> {"implicit": 0, "pageLoad": 300_000, "script": 30_000}
+
+        Returns:
+            The timeouts in milliseconds as a dictionary.
         """
         return {
             "implicit": self._implicit,
@@ -448,123 +533,184 @@ class Timeouts:
     # Implicit timeout --------------------------------------------------------------------
     @property
     def implicit(self) -> float:
-        """Access implicit timeout in seconds `<'float'>`.
+        """Return implicit timeout in seconds.
 
         Total seconds to wait when searching for an element
         if not immediately present.
+
+        Returns:
+            Implicit timeout in seconds.
         """
         return self._implicit / 1000
 
     @implicit.setter
     def implicit(self, value: int | float | None) -> None:
         # Value is None
+        """Set the implicit.
+
+        Args:
+            value: New implicit value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             if self._implicit is None:
-                self._implicit: int = DefaultTimeouts.IMPLICIT
+                self._implicit = DefaultTimeouts.IMPLICIT
         # Set implicit
         else:
-            value = self._validate_timeout(value)
-            self._implicit: int = int(value * 1000)
+            self._implicit = self._validate_timeout(value, scale=1000)
 
     @property
     def implicit_ms(self) -> int:
-        """Access implicit timeout in milliseconds `<'int'>`.
+        """Return implicit timeout in milliseconds.
 
         Total milliseconds to wait when searching for an
         element if not immediately present.
+
+        Returns:
+            Implicit timeout in milliseconds.
         """
         return self._implicit
 
     @implicit_ms.setter
     def implicit_ms(self, value: int | float | None) -> None:
         # Value is None
+        """Set the implicit ms.
+
+        Args:
+            value: New implicit ms value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             if self._implicit is None:
-                self._implicit: int = DefaultTimeouts.IMPLICIT
+                self._implicit = DefaultTimeouts.IMPLICIT
         # Set implicit ms
         else:
-            self._implicit: int = int(self._validate_timeout(value))
+            self._implicit = self._validate_timeout(value)
 
     # PageLoad timeout --------------------------------------------------------------------
     @property
     def pageLoad(self) -> float:
-        """Access pageLoad timeout in seconds `<'float'>`.
+        """Return pageLoad timeout in seconds.
 
         Total seconds to wait for a page load to complete.
+
+        Returns:
+            Pageload timeout in seconds.
         """
         return self._pageLoad / 1000
 
     @pageLoad.setter
     def pageLoad(self, value: int | float | None) -> None:
         # Value is None
+        """Set the pageLoad.
+
+        Args:
+            value: New pageLoad value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             if self._pageLoad is None:
-                self._pageLoad: int = DefaultTimeouts.PAGE_LOAD
+                self._pageLoad = DefaultTimeouts.PAGE_LOAD
         # Set pageLoad
         else:
-            value = self._validate_timeout(value)
-            self._pageLoad: int = int(value * 1000)
+            self._pageLoad = self._validate_timeout(value, scale=1000)
 
     @property
     def pageLoad_ms(self) -> int:
-        """Access pageLoad timeout in milliseconds `<'int'>`.
+        """Return pageLoad timeout in milliseconds.
 
         Total milliseconds to wait for a page load to complete.
+
+        Returns:
+            Pageload timeout in milliseconds.
         """
         return self._pageLoad
 
     @pageLoad_ms.setter
     def pageLoad_ms(self, value: int | float | None) -> None:
         # Value is None
+        """Set the pageLoad ms.
+
+        Args:
+            value: New pageLoad ms value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             if self._pageLoad is None:
-                self._pageLoad: int = DefaultTimeouts.PAGE_LOAD
+                self._pageLoad = DefaultTimeouts.PAGE_LOAD
         # Set pageLoad ms
         else:
-            self._pageLoad: int = int(self._validate_timeout(value))
+            self._pageLoad = self._validate_timeout(value)
 
     # Script timeout ----------------------------------------------------------------------
     @property
     def script(self) -> float:
-        """Access script timeout in seconds `<'float'>`.
+        """Return script timeout in seconds.
 
         Total seconds to wait for an asynchronous script execution.
+
+        Returns:
+            Script timeout in seconds.
         """
         return self._script / 1000
 
     @script.setter
     def script(self, value: int | float | None) -> None:
         # Value is None
+        """Set the script.
+
+        Args:
+            value: New script value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             if self._script is None:
-                self._script: int = DefaultTimeouts.SCRIPT
+                self._script = DefaultTimeouts.SCRIPT
         # Set script
         else:
-            value = self._validate_timeout(value)
-            self._script: int = int(value * 1000)
+            self._script = self._validate_timeout(value, scale=1000)
 
     @property
     def script_ms(self) -> int:
-        """Access script timeout in milliseconds `<'int'>`.
+        """Return script timeout in milliseconds.
 
         Total milliseconds to wait for an asynchronous script execution.
+
+        Returns:
+            Script timeout in milliseconds.
         """
         return self._script
 
     @script_ms.setter
     def script_ms(self, value: int | float | None) -> None:
         # Value is None
+        """Set the script ms.
+
+        Args:
+            value: New script ms value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             if self._script is None:
-                self._script: int = DefaultTimeouts.SCRIPT
+                self._script = DefaultTimeouts.SCRIPT
         # Set script ms
         else:
-            self._script: int = int(self._validate_timeout(value))
+            self._script = self._validate_timeout(value)
 
     # Utils -------------------------------------------------------------------------------
-    def _validate_timeout(self, value: Any) -> int | float:
-        """(internal) Validate the timeout value `<'int/float'>`"""
-        if not isinstance(value, (int, float)):
+    def _validate_timeout(self, value: Any, *, scale: int = 1) -> int:
+        """Convert a finite nonnegative timeout to safe integer milliseconds.
+
+        Args:
+            value: Numeric timeout value; bool is not accepted as a number.
+            scale: Milliseconds per input unit, either 1 or 1000.
+
+        Returns:
+            Integer milliseconds, truncating a fractional millisecond as before.
+
+        Raises:
+            InvalidOptionsError: If the input or its converted value is outside
+                the WebDriver range from zero through 2**53 - 1 milliseconds.
+        """
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or (isinstance(value, float) and not isfinite(value))
+        ):
             raise errors.InvalidOptionsError(
                 "<{}>\nInvalid timeout ({}), must be an integer or float.".format(
                     self.__class__.__name__, repr(value)
@@ -576,10 +722,22 @@ class Timeouts:
                     self.__class__.__name__, repr(value)
                 )
             )
-        return value
+        # Check before integer conversion: multiplying a finite float can overflow,
+        # and isfinite() itself cannot convert arbitrarily large Python integers.
+        milliseconds = value * scale
+        if milliseconds > 2**53 - 1:
+            raise errors.InvalidOptionsError(
+                "Timeout exceeds the WebDriver maximum of 2**53 - 1 milliseconds"
+            )
+        return int(milliseconds)
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
+        """Return a diagnostic representation of this instance.
+
+        Returns:
+            A diagnostic representation of this instance.
+        """
         return "<%s (implicity=%d, pageLoad=%d, script=%d, unit='ms')>" % (
             self.__class__.__name__,
             self._implicit,
@@ -587,43 +745,58 @@ class Timeouts:
             self._script,
         )
 
-    def __hash__(self) -> int:
-        return id(self)
-
     def __eq__(self, __o: object) -> bool:
+        """Return whether this instance compares equal to another object.
+
+        Args:
+            __o: Object to compare with this instance.
+
+        Returns:
+            True if this instance compares equal to another object; otherwise False.
+        """
         if isinstance(__o, Timeouts):
             return (
-                self._implicit == __o.implicit
-                and self._pageLoad == __o.pageLoad
-                and self._script == __o.script
+                self._implicit == __o._implicit
+                and self._pageLoad == __o._pageLoad
+                and self._script == __o._script
             )
         else:
             return False
 
     def __bool__(self) -> bool:
+        """Return the truth value of this instance.
+
+        Returns:
+            True; instances of this value type are always truthy.
+        """
         return True
 
     def copy(self) -> Timeouts:
-        """Copy the timeouts object."""
+        """Copy the timeouts object.
+
+        Returns:
+            An independent copy of this value object.
+        """
         return Timeouts(self._implicit, self._pageLoad, self._script, unit="ms")
 
 
 class Profile:
-    """Represents the user profile for a browser."""
+    """Represent the user profile for a browser."""
 
     def __init__(self, directory: str, profile_folder: str | None = None) -> None:
-        """The user profile for the browser.
+        """Initialize the instance with the supplied configuration.
 
-        :param directory [REQUIRED] `<'str'>`: The directory of the user profile.
-        :param profile_folder [OPTIONAL] `<'str/None'>`: The name of the profile folder inside of the 'directory'.
-
-        ### Explaination
+        Explanation
         - When creating a `Profile` instance, a cloned temporary profile
           will be created based on the given profile 'directory'. The
           automated session will use this temporary profile leaving the
-          original profile untouched. When this profile is no longer
-          used by the program, the temporary profile will be deleted
-          automatically.
+          original profile untouched. Call close() on the owning options
+          after use to release its temporary profile deterministically.
+          Garbage-collection cleanup is only a best-effort fallback.
+
+        Args:
+            directory: The directory of the user profile.
+            profile_folder: The name of the profile folder inside of the 'directory'.
         """
         # Profile directory
         self._profile_folder: str | None = profile_folder
@@ -644,7 +817,7 @@ class Profile:
 
     # Temporary profile -------------------------------------------------------------------
     def _create_temp_profile(self) -> None:
-        """(Internal) Create the temporary profile."""
+        """Create the temporary profile."""
         # Temporary profile already created
         if self._temp_directory is not None:
             return None  # exit
@@ -674,7 +847,8 @@ class Profile:
 
         # Clone profile to temporary directory
         try:
-            self._temp_directory = mkdtemp(prefix="aselenium-")
+            self._temp_directory = str(Path(mkdtemp(prefix="aselenium-")).resolve())
+            self._owned_temp_directory = self._temp_directory
             self._temp_profile_dir = join_path(
                 self._temp_directory, self._temp_profile_folder
             )
@@ -693,21 +867,32 @@ class Profile:
             ) from err
 
     def _delete_temp_profile(self) -> None:
-        """(Internal) Delete the temporary profile."""
+        """Delete the temporary profile."""
         # Temporary profile already deleted
         if self._temp_directory is None:
             return None  # exit
 
         # Delete temporary profile
-        while is_path_dir(self._temp_directory):
-            try:
-                rmtree(self._temp_directory)
-            except OSError:
-                continue
+        path = Path(self._temp_directory)
+        if self._temp_directory != getattr(self, "_owned_temp_directory", None):
+            raise errors.InvalidProfileError(
+                "Refusing to remove an unowned temporary profile"
+            )
+        checked_path(path.parent, path)
+        if path.exists():
+            filesystem_operation(
+                lambda: rmtree(checked_path(path.parent, path)),
+                "Remove temporary browser profile",
+            )
         self._temp_directory = None
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
+        """Return a diagnostic representation of this instance.
+
+        Returns:
+            A diagnostic representation of this instance.
+        """
         return "<%s (profile_directory='%s', temp_directory='%s')>" % (
             self.__class__.__name__,
             self._profile_dir,
@@ -715,52 +900,74 @@ class Profile:
         )
 
     def __hash__(self) -> int:
+        """Return the hash used by sets and dictionary keys.
+
+        Returns:
+            The hash used by sets and dictionary keys.
+        """
         return hash(self.__repr__())
 
     def __eq__(self, __o: object) -> bool:
+        """Return whether this instance compares equal to another object.
+
+        Args:
+            __o: Object to compare with this instance.
+
+        Returns:
+            True if this instance compares equal to another object; otherwise False.
+        """
         return hash(self) == hash(__o) if isinstance(__o, self.__class__) else False
 
     def __bool__(self) -> bool:
+        """Return the truth value of this instance.
+
+        Returns:
+            True; instances of this value type are always truthy.
+        """
         return True
 
-    def __del__(self):
-        self._delete_temp_profile()
+    def __del__(self) -> None:
+        """Release references during finalization; explicit cleanup remains preferred."""
+        try:
+            if getattr(self, "_temp_directory", None) is not None:
+                self._delete_temp_profile()
+        except Exception:
+            # Finalizers must never loop or hide an active exception.
+            pass
 
 
 class ChromiumProfile(Profile):
-    """Represents the user profile for Chromium based browser.
-    Such as: Edge, Chrome, Chromium, etc.
-    """
+    """Represent the user profile for Chromium based browser. Such as: Edge, Chrome, Chromium, etc."""
 
     def __init__(self, directory: str, profile_folder: str) -> None:
-        """The user profile for Chromium based browser.
-        Such as: Edge, Chrome, Chromium, etc.
+        r"""Initialize the instance with the supplied configuration.
 
-        :param directory `<'str'>`: The directory of the user profile.
-        :param profile_folder `<'str'>`: The name of the profile folder inside of the 'directory'.
-
-        ### Explaination
+        Explanation
         - When creating a `Profile` instance, a cloned temporary profile
           will be created based on the given profile 'directory'. The
           automated session will use this temporary profile leaving the
-          original profile untouched. When this profile is no longer
-          used by the program, the temporary profile will be deleted
-          automatically.
+          original profile untouched. Call close() on the owning options
+          after use to release its temporary profile deterministically.
+          Garbage-collection cleanup is only a best-effort fallback.
 
-        ### MacOS Default Profile Location:
+        MacOS Default Profile Location:
         - Chrome: '~/Library/Application Support/Google/Chrome' & 'Default'
         - Chromium: '~/Library/Application Support/Chromium' & 'Default'
         - Edge: '~/Library/Application Support/Microsoft Edge' & 'Default'
 
-        ### Windows Default Profile Location:
-        - Chrome: 'C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data' & 'Default'
-        - Chromium: 'C:\\Users\\<username>\\AppData\\Local\\Chromium\\User Data' & 'Default'
-        - Edge: 'C:\\Users\\<username>\\AppData\\Local\\Microsoft\\Edge\\User Data' & 'Default'
+        Windows Default Profile Location:
+        - Chrome: 'C:\Users\<username>\AppData\Local\Google\Chrome\User Data' & 'Default'
+        - Chromium: 'C:\Users\<username>\AppData\Local\Chromium\User Data' & 'Default'
+        - Edge: 'C:\Users\<username>\AppData\Local\Microsoft\Edge\User Data' & 'Default'
 
-        ### Linux Default Profile Location:
+        Linux Default Profile Location:
         - Chrome: '~/.config/google-chrome' & 'Default'
         - Chromium: '~/.config/chromium' & 'Default'
         - Edge: '~/.config/microsoft-edge' & 'Default'
+
+        Args:
+            directory: The directory of the user profile.
+            profile_folder: The name of the profile folder inside of the 'directory'.
         """
         # Pre-validation
         if not isinstance(profile_folder, str):
@@ -774,22 +981,38 @@ class ChromiumProfile(Profile):
     # Properties --------------------------------------------------------------------------
     @property
     def directory(self) -> str:
-        """Access the main directory of the original profile `<'str'>`."""
+        """Return the main directory of the original profile.
+
+        Returns:
+            The main directory of the original profile.
+        """
         return self._directory
 
     @property
     def directory_temp(self) -> str:
-        """Access the main directory of the temporary profile `<'str'>`."""
+        """Return the main directory of the temporary profile.
+
+        Returns:
+            The main directory of the temporary profile.
+        """
         return self._temp_directory
 
     @property
     def profile_folder(self) -> str:
-        """Access the profile folder name of the original profile `<'str'>`."""
+        """Return the profile folder name of the original profile.
+
+        Returns:
+            The profile folder name of the original profile.
+        """
         return self._profile_folder
 
     @property
     def profile_folder_temp(self) -> str:
-        """Access the profile folder name of the temporary profile `<'str'>`."""
+        """Return the profile folder name of the temporary profile.
+
+        Returns:
+            The profile folder name of the temporary profile.
+        """
         return self._temp_profile_folder
 
 
@@ -810,8 +1033,86 @@ class BaseOptions:
     VENDOR_PREFIX: str = None
     "the vendor prefix of the target browser `str`"
 
+    def snapshot(self: O) -> O:
+        """Create an independent configuration snapshot, cloning temporary profiles when needed.
+
+        Returns:
+            An independent options object of the same concrete class.
+
+        Example:
+            >>> snapshot = driver.options.snapshot()
+            >>> try:
+            ...     snapshot.set_timeouts(implicit=0, pageLoad=20, script=5)
+            ... finally:
+            ...     snapshot.close()
+        """
+        result = type(self).__new__(type(self))
+        result.__dict__ = deepcopy(
+            {
+                key: value
+                for key, value in self.__dict__.items()
+                if key not in {"_profile", "_pending_profile_cleanup"}
+            }
+        )
+        result._profile = None
+        result._pending_profile_cleanup = []
+        profile = getattr(self, "_profile", None)
+        if profile is not None:
+            if isinstance(profile, ChromiumProfile):
+                result.set_profile(
+                    profile._temp_directory, profile._temp_profile_folder
+                )
+            else:
+                result.set_profile(profile.directory_temp)
+        result._caps_changed()
+        return result
+
+    def close(self) -> None:
+        """Release owned profile clones and invalidate profile capabilities.
+
+        Original source profiles and independent snapshots are never removed.
+        A failed removal retains ownership for a later close() retry. The options
+        instance can be configured with a new profile after successful cleanup.
+
+        Example:
+            >>> try:
+            ...     async with driver.acquire() as session:
+            ...         await session.load("https://example.com")
+            ... finally:
+            ...     driver.options.close()
+        """
+        for pending in tuple(self._pending_profile_cleanup):
+            pending._delete_temp_profile()
+            self._pending_profile_cleanup.remove(pending)
+        profile = getattr(self, "_profile", None)
+        if profile is not None:
+            profile._delete_temp_profile()
+            self._profile = None
+            self._caps_changed()
+
+    def _replace_profile(self, profile: Profile) -> None:
+        """Replace an owned clone without losing either resource on cleanup failure.
+
+        Args:
+            profile: Fully constructed replacement clone owned by this operation.
+
+        Raises:
+            Exception: If old-profile cleanup fails. The old configuration remains
+                selected; a replacement that also fails cleanup is retained for retry.
+        """
+        try:
+            self.close()
+        except BaseException:
+            try:
+                profile._delete_temp_profile()
+            except BaseException:
+                self._pending_profile_cleanup.append(profile)
+            raise
+        self._profile = profile
+        self._caps_changed()
+
     def __init__(self) -> None:
-        """The options for the browser.
+        """Initialize the instance with the supplied configuration.
 
         Each subclass of `Options` must implement the following:
         - `DEFAULT_CAPABILITIES`: <'dict[str, Any]'> Class attribute that
@@ -849,68 +1150,81 @@ class BaseOptions:
         # Options
         self._experimental_options: dict[str, Any] = {}
         self._preferences: dict[str, Any] = {}
+        self._pending_profile_cleanup: list[Profile] = []
 
     # Session timeout ---------------------------------------------------------------------
     @property
     def session_timeout(self) -> int | float:
-        """Access the hard session timeout (seconds) for the browser `<'int/float'>`.
+        """Return the per-command transport deadline in seconds.
 
-        This timeout is not a native timeout settings provided by
-        the webdriver, but a hard timeout over the connection to
-        the webdriver server. It is used to prevent the webdriver
-        from frozen for unknown reasons and blocking the main thread
-        from receiving any response (including timeout errors).
+        This bounds one request to the driver, including its response, independently
+        of the driver's implicit, page-load, and script timeouts. It does not limit
+        the total lifetime of a session. A stalled command raises SessionTimeoutError.
 
-        For example, in some `rare` cases, the webdriver might be stuck
-        when loading a webpage (sometimes due to the network issues,
-        sometime due to conflicting actions from the pop-up alerts, etc).
-        Even with a properly configured 'pageLoad' timeout, the webdriver
-        might still not yeild any responses. In this case, this hard
-        session timeout will be triggered and raise a `SessionTimeoutError`
-        error. If user does not intercepet this error, the webdriver will
-        be terminated and the session will be closed properly (including
-        the browser process).
+        An exception escaping ``async with driver.acquire()`` triggers that context's
+        owned cleanup. Catching the exception inside the context does not itself
+        close the session. Manual sessions still require ``await session.quit()``.
 
-        The `SessionTimeoutError` exception is a subclass of `TimeoutError`
-        and `AseleniumTimeout`, but different from `WebDriverTimeoutError`,
-        which is raised when a native webdriver timeout (implicit, pageLoad,
-        and script) is triggered.
+        Returns:
+            The positive finite request deadline; the default is 360 seconds.
+            Prefer a value larger than the driver's page-load and script timeouts.
 
-        The session timeout defaults to `360` seconds, which is 1 min longer
-        than the default `pageLoad` timeout. In most cases, this timeout will
-        not be triggered but act as a last resort to prevent the webdriver
-        from frozen. When settings this timeout, it is highly recommended be
-        larger than all the native webdriver timeouts (implicit, pageLoad,
-        and script).
+        Example:
+            >>> driver.options.set_timeouts(implicit=0, pageLoad=20, script=5)
+            >>> driver.options.session_timeout = 30
         """
         return self._session_timeout
 
     @session_timeout.setter
     def session_timeout(self, value: int | float) -> None:
-        if not isinstance(value, (int, float)):
+        """Set a positive transport deadline representable as a finite number.
+
+        Args:
+            value: Per-command transport timeout in seconds; bool is not accepted.
+
+        Raises:
+            InvalidOptionsError: If value is not positive, finite, and representable
+                by the underlying asynchronous transport's numeric deadline.
+        """
+        try:
+            finite = isinstance(value, (int, float)) and isfinite(value)
+        except OverflowError:
+            finite = False
+        if isinstance(value, bool) or not finite:
             raise errors.InvalidOptionsError(
-                "<{}>\nInvalid session_timeout ({} {}), must be a postive integer "
+                "<{}>\nInvalid session_timeout ({} {}), must be a positive finite integer "
                 "or float.".format(self.__class__.__name__, repr(value), type(value))
             )
         if value <= 0:
             raise errors.InvalidOptionsError(
-                "<{}>\nInvalid session_timeout ({}), must be "
-                "greater than `0`.".format(self.__class__.__name__, value)
+                "<{}>\nInvalid session_timeout ({}), must be greater than `0`.".format(
+                    self.__class__.__name__, value
+                )
             )
         self._session_timeout = value
 
     # Caps: basic -------------------------------------------------------------------------
     @property
     def capabilities(self) -> dict[str, Any]:
-        """Access the final browser capabilities `<'dict[str, Any]'>`."""
+        """Return the final browser capabilities.
+
+        Returns:
+            The final browser capabilities.
+        """
+        if self._proxy is not None:
+            proxy = self._proxy.to_capabilities()
+            if self._capabilities.get("proxy") != proxy:
+                self.set_capability("proxy", proxy)
         if not self.__caps or self.__caps_status == 1:
             self.__caps = deepcopy(self.construct())
             self.__caps_status = 0
-        return self.__caps
+        return deepcopy(self.__caps)
 
     def construct(self) -> dict[str, Any]:
-        """Construct the final capabilities of the browser.
-        Must be implemented in subclass.
+        """Construct the final capabilities of the browser. Must be implemented in subclass.
+
+        Returns:
+            A mapping containing the construct data.
         """
         raise NotImplementedError(
             "<{}> Class instance method `construct()` has not been "
@@ -920,12 +1234,17 @@ class BaseOptions:
     def get_capability(self, name: str) -> Any:
         """Get a capability of the browser.
 
-        :param name `<'str'>`: The name of the capability.
-        :raises `<'OptionsNotSetError'>`: If the capability is not set.
-        :returns `<'Any'>`: The value of the capability.
+        Args:
+            name: The name of the capability.
+
+        Returns:
+            The value of the capability.
+
+        Raises:
+            OptionsNotSetError: If the capability is not set.
         """
         try:
-            return self._capabilities[name]
+            return deepcopy(self._capabilities[name])
         except KeyError as err:
             raise errors.OptionsNotSetError(
                 "<{}>\nCapability {} has not been set.".format(
@@ -936,16 +1255,18 @@ class BaseOptions:
     def set_capability(self, name: str, value: Any) -> None:
         """Set a capability of the browser.
 
-        :param name `<'str'>`: The name of the capability.
-        :param value `<'Any'>`: The value of the capability.
+        Args:
+            name: The name of the capability.
+            value: The value of the capability.
         """
-        self._capabilities[name] = value
+        self._capabilities[name] = deepcopy(value)
         self._caps_changed()
 
     def rem_capability(self, name: str) -> None:
         """Remove a capability of the browser.
 
-        :param name `<'str'>`: The name of the capability.
+        Args:
+            name: The name of the capability.
         """
         try:
             self._capabilities.pop(name)
@@ -954,15 +1275,34 @@ class BaseOptions:
             pass
 
     def _caps_changed(self) -> None:
-        """Switch the capabilities status to `changed`, which will
-        trigger a re-construction of the browser capabilites.
-        """
+        """Switch the capabilities status to `changed`, which will trigger a re-construction of the browser capabilites."""
         self.__caps_status = 1
+
+    def _validate_bool(self, value: Any, name: str) -> bool:
+        """Validate a boolean option without truthiness coercion.
+
+        Args:
+            value: New option value to validate before mutating configuration.
+            name: Public option name used in the diagnostic.
+
+        Returns:
+            The unchanged bool value.
+
+        Raises:
+            InvalidOptionsError: If value is not an actual bool.
+        """
+        if not isinstance(value, bool):
+            raise errors.InvalidOptionsError(f"{name} must be a bool")
+        return value
 
     # Caps: browser name ------------------------------------------------------------------
     @property
     def browser_name(self) -> str:
-        """Access the name of the browser agent `<'str'>`."""
+        """Return the name of the browser agent.
+
+        Returns:
+            The name of the browser agent.
+        """
         try:
             return self._capabilities["browserName"]
         except KeyError as err:
@@ -975,16 +1315,31 @@ class BaseOptions:
 
     # Caps: browser version ---------------------------------------------------------------
     @property
-    def browser_version(self) -> Version | None:
-        """Access the version of the browser `<'Version/None'>`."""
+    def browser_version(self) -> str | None:
+        """Return the browser version string recorded for this configuration or session.
+
+        Returns:
+            The version string, or None when no browser version has been recorded.
+            This property does not probe the browser or return a Version object.
+        """
         return self._capabilities.get("browserVersion")
 
     @browser_version.setter
     def browser_version(self, value: Version | None) -> None:
+        """Set the browser version.
+
+        Args:
+            value: New browser version value. None is handled according to the property's reset/ignore semantics.
+        """
         self._set_browser_version(value)
 
     def _set_browser_version(self, value: Version | None) -> None:
         # Same browser version
+        """Store a browser version for subsequent capability generation.
+
+        Args:
+            value: Value to inspect, normalize, or assign as described above.
+        """
         if value == self.browser_version:
             return None
 
@@ -1003,12 +1358,21 @@ class BaseOptions:
     # Options: binary location ------------------------------------------------------------
     @property
     def browser_location(self) -> str | None:
-        """Access the location of the Brwoser binary `<'str'>`."""
+        """Return the configured browser executable path.
+
+        Returns:
+            The executable path, or None when no binary override is configured.
+        """
         return self._experimental_options.get("binary")
 
     @browser_location.setter
     def browser_location(self, value: str | None) -> None:
         # Same binary location
+        """Set the browser location.
+
+        Args:
+            value: New browser location value. None is handled according to the property's reset/ignore semantics.
+        """
         if value == self.browser_location:
             return None  # exit
 
@@ -1031,15 +1395,23 @@ class BaseOptions:
     # Caps: platform name -----------------------------------------------------------------
     @property
     def platform_name(self) -> str | None:
-        """Access the name of the platform `<'str'>`.
+        """Return the name of the platform.
 
         e.g. "windows", "mac", "linux".
+
+        Returns:
+            The name of the platform.
         """
         return self._capabilities.get("platformName")
 
     @platform_name.setter
     def platform_name(self, value: str | None) -> None:
         # Remove platform name
+        """Set the platform name.
+
+        Args:
+            value: New platform name value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             self.rem_capability("platformName")
             return None  # exit
@@ -1054,14 +1426,25 @@ class BaseOptions:
     # Caps: accept insecure certs ---------------------------------------------------------
     @property
     def accept_insecure_certs(self) -> bool:
-        """Access whether untrusted and self-signed TLS certificates
-        are implicitly trusted on navigation. Defaults to `False <bool>`.
+        """Return whether untrusted and self-signed TLS certificates are implicitly trusted on navigation. Defaults to `False <bool>`.
+
+        Returns:
+            True if untrusted and self-signed TLS certificates are implicitly trusted on navigation. Defaults to `False <bool>`; otherwise False.
         """
         return self._capabilities.get("acceptInsecureCerts", False)
 
     @accept_insecure_certs.setter
     def accept_insecure_certs(self, value: bool) -> None:
         # Set acceptInsecureCerts to False (remove cap)
+        """Set the accept insecure certs.
+
+        Args:
+            value: True explicitly permits untrusted certificates; False disables it.
+
+        Raises:
+            InvalidOptionsError: If value is not a bool, including strings such as "false".
+        """
+        value = self._validate_bool(value, "accept_insecure_certs")
         if not value:
             self.rem_capability("acceptInsecureCerts")
         # Set acceptInsecureCerts to True (add cap)
@@ -1071,25 +1454,32 @@ class BaseOptions:
     # Caps: page load strategy ------------------------------------------------------------
     @property
     def page_load_strategy(self) -> str:
-        """The strategy to use when waiting for the page load
-        event to fire. Defaults to `'normal' `<'str'>`.
+        """The strategy to use when waiting for the page load event to fire. Defaults to `'normal'.
 
         Available options:
         - `'normal'`: Waits for all resources to be downloaded.
         - `'eager'`:  Waits for DOM access to be ready, other resources like images may still be loading.
         - `'none'`:   Does not wait for any events, not blocking browser at all.
+
+        Returns:
+            The page load strategy string.
         """
         return self._capabilities["pageLoadStrategy"]
 
     @page_load_strategy.setter
     def page_load_strategy(self, value: str | None) -> None:
         # Reset to default
+        """Set the page load strategy.
+
+        Args:
+            value: New page load strategy value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             self.set_capability("pageLoadStrategy", "normal")
             return None  # exit
 
         # Set pageLoadStrategy
-        if value not in Constraint.PAGE_LOAD_STRATEGIES:
+        if not isinstance(value, str) or value not in Constraint.PAGE_LOAD_STRATEGIES:
             raise errors.InvalidOptionsError(
                 "<{}>\n`page_load_stragety` {} is not valid, "
                 "available options: {}".format(
@@ -1103,12 +1493,21 @@ class BaseOptions:
     # Caps: proxy -------------------------------------------------------------------------
     @property
     def proxy(self) -> Proxy | None:
-        """Access browser proxy configurations `<'Proxy'>`."""
+        """Return browser proxy configurations.
+
+        Returns:
+            Browser proxy configurations.
+        """
         return self._proxy
 
     @proxy.setter
     def proxy(self, value: Proxy | None) -> None:
         # Remove proxy
+        """Set the proxy.
+
+        Args:
+            value: New proxy value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             self.rem_capability("proxy")
             self._proxy = None
@@ -1143,7 +1542,7 @@ class BaseOptions:
     # Caps: timeouts ----------------------------------------------------------------------
     @property
     def timeouts(self) -> Timeouts:
-        """Access the timeouts parameters of the browser `<Timeouts>`.
+        """Return the timeouts parameters of the browser.
 
         - implicit: Total seconds all acquired sessions will wait when
         searching for an element if it is not immediately present.
@@ -1154,9 +1553,11 @@ class BaseOptions:
         - script: Total seconds all acquired sessions will wait for an
         asynchronous script to finish execution before returning an error.
 
-        ### Example:
-        >>> timeouts = options.timeouts
-            # <Timeouts (implicity=0, pageLoad=300000, script=30000, unit='ms')>
+        Returns:
+            The timeouts parameters of the browser.
+
+        Example:
+            >>> timeouts = options.timeouts
         """
         return Timeouts(**self._capabilities["timeouts"], unit="ms")
 
@@ -1166,32 +1567,29 @@ class BaseOptions:
         pageLoad: int | float | None = None,
         script: int | float | None = None,
     ) -> Timeouts:
-        """Set the default timeouts for the sessions. Each session can
-        override this default value by calling `session.set_timeouts()`
-        method.
+        """Set the default timeouts for the sessions. Each session can override this default value by calling `session.set_timeouts()` method.
 
-        ### Notice
+        Notice
         All of the timeout values should be in `SECONDS` instead of milliseconds
         (as the webdriver protocol requires). The values will be converted to
         milliseconds automatically.
 
-        :param implicit `<'int/float/None'>`: Total `seconds` the current session
-          should wait when searching for an element if not immediately present.
-          If `None (default)`, keep the current implicit timeout.
+        Args:
+            implicit: Total `seconds` the current session
+                should wait when searching for an element if not immediately present.
+                If `None (default)`, keep the current implicit timeout.
+            pageLoad: Total `seconds` the current session
+                should wait for a page load to complete before returning an error. if
+                `None (default)`, keep the current pageLoad timeout.
+            script: Total `seconds` the current session
+                should wait for an asynchronous script to finish execution before
+                returning an error. if `None (default)`, keep the current script timeout.
 
-        :param pageLoad `<'int/float/None'>`: Total `seconds` the current session
-          should wait for a page load to complete before returning an error. if
-          `None (default)`, keep the current pageLoad timeout.
+        Returns:
+            The timeouts after update.
 
-        :param script `<'int/float/None'>`: Total `seconds` the current session
-          should wait for an asynchronous script to finish execution before
-          returning an error. if `None (default)`, keep the current script timeout.
-
-        :returns `<'Timeouts'>`: The timeouts after update.
-
-        ### Example:
-        >>> timeouts = options.set_timeouts(implicit=0.1, pageLoad=30, script=3)
-            # <Timeouts (implicity=100, pageLoad=30000, script=3000, unit='ms')>
+        Example:
+            >>> timeouts = options.set_timeouts(implicit=0.1, pageLoad=30, script=3)
         """
         # Set timeouts
         timeouts = self.timeouts
@@ -1208,14 +1606,25 @@ class BaseOptions:
     # Caps: strict file interactability ---------------------------------------------------
     @property
     def strict_file_interactability(self) -> bool:
-        """Access whether browser is strict about file
-        interactability. Defaults to False `<'bool'>`.
+        """Return whether browser is strict about file interactability. Defaults to False.
+
+        Returns:
+            True if browser is strict about file interactability. Defaults to False; otherwise False.
         """
         return self._capabilities.get("strictFileInteractability", False)
 
     @strict_file_interactability.setter
     def strict_file_interactability(self, value: bool) -> None:
         # Set strictFileInteractability to False (remove cap)
+        """Set the strict file interactability.
+
+        Args:
+            value: True enables strict file interactability; False disables it.
+
+        Raises:
+            InvalidOptionsError: If value is not a bool.
+        """
+        value = self._validate_bool(value, "strict_file_interactability")
         if not value:
             self.rem_capability("strictFileInteractability")
         # Set strictFileInteractability to True (add cap)
@@ -1225,8 +1634,7 @@ class BaseOptions:
     # Caps: prompt behavior ---------------------------------------------------------------
     @property
     def unhandled_prompt_behavior(self) -> str:
-        """Access what action the browser must take when a user prompt
-        is encountered. Defaults to `'dismiss and notify' <'str'>`.
+        """Return what action the browser must take when a user prompt is encountered. Defaults to `'dismiss and notify' <'str'>`.
 
         Available options:
         - `'dismiss'`: All simple dialogs encountered should be dismissed.
@@ -1241,12 +1649,23 @@ class BaseOptions:
 
         - `'ignore'`: All simple dialogs encountered should be left to the
             user to handle.
+
+        Returns:
+            What action the browser must take when a user prompt is encountered. defaults to `'dismiss and notify' <'str'>`.
         """
         return self._capabilities.get("unhandledPromptBehavior", "dismiss and notify")
 
     @unhandled_prompt_behavior.setter
     def unhandled_prompt_behavior(self, value: str) -> None:
-        if value not in Constraint.UNHANDLED_PROMPT_BEHAVIORS:
+        """Set the unhandled prompt behavior.
+
+        Args:
+            value: New unhandled prompt behavior value.
+        """
+        if (
+            not isinstance(value, str)
+            or value not in Constraint.UNHANDLED_PROMPT_BEHAVIORS
+        ):
             raise errors.InvalidOptionsError(
                 "<{}>\n`unhandled_prompt_behavior` {} is not valid, "
                 "available options: {}".format(
@@ -1260,32 +1679,37 @@ class BaseOptions:
     # Options: experimental options -------------------------------------------------------
     @property
     def experimental_options(self) -> dict[str, Any]:
-        """Access the experimental options of the browser `<dict>`."""
+        """Return the experimental options of the browser.
+
+        Returns:
+            The experimental options of the browser.
+        """
         return deepcopy(self._experimental_options)
 
     def add_experimental_options(self, **options: Any) -> None:
         """Add experimental options of the browser.
 
-        :param options [Keywords] `<'Any'>`: The experimental options to add.
+        Args:
+            **options: The experimental options to add.
 
-        ### Example:
-        >>> options.add_experimental_options(
-                excludeSwitches=["enable-automation"],
-                useAutomationExtension=False,
-                ...
-            )
+        Example:
+            >>> options.add_experimental_options(
+            ...     excludeSwitches=["enable-automation"],
+            ...     useAutomationExtension=False,
+            ... )
         """
         # Add options
-        self._experimental_options |= options
+        self._experimental_options |= deepcopy(options)
         self._caps_changed()
 
     def rem_experimental_option(self, name: str) -> None:
         """Remove an experimental option of the browser.
 
-        :param name `<'str'>`: The name of the experimental option.
+        Args:
+            name: The name of the experimental option.
 
-        ### Example:
-        >>> options.rem_experimental_options("excludeSwitches")
+        Example:
+            >>> options.rem_experimental_option("excludeSwitches")
         """
         try:
             self._experimental_options.pop(name)
@@ -1296,12 +1720,17 @@ class BaseOptions:
     def get_experimental_option(self, name: str) -> Any:
         """Get an experimental option of the browser.
 
-        :param name `<'str'>`: The name of the experimental option.
-        :raises `<'OptionsNotSetError'>`: If the experimental option is not set.
-        :returns `<'Any'>`: The value of the experimental option.
+        Args:
+            name: The name of the experimental option.
+
+        Returns:
+            The value of the experimental option.
+
+        Raises:
+            OptionsNotSetError: If the experimental option is not set.
         """
         try:
-            return self._experimental_options[name]
+            return deepcopy(self._experimental_options[name])
         except KeyError as err:
             raise errors.OptionsNotSetError(
                 "<{}>\nExperimental option {} has not been set.".format(
@@ -1312,20 +1741,24 @@ class BaseOptions:
     # Caps: arguments ---------------------------------------------------------------------
     @property
     def arguments(self) -> list[str]:
-        """Access specified browser arguments `<list>`."""
+        """Return specified browser arguments.
+
+        Returns:
+            Specified browser arguments.
+        """
         return self._arguments.copy()
 
     def add_arguments(self, *args: str) -> None:
         """Add arguments to browser capabilites.
 
-        :param args `<'str'>`: The arguments to add.
+        Args:
+            *args: The arguments to add.
 
-        ### Example:
-        >>> options.add_arguments(
-                "--headless",
-                "--disable-gpu",
-                ...
-            )
+        Example:
+            >>> options.add_arguments(
+            ...     "--headless=new",
+            ...     "--disable-gpu",
+            ... )
         """
         # Add arguments
         added = False
@@ -1336,6 +1769,7 @@ class BaseOptions:
                         self.__class__.__name__, type(arg), repr(arg)
                     )
                 )
+        for arg in args:
             if arg not in self._arguments:
                 self._arguments.append(arg)
                 added = True
@@ -1353,41 +1787,50 @@ class BaseOptions:
     # Options: preferences ----------------------------------------------------------------
     @property
     def preferences(self) -> dict[str, Any]:
-        """Access the preferences of the browser `<'dict[str, Any]'>`."""
+        """Return the preferences of the browser.
+
+        Returns:
+            The preferences of the browser.
+        """
         return deepcopy(self._preferences)
 
     def set_preferences(self, **prefs: Any) -> None:
         """Set preferences of the browser.
 
-        :param prefs [Keywords] `<'Any'>`: The preferences to set.
+        Args:
+            **prefs: The preferences to set.
 
-        ### Example:
-        >>> options.set_preferences(
-                **{
-                "download.default_directory": "/path/to/download/directory",
-                "download.prompt_for_download": False,
-                "download.directory_upgrade": True,
-                "safebrowsing.enabled": True
-            }
-        )
+        Example:
+            >>> options.set_preferences(
+            ...     **{
+            ...     "download.default_directory": "/path/to/download/directory",
+            ...     "download.prompt_for_download": False,
+            ...     "download.directory_upgrade": True,
+            ...     "safebrowsing.enabled": True
+            ... }
+            ... )
         """
         # Set preferences
-        self._preferences |= prefs
+        self._preferences |= deepcopy(prefs)
         self._caps_changed()
 
     def get_preference(self, name: str) -> Any:
         """Get a preference value of the browser.
 
-        :param name `<'str'>`: The name of the preference.
-        :raises `<'OptionsNotSetError'>`: If the preference is not set.
-        :returns `<'Any'>`: The value of the preference.
+        Args:
+            name: The name of the preference.
 
-        ### Example:
-        >>> options.get_preference("media.navigator.permission.disabled")
-            # False
+        Returns:
+            The value of the preference.
+
+        Raises:
+            OptionsNotSetError: If the preference is not set.
+
+        Example:
+            >>> options.get_preference("media.navigator.permission.disabled")
         """
         try:
-            return self._preferences[name]
+            return deepcopy(self._preferences[name])
         except KeyError as err:
             raise errors.OptionsNotSetError(
                 "<{}>\nPreference {} has not been set.".format(
@@ -1398,10 +1841,11 @@ class BaseOptions:
     def rem_preference(self, name: str) -> None:
         """Remove a preference of the browser.
 
-        :param name `<'str'>`: The name of the preference.
+        Args:
+            name: The name of the preference.
 
-        ### Example:
-        >>> options.rem_preference("media.navigator.permission.disabled")
+        Example:
+            >>> options.rem_preference("media.navigator.permission.disabled")
         """
         # Remove preference
         try:
@@ -1412,25 +1856,29 @@ class BaseOptions:
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
+        """Return a diagnostic representation of this instance.
+
+        Returns:
+            A diagnostic representation of this instance.
+        """
         return "<%s (capabilities=%s)>" % (
             self.__class__.__name__,
-            prettify_dict(self.capabilities),
+            "<redacted>",
         )
 
-    def __hash__(self) -> int:
-        return id(self)
-
     def __eq__(self, __o: Any) -> bool:
+        """Return whether this instance compares equal to another object.
+
+        Args:
+            __o: Object to compare with this instance.
+
+        Returns:
+            True if this instance compares equal to another object; otherwise False.
+        """
         if isinstance(__o, BaseOptions):
             return self.capabilities == __o.capabilities
         else:
             return False
-
-    def __del__(self):
-        self._capabilities = None
-        self.__caps = None
-        self._arguments = None
-        self._proxy = None
 
 
 # Chromium Base Options ---------------------------------------------------------------------------
@@ -1455,7 +1903,7 @@ class ChromiumBaseOptions(BaseOptions):
     "The unique option key for the chromium browser `str`"
 
     def __init__(self) -> None:
-        """The options for the browser.
+        """Initialize the instance with the supplied configuration.
 
         Each subclass of `ChromiumOptions` must implement the following:
         - `DEFAULT_CAPABILITIES`: `dict[str, Any]` Class attribute that
@@ -1491,7 +1939,11 @@ class ChromiumBaseOptions(BaseOptions):
 
     # Caps: basic -------------------------------------------------------------------------
     def construct(self) -> dict[str, Any]:
-        """Construct the final capabilities for the browser."""
+        """Construct the final capabilities for the browser.
+
+        Returns:
+            A mapping containing the construct data.
+        """
         # Base caps
         caps = deepcopy(self._capabilities)
 
@@ -1510,27 +1962,46 @@ class ChromiumBaseOptions(BaseOptions):
 
     # Caps: browser version ---------------------------------------------------------------
     @property
-    def browser_version(self) -> ChromiumVersion | None:
-        """Access the version of the browser `<'ChromiumVersion/None'>`."""
+    def browser_version(self) -> str | None:
+        """Return the browser version string recorded for this configuration or session.
+
+        Returns:
+            The version string, or None when no browser version has been recorded.
+            This property does not probe the browser or return a Version object.
+        """
         return self._capabilities.get("browserVersion")
 
     @browser_version.setter
     def browser_version(self, value: ChromiumVersion | None) -> None:
+        """Set the browser version.
+
+        Args:
+            value: New browser version value. None is handled according to the property's reset/ignore semantics.
+        """
         self._set_browser_version(value)
 
     # Options: debugger -------------------------------------------------------------------
     @property
-    def debugger_address(self) -> str:
-        """Access the address of the remote devtools for debugging `<'str'>`.
+    def debugger_address(self) -> str | None:
+        """Return the address of the remote devtools for debugging.
 
-        ChromeDriver will try to connect to this devtools instance
-        during an active wait. For example: `"hostname:port"`.
+        A configured address asks ChromeDriver to attach to an existing
+        DevTools endpoint at session startup, for example "127.0.0.1:9222".
+        None leaves attachment disabled. The endpoint must be trusted and private.
+
+        Returns:
+            The address of the remote devtools for debugging.
         """
         return self._experimental_options.get("debuggerAddress")
 
     @debugger_address.setter
     def debugger_address(self, value: str | None) -> None:
         # Remove debugger address
+        """Set the debugger address.
+
+        Args:
+            value: New debugger address value. None is handled according to the property's reset/ignore semantics.
+        """
         if value is None:
             self.rem_experimental_option("debuggerAddress")
             return None  # exit
@@ -1543,74 +2014,91 @@ class ChromiumBaseOptions(BaseOptions):
         self.add_experimental_options(debuggerAddress=value)
 
     # Options: profile --------------------------------------------------------------------
+    def close(self) -> None:
+        """Release owned profile clones and their automatically added launch arguments.
+
+        Other arguments, original profile data, and independent snapshots remain
+        unchanged. Failed cleanup retains the configuration for a later retry.
+        """
+        had_profile = self._profile is not None
+        super().close()
+        if had_profile:
+            self._remove_profile_arguments()
+            self._caps_changed()
+
     @property
     def profile(self) -> ChromiumProfile | None:
-        """Access the profile of the browser `<ChromiumProfile>`.
-        Returns `None` if profile is not configured.
+        """Return the profile of the browser. Returns `None` if profile is not configured.
 
-        ### Notice
+        Notice
         - Please use `set_profile()` method to configure the profile.
+
+        Returns:
+            The profile of the browser. returns `none` if profile is not configured.
         """
         return self._profile
 
     def set_profile(self, directory: str, profile: str) -> ChromiumProfile:
-        """Set the user profile for the Chromium based browser.
-        Such as: Edge, Chrome, Chromium, etc.
+        r"""Set the user profile for the Chromium based browser. Such as: Edge, Chrome, Chromium, etc.
 
-        :param directory `<'str'>`: The directory of the user profile.
-        :param profile_folder `<'str'>`: The name of the profile folder inside of the 'directory'.
-        :returns `<'ChromiumProfile'>`: The profile instance.
-
-        ### Explaination
+        Explanation
         - When setting the profile through this method, a cloned temporary
           profile will be created based on the given profile 'directory'.
           The automated session will use the temporary profile leaving the
-          original profile untouched. When the driver is no longer used by
-          the program, the temporary profile will be deleted automatically.
+          original profile untouched. Call options.close() after all uses of
+          the facade to release its template clone. Acquisition contexts own
+          and clean up their independent snapshot clones.
 
-        ### MacOS Default Profile Location:
+        MacOS Default Profile Location:
         - Chrome: '~/Library/Application Support/Google/Chrome' & 'Default'
         - Chromium: '~/Library/Application Support/Chromium' & 'Default'
         - Edge: '~/Library/Application Support/Microsoft Edge' & 'Default'
 
-        ### Windows Default Profile Location:
-        - Chrome: 'C:\\Users\\<username>\\AppData\\Local\\Google\\Chrome\\User Data' & 'Default'
-        - Chromium: 'C:\\Users\\<username>\\AppData\\Local\\Chromium\\User Data' & 'Default'
-        - Edge: 'C:\\Users\\<username>\\AppData\\Local\\Microsoft\\Edge\\User Data' & 'Default'
+        Windows Default Profile Location:
+        - Chrome: 'C:\Users\<username>\AppData\Local\Google\Chrome\User Data' & 'Default'
+        - Chromium: 'C:\Users\<username>\AppData\Local\Chromium\User Data' & 'Default'
+        - Edge: 'C:\Users\<username>\AppData\Local\Microsoft\Edge\User Data' & 'Default'
 
-        ### Linux Default Profile Location:
+        Linux Default Profile Location:
         - Chrome: '~/.config/google-chrome' & 'Default'
         - Chromium: '~/.config/chromium' & 'Default'
         - Edge: '~/.config/microsoft-edge' & 'Default'
+
+        Args:
+            directory: The directory of the user profile.
+            profile: Profile used by this operation.
+
+        Returns:
+            The profile instance.
         """
         # Create profile
         value = ChromiumProfile(directory, profile)
         # Set new profile
+        self._replace_profile(value)
         self._remove_profile_arguments()
         self.add_arguments(
             "--user-data-dir=%s" % value.directory_temp,
             "--profile-directory=%s" % value.profile_folder_temp,
         )
-        self._profile = value
         self._caps_changed()
         return value
 
     def rem_profile(self) -> None:
-        """Remove the previously configured profile of the browser.
+        """Release the owned profile clone and remove its browser launch arguments.
 
-        ### Example:
-        >>> # . set a new profile
-            options.set_profile(directory, profile)
+        Example:
+            >>> # . set a new profile
+            >>> options.set_profile(directory, profile)
 
-        >>> # . remove the profile
-            options.rem_profile()
+            >>> # . remove the profile
+            >>> options.rem_profile()
         """
+        self.close()
         self._remove_profile_arguments()
-        self._profile = None
         self._caps_changed()
 
     def _remove_profile_arguments(self) -> None:
-        """(Internal) Remove previously setted profile arguments."""
+        """Remove previously setted profile arguments."""
         self._arguments = [
             arg
             for arg in self._arguments
@@ -1621,27 +2109,30 @@ class ChromiumBaseOptions(BaseOptions):
     # Options: extensions -----------------------------------------------------------------
     @property
     def extensions(self) -> list[str]:
-        """Access the extensions for the browser `<list[str]>`.
+        """Return the extensions for the browser.
 
         Each item in the list corresponds to the encoded base64
         value of the extension file.
+
+        Returns:
+            The extensions for the browser.
         """
         return self._extensions.copy()
 
     def add_extensions(self, *paths: str) -> None:
-        """Add extensions to the browser (through local file).
+        r"""Add extensions to the browser (through local file).
 
-        :param paths `<'str'>`: The paths to the extension files (\\*.crx).
+        Args:
+            *paths: The paths to the extension files (\*.crx).
 
-        ### Example:
-        >>> options.add_extensions(
-                "/path/to/extension1.crx",
-                "/path/to/extension2.crx",
-                ...
-            )
+        Example:
+            >>> options.add_extensions(
+            ...     "/path/to/extension1.crx",
+            ...     "/path/to/extension2.crx",
+            ... )
         """
-        # Add extionsions
-        added = False
+        # Read and validate the entire batch before committing any update.
+        pending = []
         for path in paths:
             # . validate ext path
             try:
@@ -1658,36 +2149,40 @@ class ChromiumBaseOptions(BaseOptions):
                     data = b64encode(f.read()).decode("utf-8")
             except Exception as err:
                 raise errors.InvalidExtensionError(
-                    "<{}>\nFailed to encode extension at: {}\n"
-                    "Error: {}".format(self.__class__.__name__, repr(path), err)
+                    "<{}>\nFailed to encode extension at: {}\nError: {}".format(
+                        self.__class__.__name__, repr(path), err
+                    )
                 ) from err
             # . add ext data
-            if data not in self._extensions:
-                self._extensions.append(data)
-                added = True
-
-        # Update caps status
-        if added:
-            self._caps_changed()
+            pending.append(data)
+        self.add_extensions_base64(*pending)
 
     def add_extensions_base64(self, *extensions: str | bytes) -> None:
-        """Add extensions to the browser (through encoded Base64 data).
-        (For extensions that have already been encoded into Base64 `<'str/bytes'>`.)
+        """Add extensions to the browser (through encoded Base64 data). (For extensions that have already been encoded into Base64.).
 
-        :param extensions `<'str/bytes'>`: The Base64 encoded extension data.
+        Args:
+            *extensions: The Base64 encoded extension data.
         """
         # Add extionsions
-        added = False
+        pending = []
         for ext in extensions:
             # . validate ext data
             if isinstance(ext, bytes):
-                ext = ext.decode("utf-8")
+                try:
+                    ext = ext.decode("utf-8")
+                except UnicodeError as cause:
+                    raise errors.InvalidExtensionError(
+                        "Extension data must be UTF-8 text"
+                    ) from cause
             elif not isinstance(ext, str):
                 raise errors.InvalidExtensionError(
                     "<{}>\nExtension data is not valid: {} {}".format(
                         self.__class__.__name__, type(ext), repr(ext)
                     )
                 )
+            pending.append(ext)
+        added = False
+        for ext in pending:
             # . add ext data
             if ext and ext not in self._extensions:
                 self._extensions.append(ext)

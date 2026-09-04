@@ -51,6 +51,7 @@ lost+found
 # Html #
 ######################
 *.html
+!src/demo_assets/*.html
 
 # Logs and databases #
 ######################
@@ -68,8 +69,26 @@ lost+found
 # Python #
 ######################
 __pycache__
+*.py[cod]
 /build
 /dist
 *.egg-info
 *.tar.gz
 *.whl
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+.demo-cache/
+.acceptance-results/
+.demo-output/
+
+# Generated reports in the repository root #
+############################################
+/coverage.json
+/coverage-contexts.json
+/feature-coverage.json
+/feature-api-inventory.json
