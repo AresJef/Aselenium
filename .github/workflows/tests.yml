@@ -205,5 +205,6 @@ jobs:
         with:
           name: native-${{ matrix.os }}-${{ matrix.browser }}
           path: .acceptance-results/
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14

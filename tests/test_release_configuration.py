@@ -155,6 +155,13 @@ def test_native_ci_requires_installed_wheel_and_all_browser_stages() -> None:
         "name": "candidate-distributions",
         "path": "dist",
     }
+    native_upload = next(
+        step
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/upload-artifact@")
+    )
+    assert native_upload["if"] == "always()"
+    assert native_upload["with"]["include-hidden-files"] == "true"
     assert not any("python -m build" in step.get("run", "") for step in job["steps"])
 
 
