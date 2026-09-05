@@ -42,8 +42,15 @@ def make_driver(args: argparse.Namespace) -> WebDriver:
     Returns:
         The WebDriver value produced by this operation.
     """
+    # The local tour exposes one explicit session-start budget. Apply it to
+    # both service readiness and WebDriver session creation so a cold native
+    # service cannot fail at the facade's shorter default first. The install
+    # command and Google demo have no such setting and retain the package
+    # default.
+    service_timeout = getattr(args, "session_timeout", 10)
     if args.browser == "safari":
-        return Safari()  # Safari has no download/cache constructor parameters.
+        # Safari has no download/cache constructor parameters.
+        return Safari(service_timeout=service_timeout)
     cache = args.cache_dir.expanduser()
     cache.mkdir(parents=True, exist_ok=True)
     kwargs: dict[str, Any] = {
@@ -51,6 +58,7 @@ def make_driver(args: argparse.Namespace) -> WebDriver:
         "max_cache_size": None,
         "request_timeout": 20,
         "download_timeout": 90,
+        "service_timeout": service_timeout,
     }
     profile_root = getattr(args, "profile_root", None)
     if args.browser == "firefox" and profile_root is not None:

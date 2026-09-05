@@ -268,6 +268,7 @@ def test_options_and_constructor_work_without_browser_probes(
         assert details["defensive_capabilities"] is True
         assert driver.options.timeouts.implicit == 0
         assert driver.options.session_timeout == 30
+        assert driver._service_timeout == 30
         assert details["session_timeout_seconds"] == 30
         assert driver.options.proxy is None  # Serialization-only proxy example.
         assert args.cache_dir.exists() == (browser != "safari")
@@ -289,6 +290,7 @@ def test_run_accepts_an_explicit_session_timeout(demo: Any, tmp_path: Path) -> N
     try:
         details = demo.configure(driver, args, source)
         assert driver.options.session_timeout == 75
+        assert driver._service_timeout == 75
         assert details["session_timeout_seconds"] == 75
     finally:
         driver.options.close()
