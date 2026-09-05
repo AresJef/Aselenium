@@ -24,6 +24,7 @@ from aselenium import errors
 T = TypeVar("T")
 
 IO_ATTEMPTS = 3
+PATH_CHECK_ATTEMPTS = 3
 MAX_MEMBERS = 50_000
 MAX_MEMBER_BYTES = 2 * 1024**3
 MAX_TOTAL_BYTES = 4 * 1024**3
@@ -74,13 +75,25 @@ def is_link(path: Path) -> bool:
         info = path.lstat()
     except FileNotFoundError:
         return False
+    return _stat_is_link(info)
+
+
+def _stat_is_link(info: os.stat_result) -> bool:
+    """Classify symbolic links and Windows reparse points from one stat result.
+
+    Args:
+        info: Result returned by a non-following ``Path.lstat()`` call.
+
+    Returns:
+        True for a symbolic link, junction, or other Windows reparse point.
+    """
     return stat.S_ISLNK(info.st_mode) or bool(
         getattr(info, "st_file_attributes", 0) & 0x400
     )
 
 
 def checked_path(root: Path, value: Path, *, allow_root: bool = False) -> Path:
-    """Require a lexical descendant with no existing link/reparse ancestors.
+    """Require a stable lexical descendant without link/reparse ancestors.
 
     Args:
         root: Absolute ``Path`` anchoring the managed filesystem operation.
@@ -89,6 +102,11 @@ def checked_path(root: Path, value: Path, *, allow_root: bool = False) -> Path:
 
     Returns:
         The absolute path after containment and link/reparse checks succeed.
+
+    Raises:
+        ValueError: Either path is relative, contains parent traversal, escapes
+            the root, traverses a link/reparse point, or changes repeatedly
+            while it is being validated.
     """
     if not root.is_absolute() or not value.is_absolute():
         raise ValueError("Managed filesystem paths must be absolute")
@@ -97,19 +115,68 @@ def checked_path(root: Path, value: Path, *, allow_root: bool = False) -> Path:
     relative = value.relative_to(root)
     if not relative.parts and not allow_root:
         raise ValueError("The managed root itself is not an entry: %s" % root)
-    current = root
-    if is_link(current):
-        raise ValueError("Managed root is a link/reparse point: %s" % current)
-    for part in relative.parts:
-        current = current / part
-        if is_link(current):
-            raise ValueError("Managed path contains a link/reparse point: %s" % current)
-    # Also catch replacement of a parent of the anchored root with a link.
-    if value.resolve(strict=False) != value:
-        raise ValueError(
-            "Managed path no longer resolves to its anchored location: %s" % value
-        )
-    return value
+    for _ in range(PATH_CHECK_ATTEMPTS):
+        current = root
+        deepest: Path | None = None
+        missing: Path | None = None
+        components = (None, *relative.parts)
+        try:
+            for part in components:
+                if part is not None:
+                    current = current / part
+                try:
+                    info = current.lstat()
+                except FileNotFoundError:
+                    missing = current
+                    break
+                if _stat_is_link(info):
+                    subject = "root" if current == root else "path"
+                    raise ValueError(
+                        "Managed %s contains a link/reparse point: %s"
+                        % (subject, current)
+                    )
+                deepest = current
+
+            # The root is an existing, canonical anchor at every call site. If
+            # it or an existing descendant vanishes while being checked, start
+            # a new bounded pass rather than treating the race as redirection.
+            if deepest is None:
+                continue
+            if deepest.resolve(strict=True) != deepest:
+                # On Windows an ordinary file can disappear between the two
+                # native calls used by Path.resolve(), leaving a transient
+                # ``\\?\`` spelling. A fresh pass distinguishes that race from
+                # a stable symlink or junction without normalizing path text.
+                continue
+
+            if missing is not None:
+                try:
+                    appeared = missing.lstat()
+                except FileNotFoundError:
+                    # The parent chain may have been replaced after the first
+                    # resolution and before the absence check. Revalidate the
+                    # persistent anchor at the last possible point before an
+                    # absent volatile leaf is accepted.
+                    if deepest.resolve(strict=True) != deepest:
+                        continue
+                    return value
+                if _stat_is_link(appeared):
+                    raise ValueError(
+                        "Managed path contains a link/reparse point: %s" % missing
+                    )
+                # A formerly absent component appeared. Validate it and every
+                # descendant together on the next pass.
+                continue
+            return value
+        except FileNotFoundError:
+            # ``deepest`` disappeared during strict resolution. This is normal
+            # for SQLite sidecars shared by independent cache processes.
+            continue
+        except RuntimeError as cause:
+            raise ValueError(
+                "Managed path could not be resolved safely: %s" % value
+            ) from cause
+    raise ValueError("Managed path changed while it was validated: %s" % value)
 
 
 def member_path(name: str) -> PurePosixPath:
@@ -152,7 +219,7 @@ class ArchiveWriter:
         self.root = root
         checked_path(self.root.parent.resolve(strict=True), self.root)
         self.root.mkdir(mode=0o700, parents=False, exist_ok=False)
-        self.names: list[str] = []
+        self.names: list[PurePosixPath] = []
         self.kinds: dict[str, str] = {}
         self.parent_names: set[str] = set()
         self.count = 0
@@ -212,7 +279,7 @@ class ArchiveWriter:
         self.kinds[key] = kind
         target = checked_path(self.root, self.root.joinpath(*relative.parts))
         target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        self.names.append(str(relative))
+        self.names.append(relative)
         if kind == "dir":
             target.mkdir(mode=0o700, exist_ok=True)
         elif kind == "file":
@@ -253,13 +320,14 @@ class ArchiveWriter:
         else:
             raise ValueError("Archive special files are not permitted: %s" % name)
 
-    def finish(self) -> list[str]:
+    def finish(self) -> list[PurePosixPath]:
         # Never extract data through a link. Create links only after all regular
         # files, and only to existing targets contained within this private tree.
         """Create deferred safe links and return the extracted member names.
 
         Returns:
-            Names of the validated extracted members, after all deferred links are created.
+            Parsed names of the validated extracted members after all deferred
+            links are created.
         """
         pending = self.links
         for _ in range(MAX_PATH_DEPTH):

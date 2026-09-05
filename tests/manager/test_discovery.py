@@ -87,7 +87,7 @@ def test_browser_version_is_parsed_from_fake_probe(
     browser = tmp_path / "browser with spaces"
     browser.write_bytes(b"not executable")
 
-    version = manager._detect_browser_version(str(browser))
+    version = manager._detect_browser_version(browser)
 
     assert version.version == "120.0.6000.1"
     assert len(fake_probe) == 1
@@ -109,7 +109,7 @@ def test_browser_probe_passes_path_as_literal_argv_without_shell(
     browser = tmp_path / "browser;NEVER_EXECUTE_THIS"
     browser.write_bytes(b"synthetic; all process calls are intercepted")
 
-    assert manager._detect_browser_version(str(browser)).version == "120.0.6000.1"
+    assert manager._detect_browser_version(browser).version == "120.0.6000.1"
     assert len(fake_probe) == 1
     args, kwargs = fake_probe[0]
     assert kwargs.get("shell", False) is False, (

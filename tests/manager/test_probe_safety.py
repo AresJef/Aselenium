@@ -116,10 +116,10 @@ def test_unix_probe_uses_literal_path_and_deadline(
     """
     manager = drivers.ChromeDriverManager(directory=str(tmp_path))
     manager._DriverManager__os_name = platform
-    path = str(tmp_path / name)
+    path = tmp_path / name
     assert manager._detect_browser_version(path).version == "120.0.6000.1"
     argv, kwargs = probe.calls[0]
-    assert argv == [path, "--version"]
+    assert argv == [str(path), "--version"]
     assert kwargs["shell"] is False
     instance = probe.instances[0]
     assert instance.events == [("communicate", 10.0)]
@@ -149,7 +149,8 @@ def test_windows_probe_encodes_a_literal_noninteractive_script(
     manager = drivers.ChromeDriverManager(directory=str(tmp_path))
     manager._DriverManager__os_name = "win"
     monkeypatch.setenv("SystemRoot", r"C:\Windows")
-    assert manager._detect_browser_version(name).version == "120.0.6000.1"
+    browser = Path(name)
+    assert manager._detect_browser_version(browser).version == "120.0.6000.1"
     assert len(probe.calls) == 1
     argv, kwargs = probe.calls[0]
     assert argv[0].endswith("powershell.exe")
@@ -157,7 +158,7 @@ def test_windows_probe_encodes_a_literal_noninteractive_script(
     script = b64decode(argv[5]).decode("utf-16le")
     assert script == (
         "$ErrorActionPreference='Stop'; (Get-Item -LiteralPath '%s').VersionInfo.FileVersion"
-        % name.replace("'", "''")
+        % str(browser).replace("'", "''")
     )
     assert kwargs["shell"] is False
 
@@ -200,7 +201,7 @@ def test_probe_timeout_kills_and_bounds_reaping_without_second_pipe_read(
     probe.failure = original
     probe.wait_failure = wait_failure
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as failure:
-        manager._detect_browser_version("/synthetic/browser")
+        manager._detect_browser_version(Path("/synthetic/browser"))
     assert failure.value.__cause__ is original
     instance = probe.instances[0]
     assert instance.events == [("communicate", 10.0), ("kill",), ("wait", 1.0)]
@@ -220,7 +221,7 @@ def test_probe_nonzero_exit_is_not_parsed_as_success(
     manager = drivers.ChromeDriverManager(directory=str(tmp_path))
     manager._DriverManager__os_name = "linux"
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as failure:
-        manager._detect_browser_version("/synthetic/browser")
+        manager._detect_browser_version(Path("/synthetic/browser"))
     assert isinstance(failure.value.__cause__, CalledProcessError)
     assert failure.value.__cause__.returncode == 17
     assert probe.instances[0].stdout.closed
@@ -237,7 +238,7 @@ def test_invalid_output_encoding_preserves_cause(tmp_path: Path, probe: Any) -> 
     manager = drivers.ChromeDriverManager(directory=str(tmp_path))
     manager._DriverManager__os_name = "linux"
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as failure:
-        manager._detect_browser_version("/synthetic/browser")
+        manager._detect_browser_version(Path("/synthetic/browser"))
     assert isinstance(failure.value.__cause__, UnicodeDecodeError)
 
 
@@ -267,7 +268,7 @@ def test_exit_during_kill_still_reaps_and_preserves_timeout(
     manager = drivers.ChromeDriverManager(directory=str(tmp_path))
     manager._DriverManager__os_name = "linux"
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as failure:
-        manager._detect_browser_version("/synthetic/browser")
+        manager._detect_browser_version(Path("/synthetic/browser"))
     assert failure.value.__cause__ is cause
     assert probe.instances[0].events[-1] == ("wait", 1.0)
     assert probe.instances[0].stdout.closed

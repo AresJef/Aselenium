@@ -656,7 +656,7 @@ def test_invalid_browser_probe_output_preserves_browser_version_cause(
     monkeypatch.setattr(manager, "_read_from_cmd", lambda _command: output)
 
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as failure:
-        manager._detect_browser_version(str(browser))
+        manager._detect_browser_version(browser)
 
     assert isinstance(failure.value.__cause__, errors.InvalidBrowserVersionError)
 
@@ -695,7 +695,7 @@ def test_browser_probe_oserror_is_wrapped_with_original_cause(
     monkeypatch.setattr(manager, "_read_from_cmd", fail_probe)
 
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as failure:
-        manager._detect_browser_version(str(browser))
+        manager._detect_browser_version(browser)
 
     assert failure.value.__cause__ is underlying
 

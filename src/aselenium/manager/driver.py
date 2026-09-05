@@ -25,7 +25,7 @@ from collections.abc import Callable
 from contextvars import ContextVar
 from importlib import resources
 from math import isfinite
-from os import environ, fspath, pathsep
+from os import environ, pathsep
 from pathlib import Path
 from platform import architecture, machine, system
 from re import fullmatch
@@ -806,19 +806,19 @@ class DriverManager:
             self._raise_installation_error("browser_version")
         return self._browser_version
 
-    def _detect_browser_version(self, browser_location: PathInput) -> Version:
+    def _detect_browser_version(self, browser_location: Path) -> Version:
         """Detect the version of the browser.
 
         Args:
-            browser_location: Browser executable path used for discovery or version probing.
+            browser_location: Validated browser executable path used for the probe.
 
         Returns:
             The Version value produced by this operation.
         """
         try:
-            location = fspath(browser_location)
-            if not isinstance(location, str):
-                raise TypeError("Browser probe paths must be string-valued")
+            # Subprocess arguments are an intentional text boundary. All
+            # discovery and installation work before this point retains Path.
+            location = str(browser_location)
             if self._os_name == OSType.WIN:
                 # A fixed executable and an encoded script avoid cmd.exe parsing.
                 # Single-quoted PowerShell literals escape apostrophes by doubling
@@ -3104,23 +3104,18 @@ class SafariDriverManager(DriverManager):
         """
         return super().browser_version
 
-    def _detect_browser_version(self, browser_location: PathInput) -> SafariVersion:
+    def _detect_browser_version(self, browser_location: Path) -> SafariVersion:
         """Detect the browser version.
 
         Args:
-            browser_location: Browser executable path used for discovery or version probing.
+            browser_location: Validated Safari executable path used for the probe.
 
         Returns:
             A new SafariVersion instance constructed from the current values.
         """
         try:
             # Application folder
-            location = (
-                browser_location
-                if isinstance(browser_location, Path)
-                else self._normalize_file_location(browser_location)
-            )
-            content_dir = location.parent.parent
+            content_dir = browser_location.parent.parent
             # Load plist file
             try:
                 plist = load_plist_file(content_dir / "version.plist")

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from os import PathLike
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
 import pytest
@@ -152,9 +152,46 @@ def test_private_archive_helpers_exchange_paths(tmp_path: Path) -> None:
     executable.write_bytes(b"fixture-never-executed")
     selected = ChromeDriverFile(
         "win", "https://example.invalid/chromedriver.zip", b""
-    )._find_target_executable(extracted, [executable.name])
+    )._find_target_executable(extracted, [PurePosixPath(executable.name)])
 
     assert isinstance(saved, Path)
     assert saved.is_file()
     assert selected == executable
     assert isinstance(selected, Path)
+
+
+def test_archive_members_remain_parsed_between_private_stages(
+    tmp_path: Path,
+) -> None:
+    """Retain each validated archive member as ``PurePosixPath`` internally.
+
+    Args:
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    archive = driver_archive()
+    saved = archive._save_file(tmp_path / "download")
+    extracted = tmp_path / "extracted"
+
+    members = archive._extract_zip_file(saved, extracted)
+    selected = archive._find_target_executable(extracted, members)
+
+    assert members == [PurePosixPath("chromedriver")]
+    assert all(isinstance(member, PurePosixPath) for member in members)
+    assert selected == extracted / "chromedriver"
+
+
+def test_generated_archive_basename_uses_its_parsed_parts(tmp_path: Path) -> None:
+    """Preserve a portable Unicode basename through the native ``Path`` join.
+
+    Args:
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    archive = ChromeDriverFile(
+        "linux", "https://example.invalid/chromedriver.zip", b"fixture"
+    )
+    archive._name = "driver package 驱动"
+
+    saved = archive._save_file(tmp_path / "download")
+
+    assert saved == tmp_path / "download" / "driver package 驱动.zip"
+    assert saved.read_bytes() == b"fixture"

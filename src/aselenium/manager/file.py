@@ -25,7 +25,7 @@ import logging
 import os
 import stat
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from shutil import copyfileobj, rmtree
 from tarfile import ReadError
 from tarfile import open as tarfile_open
@@ -268,7 +268,7 @@ class File:
                 if is_link(root):
                     raise ValueError("Download directory cannot be a link")
                 root.mkdir(mode=0o700, parents=True, exist_ok=True)
-                file_path = checked_path(root, root / str(name))
+                file_path = checked_path(root, root.joinpath(*name.parts))
                 created = False
                 try:
                     with file_path.open("xb") as file:
@@ -307,7 +307,9 @@ class File:
                 self._content.close()
             self._content = None
 
-    def _extract_zip_file(self, file_path: Path, unzip_dir: Path) -> list[str]:
+    def _extract_zip_file(
+        self, file_path: Path, unzip_dir: Path
+    ) -> list[PurePosixPath]:
         """Extracts a zip file. Returns a list of the extracted file names.
 
         Args:
@@ -315,7 +317,7 @@ class File:
             unzip_dir: Unzip dir used by this operation.
 
         Returns:
-            The extract zip file values in order.
+            Validated ZIP member paths in archive order.
         """
         try:
             writer = ArchiveWriter(unzip_dir)
@@ -349,7 +351,9 @@ class File:
                 )
             ) from err
 
-    def _extract_tar_file(self, file_path: Path, unzip_dir: Path) -> list[str]:
+    def _extract_tar_file(
+        self, file_path: Path, unzip_dir: Path
+    ) -> list[PurePosixPath]:
         """Extracts a tar file. Returns a list of the extracted file names.
 
         Args:
@@ -357,7 +361,7 @@ class File:
             unzip_dir: Unzip dir used by this operation.
 
         Returns:
-            The extract tar file values in order.
+            Validated TAR member paths in archive order.
         """
         try:
             writer = ArchiveWriter(unzip_dir)
@@ -401,7 +405,9 @@ class File:
                 )
             ) from err
 
-    def _find_target_executable(self, base_dir: Path, files: list[str]) -> Path | None:
+    def _find_target_executable(
+        self, base_dir: Path, files: list[PurePosixPath]
+    ) -> Path | None:
         """Find the target executable from the extracted files. Return `None` if not found.
 
         Args:
@@ -423,8 +429,7 @@ class File:
                 "Archive extraction directory does not exist"
             )
         matches = []
-        for file in files:
-            relative = member_path(file)
+        for relative in files:
             if relative.name != match_name:
                 continue
             path = root.joinpath(*relative.parts).resolve(strict=False)

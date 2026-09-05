@@ -7,7 +7,7 @@ import sqlite3
 import stat
 import tarfile
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from zipfile import ZipFile, ZipInfo
 
@@ -449,7 +449,7 @@ def test_executable_selection_cannot_return_a_foreign_sibling_file(
 
     try:
         selected = archive._find_target_executable(
-            extracted, ["../outside-extraction/chromedriver.exe"]
+            extracted, [PurePosixPath("../outside-extraction/chromedriver.exe")]
         )
     except (errors.InvalidDownloadFileError, ValueError):
         return
