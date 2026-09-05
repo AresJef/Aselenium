@@ -8,6 +8,7 @@ import asyncio
 import importlib.util
 import os
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 from types import ModuleType, SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -731,6 +732,77 @@ async def test_command_failure_before_acknowledgement_prevents_fault(
     await completed
     with pytest.raises(RuntimeError, match="before browser acknowledgement"):
         await recovery.await_started(state, completed)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("browser", ["chrome", "edge"])
+async def test_recovery_setup_retains_the_normal_command_budget(
+    recovery: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    browser: str,
+) -> None:
+    """Keep initial and future acquisitions independent of the fault deadline.
+
+    Args:
+        recovery: Imported recovery harness.
+        monkeypatch: Replace browser creation and the loopback fixture.
+        tmp_path: Disposable path standing in for the owned profile.
+        browser: Chromium facade selected by the real scenario setup.
+    """
+    driver = Mock()
+    driver.acquire.side_effect = RuntimeError("setup inspected")
+    monkeypatch.setattr(
+        recovery, "Chrome" if browser == "chrome" else "Edge", Mock(return_value=driver)
+    )
+    monkeypatch.setattr(
+        recovery, "local_page", lambda state: nullcontext("http://127.0.0.1/")
+    )
+    monkeypatch.setattr(recovery, "owned_profile_directory", lambda options: tmp_path)
+    args = argparse.Namespace(
+        browser=browser,
+        binary=str(tmp_path / "browser"),
+        cache_dir=tmp_path,
+        command_timeout=5,
+    )
+    with pytest.raises(RuntimeError, match="setup inspected"):
+        await recovery.scenario_run(args, "driver-crash")
+    assert driver.options.session_timeout == 30
+    driver.acquire.assert_called_once_with("offline", binary=args.binary)
+
+
+@pytest.mark.asyncio
+async def test_fault_command_keeps_a_separate_strict_deadline(
+    recovery: ModuleType,
+) -> None:
+    """Apply the five-second fault budget only to the held protocol command.
+
+    Args:
+        recovery: Imported recovery harness with no native browser started.
+    """
+    session = SimpleNamespace(execute_command=AsyncMock(return_value={"value": None}))
+    assert recovery.SETUP_COMMAND_TIMEOUT == 30
+    response = await recovery.execute_fault_command(session, "/started/fixture", 5)
+    session.execute_command.assert_awaited_once_with(
+        recovery.Command.W3C_EXECUTE_SCRIPT_ASYNC,
+        body={"script": recovery.HOLD_SCRIPT, "args": ["/started/fixture"]},
+        timeout=5,
+    )
+    assert response == {"value": None}
+
+
+@pytest.mark.asyncio
+async def test_fault_command_preserves_transport_failure(recovery: ModuleType) -> None:
+    """Keep transport deadline failures visible to recovery validation.
+
+    Args:
+        recovery: Imported recovery harness with a controlled transport failure.
+    """
+    failure = errors.SessionTimeoutError("fault deadline exceeded")
+    session = SimpleNamespace(execute_command=AsyncMock(side_effect=failure))
+    with pytest.raises(errors.SessionTimeoutError) as caught:
+        await recovery.execute_fault_command(session, "/started/fixture", 5)
+    assert caught.value is failure
 
 
 @pytest.mark.asyncio

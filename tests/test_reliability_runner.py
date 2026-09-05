@@ -433,6 +433,8 @@ def test_reliability_runner_keeps_later_gates_and_failure_diagnostics(
         gate = GATES[len(calls)]
         calls.append(command)
         assert kwargs["timeout"] > 0
+        if gate == "recovery":
+            assert kwargs["timeout"] == 540
         assert "PYTHONPATH" not in kwargs["env"]
         path = Path(command[command.index("--output") + 1])
         assert kwargs["cwd"] == path.parent

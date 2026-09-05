@@ -27,14 +27,18 @@ from typing import TYPE_CHECKING, Any, Iterator, cast
 import psutil
 
 from aselenium import Chrome, Edge, errors
+from aselenium.command import Command
 
 if TYPE_CHECKING:
     from aselenium.options import ChromiumBaseOptions
+    from aselenium.session import Session
 
 SCENARIOS = ("browser-crash", "driver-crash", "browser-hang", "driver-hang")
 HOLD_SCRIPT = "fetch(arguments[0], {cache:'no-store'}).then(() => {window.recoveryCommandStarted=true;});"
 PAGE = b"<!doctype html><title>Aselenium recovery fixture</title><link rel='icon' href='data:,'><input id='field'>"
 USER_DATA_DIR_FLAG = "--user-data-dir"
+SETUP_COMMAND_TIMEOUT = 30
+SCENARIO_TIMEOUT = 120
 
 
 @dataclass(frozen=True)
@@ -620,6 +624,28 @@ async def verify_fresh_session(
     return {"session_id": identifier, "profile_removed": True}
 
 
+async def execute_fault_command(
+    session: Session, acknowledgement: str, timeout: float
+) -> dict[str, Any]:
+    """Dispatch the held script with its own strict transport deadline.
+
+    Args:
+        session: Active disposable session with a separate normal setup budget.
+        acknowledgement: Exact local path proving the script began executing.
+        timeout: Faulted-command deadline in seconds, independent of startup,
+            navigation, teardown, and fresh-session verification.
+
+    Returns:
+        The WebDriver response if the held command unexpectedly succeeds.
+        The recovery scenario requires an expected WebDriver error instead.
+    """
+    return await session.execute_command(
+        Command.W3C_EXECUTE_SCRIPT_ASYNC,
+        body={"script": HOLD_SCRIPT, "args": [acknowledgement]},
+        timeout=timeout,
+    )
+
+
 async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any]:
     """Inject one fault, record library cleanup, and verify independent reacquisition.
 
@@ -652,7 +678,9 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
         )
         driver.options.set_profile(template, "Default")
         driver.options.set_timeouts(implicit=0, pageLoad=10, script=30)
-        driver.options.session_timeout = args.command_timeout
+        # Cold startup and fixture navigation are not the fault-injection test.
+        # Only the acknowledged held command uses the strict recovery deadline.
+        driver.options.session_timeout = SETUP_COMMAND_TIMEOUT
         template_profile = owned_profile_directory(driver.options)
         identities: list[OwnedProcess] = []
         context = driver.acquire("offline", binary=args.binary)
@@ -668,8 +696,8 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
                     identities = capture_owned(session.service.process)
                     command_started = time.monotonic()
                     pending = asyncio.create_task(
-                        session.execute_async_script(
-                            HOLD_SCRIPT, "/started/" + state.token
+                        execute_fault_command(
+                            session, "/started/" + state.token, args.command_timeout
                         )
                     )
                     await await_started(state, pending)
@@ -792,7 +820,9 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     results = []
     for scenario in SCENARIOS if args.scenario == "all" else (args.scenario,):
         try:
-            result = await asyncio.wait_for(scenario_run(args, scenario), timeout=45)
+            result = await asyncio.wait_for(
+                scenario_run(args, scenario), timeout=SCENARIO_TIMEOUT
+            )
         except Exception as cause:
             result = {
                 "scenario": scenario,
@@ -824,7 +854,12 @@ def main() -> int:
     parser.add_argument("--binary", required=True)
     parser.add_argument("--cache-dir", required=True)
     parser.add_argument("--scenario", choices=(*SCENARIOS, "all"), default="all")
-    parser.add_argument("--command-timeout", type=float, default=5)
+    parser.add_argument(
+        "--command-timeout",
+        type=float,
+        default=5,
+        help="Faulted-command deadline; setup and fresh sessions retain 30 seconds",
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if not 4 <= args.command_timeout <= 10:

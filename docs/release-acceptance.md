@@ -96,6 +96,10 @@ This runs:
    ownership protect unrelated processes. Acceptance requires a bounded typed
    failure, clean library teardown and successful fresh acquisition. Emergency
    fixture cleanup is reported as a failure, not credited as library cleanup.
+   Setup and fresh-session commands use a 30-second transport budget; the held
+   command under fault retains its independent 5-second deadline. Each scenario
+   is bounded by 120 seconds, and the four-case runner by 540 seconds including
+   process/report cleanup. Slow setup does not relax the fault-response limit.
 2. **HTTP and HTTPS CONNECT browser routing.** Only the exact local origin is
    permitted. The HTTPS browser fixture explicitly enables insecure certificates
    for this disposable test; it does not establish browser certificate validation.

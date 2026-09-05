@@ -513,7 +513,8 @@ def commands(args: argparse.Namespace, binary: str) -> list[tuple[str, list[str]
                 "--command-timeout",
                 str(RECOVERY_COMMAND_TIMEOUT),
             ],
-            240,
+            # Four bounded 120-second scenarios plus process/report cleanup.
+            540,
         ),
         (
             "browser-proxy",
