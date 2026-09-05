@@ -116,10 +116,11 @@ records are retained for comparison; they are not silently overwritten.
    signatures or whole-browser-bundle integrity checks. Probe stdout is not byte-capped,
    and driver diagnostic capture remains limited; these are follow-up hardening items.
 5. A public GitHub Release is created only after the pushed version tag passes the
-   complete release workflow. PyPI promotion is separate and requires
-   `ASELENIUM_PUBLISH_ENABLED=true`, a configured `pypi` environment, and a matching
-   Trusted Publisher; declaring the environment in YAML does not create its approval
-   policy or its PyPI authorization.
+   complete release workflow and PyPI publication succeeds. The current workflow
+   publishes automatically using the `PYPI_API_TOKEN` GitHub Actions secret;
+   the earlier opt-in variable and Trusted Publisher requirement were superseded
+   by the requested token-based publishing setup. See the current
+   [release procedure](release-acceptance.md#ci-and-release-gates).
 
 ## Primary references checked for this pass
 
