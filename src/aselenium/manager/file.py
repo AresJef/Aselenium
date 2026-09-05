@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium file implementation and supporting types."""
+"""One-shot downloaded artifacts and safe executable archive extraction."""
 
 from __future__ import annotations
 
@@ -25,7 +24,7 @@ import logging
 import os
 import stat
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from shutil import copyfileobj, rmtree
 from tarfile import ReadError
 from tarfile import open as tarfile_open
@@ -38,7 +37,7 @@ from zipfile import ZipFile
 import psutil
 
 from aselenium import errors
-from aselenium._paths import PathInput, parse_path
+from aselenium._paths import PathInput, is_link, parse_path
 from aselenium.manager._cache import (
     ChromeFileManager as ChromeFileManager,
 )
@@ -58,7 +57,6 @@ from aselenium.manager._filesystem import (
     ArchiveWriter,
     checked_path,
     filesystem_operation,
-    is_link,
     member_path,
 )
 from aselenium.manager._http import Download
@@ -68,7 +66,7 @@ _LOGGER = logging.getLogger(__name__)
 
 # File ---------------------------------------------------------------------------------------------
 class File:
-    """Represent a downloaded file."""
+    """Own one downloaded driver or browser artifact until it is unpacked."""
 
     _MAC_EXECUTABLE_NAME: str | None = None
     _WIN_EXECUTABLE_NAME: str | None = None
@@ -77,18 +75,18 @@ class File:
     def __init__(
         self, name: str, os_name: str, url: str, content: bytes | Download
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a one-shot downloaded artifact for a target platform.
 
         Args:
-            name: Name identifying the requested item.
-            os_name: The name of the operating system.
-            url: The url that downloaded the file.
+            name: Portable executable product basename, without an extension.
+            os_name: Normalized target operating-system identifier.
+            url: Vendor download URL used to determine the archive type.
             content: Archive bytes or an owned temporary download. Saving or unpacking
                 consumes this content and closes a supplied Download stream.
         """
         # file name
         self._name: str = name
-        self._filetype: Literal["zip", "tar.gz", "exe"] | None = None
+        self._filetype: Literal["zip", "tar.gz"] | None = None
         # Platform
         self._os_name: str = os_name
         # file data
@@ -106,21 +104,21 @@ class File:
         return self._name
 
     @property
-    def filetype(self) -> Literal["zip", "tar.gz", "exe"]:
-        """Return the type of the downloaded file.
-
-        Expected values: `'zip'`, `'tar.gz'`, `'exe'`.
+    def filetype(self) -> Literal["zip", "tar.gz"]:
+        """Return the supported archive type inferred from the download URL.
 
         Returns:
-            The type of the downloaded file.
+            ``"zip"`` or ``"tar.gz"``.
+
+        Raises:
+            errors.InvalidDownloadFileError: The URL does not identify a
+                supported archive.
         """
         if self._filetype is None:
             if self._url.endswith(".zip"):
                 self._filetype = "zip"
             elif self._url.endswith(".tar.gz"):
                 self._filetype = "tar.gz"
-            elif self._url.endswith(".exe"):
-                self._filetype = "exe"
             else:
                 raise errors.InvalidDownloadFileError(
                     "<{}>\nUnsupported file type from download url: '{}'.".format(
@@ -133,25 +131,54 @@ class File:
     def unpack(
         self,
         directory: PathInput,
+    ) -> Path:
+        """Validate and atomically publish a downloaded executable archive.
+
+        Args:
+            directory: Destination supplied as text or a string-valued path-like
+                object. It is parsed once at this public filesystem boundary.
+
+        Returns:
+            Absolute path to the executable in the published artifact directory.
+
+        Raises:
+            errors.InvalidDownloadFileError: The destination is unsafe, the archive is
+                invalid, extraction fails, or atomic publication cannot complete.
+        """
+        destination = parse_path(directory)
+        return self._unpack_to(destination)
+
+    def _unpack_to(
+        self,
+        destination: Path,
         *,
         _before_publish: Callable[[Path, Path], None] | None = None,
         _owner_key: str | None = None,
-    ) -> str:
-        """Unpack the file.
+    ) -> Path:
+        """Publish an archive to an already-parsed destination path.
+
+        This is the Path-only core used by cache workflows that already own a
+        validated ``Path``. It deliberately performs no filesystem-protocol
+        conversion or public-input parsing.
 
         Args:
-            directory: Destination supplied as text or a string-valued path-like object.
-            _before_publish: Optional hook called with the staging directory and executable before rename.
+            destination: Absolute destination path retained by the calling workflow.
+            _before_publish: Optional hook called with the staging directory and
+                executable before publication.
             _owner_key: Artifact ownership key recorded for safe abandoned-staging recovery.
 
         Returns:
-            The path to the target executable of the unpacked files.
+            Absolute path to the executable in the published artifact directory.
+
+        Raises:
+            errors.InvalidDownloadFileError: The destination is not an absolute
+                ``Path``, the archive is invalid, extraction fails, or atomic
+                publication cannot complete.
         """
-        # ``parse_path`` is a zero-conversion fast path for an already-owned,
-        # absolute ``Path`` and the single validation boundary for public input.
-        destination = parse_path(directory)
         staging: Path | None = None
         try:
+            if not isinstance(destination, Path) or not destination.is_absolute():
+                raise ValueError("Archive destination must be an absolute pathlib.Path")
             # The caller selects the parent; never follow a link at the entry
             # itself and never overwrite an existing entry, even if incomplete.
             parent = destination.parent.resolve(strict=True)
@@ -213,11 +240,11 @@ class File:
                 publish, "Publish validated cache entry %s" % destination
             )
             staging = None
-            return str(destination / relative)
+            return destination / relative
         except Exception as cause:
             raise errors.InvalidDownloadFileError(
                 "<%s> Failed to unpack download into %r: %s"
-                % (self.__class__.__name__, directory, cause)
+                % (self.__class__.__name__, destination, cause)
             ) from cause
         finally:
             if isinstance(self._content, Download):
@@ -268,7 +295,7 @@ class File:
                 if is_link(root):
                     raise ValueError("Download directory cannot be a link")
                 root.mkdir(mode=0o700, parents=True, exist_ok=True)
-                file_path = checked_path(root, root / str(name))
+                file_path = checked_path(root, root.joinpath(*name.parts))
                 created = False
                 try:
                     with file_path.open("xb") as file:
@@ -307,15 +334,21 @@ class File:
                 self._content.close()
             self._content = None
 
-    def _extract_zip_file(self, file_path: Path, unzip_dir: Path) -> list[str]:
-        """Extracts a zip file. Returns a list of the extracted file names.
+    def _extract_zip_file(
+        self, file_path: Path, unzip_dir: Path
+    ) -> list[PurePosixPath]:
+        """Extract a ZIP archive through the bounded, link-safe writer.
 
         Args:
-            file_path: File path used by this operation.
-            unzip_dir: Unzip dir used by this operation.
+            file_path: Retained path to the downloaded ZIP archive.
+            unzip_dir: New private directory that receives validated members.
 
         Returns:
-            The extract zip file values in order.
+            Validated ZIP member paths in archive order.
+
+        Raises:
+            errors.InvalidDownloadFileError: The archive is invalid, encrypted,
+                unsafe, or exceeds an extraction limit.
         """
         try:
             writer = ArchiveWriter(unzip_dir)
@@ -349,15 +382,21 @@ class File:
                 )
             ) from err
 
-    def _extract_tar_file(self, file_path: Path, unzip_dir: Path) -> list[str]:
-        """Extracts a tar file. Returns a list of the extracted file names.
+    def _extract_tar_file(
+        self, file_path: Path, unzip_dir: Path
+    ) -> list[PurePosixPath]:
+        """Extract a compressed TAR archive through the bounded, link-safe writer.
 
         Args:
-            file_path: File path used by this operation.
-            unzip_dir: Unzip dir used by this operation.
+            file_path: Retained path to the downloaded TAR archive.
+            unzip_dir: New private directory that receives validated members.
 
         Returns:
-            The extract tar file values in order.
+            Validated TAR member paths in archive order.
+
+        Raises:
+            errors.InvalidDownloadFileError: The archive is invalid, unsafe, or
+                exceeds an extraction limit.
         """
         try:
             writer = ArchiveWriter(unzip_dir)
@@ -401,7 +440,9 @@ class File:
                 )
             ) from err
 
-    def _find_target_executable(self, base_dir: Path, files: list[str]) -> Path | None:
+    def _find_target_executable(
+        self, base_dir: Path, files: list[PurePosixPath]
+    ) -> Path | None:
         """Find the target executable from the extracted files. Return `None` if not found.
 
         Args:
@@ -423,8 +464,7 @@ class File:
                 "Archive extraction directory does not exist"
             )
         matches = []
-        for file in files:
-            relative = member_path(file)
+        for relative in files:
             if relative.name != match_name:
                 continue
             path = root.joinpath(*relative.parts).resolve(strict=False)
@@ -464,7 +504,7 @@ class EdgeDriverFile(File):
     _LINUX_EXECUTABLE_NAME: str = "msedgedriver"
 
     def __init__(self, os_name: str, url: str, content: bytes | Download) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a one-shot Microsoft Edge WebDriver archive.
 
         Args:
             os_name: Operating-system identifier used by the driver vendor.
@@ -482,7 +522,7 @@ class ChromeDriverFile(File):
     _LINUX_EXECUTABLE_NAME: str = "chromedriver"
 
     def __init__(self, os_name: str, url: str, content: bytes | Download) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a one-shot ChromeDriver archive.
 
         Args:
             os_name: Operating-system identifier used by the driver vendor.
@@ -500,7 +540,7 @@ class ChromeBinaryFile(File):
     _LINUX_EXECUTABLE_NAME: str = "chrome"
 
     def __init__(self, os_name: str, url: str, content: bytes | Download) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a one-shot Chrome for Testing archive.
 
         Args:
             os_name: Operating-system identifier used by the driver vendor.
@@ -518,7 +558,7 @@ class GeckoDriverFile(File):
     _LINUX_EXECUTABLE_NAME: str = "geckodriver"
 
     def __init__(self, os_name: str, url: str, content: bytes | Download) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a one-shot GeckoDriver archive.
 
         Args:
             os_name: Operating-system identifier used by the driver vendor.

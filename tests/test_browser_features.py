@@ -9,6 +9,7 @@ from __future__ import annotations
 from asyncio import CancelledError
 from base64 import b64decode, b64encode
 from collections.abc import Callable, Iterator
+from contextlib import AbstractAsyncContextManager, nullcontext
 from io import BytesIO
 from json import dumps, loads
 from pathlib import Path
@@ -33,7 +34,13 @@ from aselenium.firefox.service import FirefoxService
 from aselenium.firefox.session import FirefoxSession
 from aselenium.firefox.utils import FirefoxAddon, extract_firefox_addon_details
 from aselenium.manager.version import ChromiumVersion, FirefoxVersion, GeckoVersion
-from aselenium.options import BaseOptions, ChromiumBaseOptions, Proxy
+from aselenium.options import (
+    BaseOptions,
+    ChromiumBaseOptions,
+    ChromiumProfile,
+    Proxy,
+    Timeouts,
+)
 from aselenium.safari.options import SafariOptions
 from aselenium.safari.service import SafariService
 from aselenium.safari.session import SafariSession
@@ -60,6 +67,14 @@ class RecordingTransport:
         """
         self.responses = list(responses)
         self.calls: list[dict[str, Any]] = []
+
+    def transaction(self) -> AbstractAsyncContextManager[None]:
+        """Provide the ownership boundary for single-task protocol contract tests.
+
+        Returns:
+            A no-op context; concurrent ownership is tested with real connections.
+        """
+        return nullcontext()
 
     async def execute(
         self,
@@ -126,7 +141,13 @@ def make_session() -> Iterator[
         options = (
             FirefoxOptions() if session_class is FirefoxSession else SafariOptions()
         )
-        session = session_class(options, SimpleNamespace(url="http://127.0.0.1:4444"))
+        session = session_class(
+            options,
+            SimpleNamespace(
+                url="http://127.0.0.1:4444",
+                driver_version=None,
+            ),
+        )
         transport = RecordingTransport(responses)
         session._conn = transport
         session._base_url = "/session/vendor-test"
@@ -510,17 +531,19 @@ async def test_safari_permissions_rejects_malformed_values(
 async def test_safari_disabled_features_do_not_send_commands(
     make_session: Callable[..., Any],
 ) -> None:
-    """Record current unsupported Safari API return values without native effects.
+    """Reject unsupported Safari APIs without issuing driver commands.
 
     Args:
         make_session: Isolated session factory.
     """
     session, transport = make_session(SafariSession, [])
-    assert await session.print_page() is None
+    with pytest.raises(errors.InvalidMethodError):
+        await session.print_page()
     assert await session.switch_frame("#frame") is False
     assert await session.default_frame() is True
     assert await session.parent_frame() is True
-    assert session.actions() is None
+    with pytest.raises(errors.InvalidMethodError):
+        session.actions()
     assert transport.calls == []
 
 
@@ -783,6 +806,30 @@ def test_proxy_mutation_is_reflected_in_browser_capabilities(
     assert "proxy" not in options.capabilities
 
 
+def test_proxy_mode_is_recomputed_from_retained_settings() -> None:
+    """Restore the next applicable mode when a higher-priority setting is cleared."""
+    proxy = Proxy(
+        auto_detect=True,
+        pac_url="http://localhost/proxy.pac",
+        http_proxy="http://localhost:8080",
+    )
+    assert proxy.proxy_type == "MANUAL"
+    assert proxy.auto_detect is True
+
+    proxy.auto_detect = False
+    assert proxy.proxy_type == "MANUAL"
+    proxy.http_proxy = None
+    assert proxy.to_capabilities() == {
+        "proxyType": "pac",
+        "proxyAutoconfigUrl": "http://localhost/proxy.pac",
+    }
+    proxy.auto_detect = True
+    proxy.pac_url = None
+    assert proxy.to_capabilities() == {"proxyType": "autodetect"}
+    proxy.auto_detect = False
+    assert proxy.proxy_type in {"DIRECT", "SYSTEM"}
+
+
 def test_firefox_profile_cloning_encoding_extensions_and_cleanup(
     addon_directory: Path, tmp_path: Path
 ) -> None:
@@ -804,8 +851,9 @@ def test_firefox_profile_cloning_encoding_extensions_and_cleanup(
     snapshot: FirefoxOptions | None = None
     try:
         profile = options.set_profile(source)
-        clone = Path(profile.directory_temp)
-        assert profile.directory == str(source)
+        clone = profile.directory_temp
+        assert clone is not None
+        assert profile.directory == source
         assert profile._profile_dir == source
         assert isinstance(profile._temp_profile_dir, Path)
         assert clone != source
@@ -816,13 +864,17 @@ def test_firefox_profile_cloning_encoding_extensions_and_cleanup(
             assert "parent.lock" not in archive.namelist()
         assert options.capabilities["moz:firefoxOptions"]["profile"] == profile.encode
         snapshot = options.snapshot()
-        snapshot_clone = Path(snapshot.profile.directory_temp)
+        assert snapshot.profile is not None
+        snapshot_clone = snapshot.profile.directory_temp
+        assert snapshot_clone is not None
         (clone / "prefs.js").write_text("changed clone", encoding="utf-8")
         assert (
             snapshot_clone / "prefs.js"
         ).read_text() == 'user_pref("fixture", true);'
         assert (source / "prefs.js").read_text() == 'user_pref("fixture", true);'
         options.close()
+        assert profile.directory_temp is None
+        assert profile._owned_temp_directory is None
         options.rem_profile()
         assert options.profile is None
         assert not clone.exists()
@@ -850,8 +902,9 @@ def test_chromium_profile_arguments_and_replacement_cleanup(
     try:
         options.add_arguments("--headless=new")
         first = options.set_profile(tmp_path, "Default")
-        first_clone = Path(first.directory_temp)
-        assert first.directory == str(tmp_path)
+        first_clone = first.directory_temp
+        assert first_clone is not None
+        assert first.directory == tmp_path
         assert first._profile_dir == tmp_path / "Default"
         assert isinstance(first._temp_profile_dir, Path)
         assert first.profile_folder == "Default"
@@ -859,10 +912,14 @@ def test_chromium_profile_arguments_and_replacement_cleanup(
         assert "--profile-directory=TEMP_PROFILE" in options.arguments
         assert "--user-data-dir=" + str(first_clone) in options.arguments
         second = options.set_profile(str(tmp_path), "Default")
-        second_clone = Path(second.directory_temp)
+        second_clone = second.directory_temp
+        assert second_clone is not None
         assert second_clone.exists()
         first._delete_temp_profile()
         assert not first_clone.exists()
+        assert first.directory_temp is None
+        assert first._temp_profile_dir is None
+        assert first._owned_temp_directory is None
         options.close()
         options.rem_profile()
         assert options.arguments == ["--headless=new"]
@@ -870,6 +927,104 @@ def test_chromium_profile_arguments_and_replacement_cleanup(
         assert (tmp_path / "Default" / "Preferences").read_text() == "original"
     finally:
         options.close()
+
+
+@pytest.mark.parametrize(
+    "profile_folder", ["Default", "Profile 1", " Profile", ".profile", "用户 配置"]
+)
+def test_chromium_profile_accepts_portable_single_directory_names(
+    tmp_path: Path, profile_folder: str
+) -> None:
+    """Preserve ordinary spaces, dot prefixes, and Unicode in profile names.
+
+    Args:
+        tmp_path: Isolated user-data directory containing the selected profile.
+        profile_folder: Portable single-component profile-directory name.
+    """
+    source = tmp_path / profile_folder
+    source.mkdir()
+    (source / "Preferences").write_text("original", encoding="utf-8")
+    profile = ChromiumProfile(tmp_path, profile_folder)
+    assert profile.directory_temp is not None
+    clone = profile.directory_temp
+    try:
+        assert profile.profile_folder == profile_folder
+        assert profile._profile_dir == source
+        assert clone.is_dir()
+        assert (clone / "TEMP_PROFILE" / "Preferences").read_text(
+            encoding="utf-8"
+        ) == "original"
+    finally:
+        profile._delete_temp_profile()
+
+
+@pytest.mark.parametrize(
+    "profile_folder",
+    [
+        "",
+        ".",
+        "..",
+        "../Default",
+        "..\\Default",
+        "/Default",
+        "\\Default",
+        "Default/Profile 1",
+        "Default\\Profile 1",
+        "Default/",
+        "Default\\",
+        "C:",
+        "C:Default",
+        "C:\\Default",
+        "//server/share/Default",
+        "\\\\server\\share\\Default",
+        "Default\x00Profile",
+        "Default:stream",
+        'Default"Profile',
+        "Default*Profile",
+        "Default<Profile",
+        "Default>Profile",
+        "Default?Profile",
+        "Default|Profile",
+        "Default.",
+        "Default ",
+        "CON",
+        "con.profile",
+        "CON .profile",
+        "PRN",
+        "AUX",
+        "NUL",
+        "COM1",
+        "com¹.log",
+        "LPT9",
+        "CONIN$",
+        "CONOUT$",
+    ],
+)
+def test_chromium_profile_rejects_ambiguous_or_reserved_path_names(
+    tmp_path: Path, profile_folder: str
+) -> None:
+    """Reject cross-platform path syntax before selecting or copying a profile.
+
+    Args:
+        tmp_path: Existing user-data root that must not override validation.
+        profile_folder: Malformed, escaping, or reserved profile-folder value.
+    """
+    with pytest.raises(errors.InvalidProfileError, match="portable directory basename"):
+        ChromiumProfile(tmp_path, profile_folder)
+
+
+@pytest.mark.parametrize("profile_folder", [None, b"Default", Path("Default"), 1])
+def test_chromium_profile_rejects_non_string_folder_names(
+    tmp_path: Path, profile_folder: Any
+) -> None:
+    """Reject path-like and other non-string values for the basename-only input.
+
+    Args:
+        tmp_path: Existing user-data root that must not override validation.
+        profile_folder: Non-string value supplied despite the public annotation.
+    """
+    with pytest.raises(errors.InvalidProfileError, match="portable directory basename"):
+        ChromiumProfile(tmp_path, profile_folder)
 
 
 @pytest.mark.parametrize(
@@ -1196,7 +1351,124 @@ def test_proxy_reset_socks_clears_credentials() -> None:
     assert proxy.socks_proxy is None
     assert proxy.socks_username is None
     assert proxy.socks_password is None
-    assert proxy.to_capabilities() == {"proxyType": "manual"}
+    assert proxy.to_capabilities() == Proxy().to_capabilities()
+
+
+@pytest.mark.parametrize("options_class", [ChromeOptions, FirefoxOptions])
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("browserName", ""),
+        ("browserName", 1),
+        ("browserVersion", None),
+        ("platformName", False),
+        ("acceptInsecureCerts", "false"),
+        ("pageLoadStrategy", "fast"),
+        ("pageLoadStrategy", []),
+        ("strictFileInteractability", 1),
+        ("unhandledPromptBehavior", "close"),
+        ("unhandledPromptBehavior", {}),
+    ],
+)
+def test_standard_capability_mutation_preserves_typed_contracts(
+    options_class: type[BaseOptions], name: str, value: Any
+) -> None:
+    """Validate standard keys while leaving extension capabilities flexible.
+
+    Args:
+        options_class: Concrete options implementation under test.
+        name: Standard W3C capability name.
+        value: Invalid replacement value.
+    """
+    options = options_class()
+    before = options.capabilities
+    try:
+        with pytest.raises(errors.InvalidOptionsError):
+            options.set_capability(name, value)
+        assert options.capabilities == before
+        options.set_capability("fixture:extension", {"arbitrary": [1, None]})
+        assert options.get_capability("fixture:extension") == {"arbitrary": [1, None]}
+    finally:
+        options.close()
+
+
+@pytest.mark.parametrize("options_class", [ChromeOptions, FirefoxOptions])
+def test_timeout_capability_is_validated_normalized_and_reset(
+    options_class: type[BaseOptions],
+) -> None:
+    """Keep the low-level timeout capability consistent with its typed getter.
+
+    Args:
+        options_class: Concrete options implementation under test.
+    """
+    options = options_class()
+    try:
+        options.set_capability("timeouts", {"implicit": 12.9, "script": 50})
+        assert options.get_capability("timeouts") == {
+            "implicit": 12,
+            "pageLoad": 300_000,
+            "script": 50,
+        }
+        assert options.timeouts.implicit_ms == 12
+
+        before = options.capabilities
+        for value in (1, {"implicit": True}, {"unknown": 1}):
+            with pytest.raises(errors.InvalidOptionsError):
+                options.set_capability("timeouts", value)
+            assert options.capabilities == before
+
+        options.rem_capability("timeouts")
+        assert options.timeouts == Timeouts()
+        options.page_load_strategy = "eager"
+        options.rem_capability("pageLoadStrategy")
+        assert options.page_load_strategy == "normal"
+    finally:
+        options.close()
+
+
+@pytest.mark.parametrize("options_class", [ChromeOptions, FirefoxOptions])
+def test_low_level_proxy_capability_requires_a_mapping(
+    options_class: type[BaseOptions],
+) -> None:
+    """Reject proxy payloads that cannot satisfy the W3C object boundary.
+
+    Args:
+        options_class: Concrete options implementation under test.
+    """
+    options = options_class()
+    try:
+        with pytest.raises(errors.InvalidOptionsError):
+            options.set_capability("proxy", "http://proxy.invalid")
+        options.set_capability("proxy", {"proxyType": "direct"})
+        assert options.get_capability("proxy") == {"proxyType": "direct"}
+        assert options.proxy is None
+    finally:
+        options.close()
+
+
+@pytest.mark.parametrize("options_class", [ChromeOptions, FirefoxOptions])
+def test_low_level_proxy_capability_durably_replaces_typed_proxy(
+    options_class: type[BaseOptions],
+) -> None:
+    """Prevent typed and low-level proxy configurations from overwriting each other.
+
+    Args:
+        options_class: Concrete options implementation under test.
+    """
+    options = options_class()
+    try:
+        options.proxy = Proxy(http_proxy="http://first.invalid:80")
+        options.set_capability("proxy", {"proxyType": "direct"})
+        assert options.proxy is None
+        assert options.get_capability("proxy") == {"proxyType": "direct"}
+        assert options.capabilities["proxy"] == {"proxyType": "direct"}
+
+        options.proxy = Proxy(http_proxy="http://second.invalid:80")
+        options.rem_capability("proxy")
+        assert options.proxy is None
+        assert "proxy" not in options.capabilities
+    finally:
+        options.close()
 
 
 @pytest.mark.parametrize("options_class", (*CHROMIUM_OPTION_CLASSES, FirefoxOptions))
@@ -1216,7 +1488,7 @@ def test_missing_browser_binary_preserves_existing_configuration(
     before = options.capabilities
     with pytest.raises(errors.InvalidOptionsError):
         options.browser_location = str(tmp_path / "missing")
-    assert options.browser_location == str(binary)
+    assert options.browser_location == binary
     assert options.capabilities == before
 
 
@@ -1274,7 +1546,7 @@ def test_vendor_session_basic_properties(
         session_class: Vendor session wrapper being inspected.
     """
     session, transport = make_session(session_class, [])
-    session._service._driver_version = GeckoVersion("0.37.0")
+    session._service.driver_version = GeckoVersion("0.37.0")
     assert session.options is session._options
     assert session.service is session._service
     assert session.browser_version is None
@@ -1296,11 +1568,11 @@ async def test_firefox_addon_encoding_failure_does_not_send_or_cache(
         monkeypatch: Reversible patch fixture for the I/O boundary.
     """
 
-    def fail_encoding(directory: str) -> str:
+    def fail_encoding(directory: Path) -> str:
         """Simulate a disk-read failure while packing an unpacked extension.
 
         Args:
-            directory: Extension directory requested by the package.
+            directory: Validated extension directory requested by the package.
 
         Returns:
             Never returns because the simulated disk is unavailable.
@@ -1310,9 +1582,7 @@ async def test_firefox_addon_encoding_failure_does_not_send_or_cache(
         """
         raise OSError("fixture archive read failure")
 
-    monkeypatch.setattr(
-        firefox_session_module, "encode_dir_to_firefox_wire_protocol", fail_encoding
-    )
+    monkeypatch.setattr(firefox_session_module, "_encode_addon_path", fail_encoding)
     session, transport = make_session(FirefoxSession, [])
     with pytest.raises(errors.InvalidExtensionError, match="Failed to encode add-on"):
         await session.install_addons(str(addon_directory))
@@ -1330,7 +1600,7 @@ def test_firefox_profile_encoding_failure_is_retryable(
         monkeypatch: Reversible patch fixture for the archive-encoding boundary.
     """
 
-    def fail_encoding(directory: str) -> str:
+    def fail_encoding(directory: Path) -> str:
         """Simulate a disk-read failure while encoding a Firefox profile.
 
         Args:
@@ -1351,7 +1621,7 @@ def test_firefox_profile_encoding_failure_is_retryable(
         with monkeypatch.context() as patch:
             patch.setattr(
                 firefox_options_module,
-                "encode_dir_to_firefox_wire_protocol",
+                "_encode_dir_to_firefox_wire_protocol",
                 fail_encoding,
             )
             with pytest.raises(errors.InvalidProfileError, match="Failed to encode"):

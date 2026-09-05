@@ -1,5 +1,4 @@
-# -*- coding: UTF-8 -*-
-"""Aselenium logs implementation and supporting types."""
+"""Package logger configured to remain silent until an application opts in."""
 
 import logging
 

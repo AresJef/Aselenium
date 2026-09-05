@@ -32,7 +32,7 @@ def chrome_manager(tmp_path: Path) -> ChromeDriverManager:
     return manager
 
 
-def cache_pair(manager: ChromeDriverManager) -> str:
+def cache_pair(manager: ChromeDriverManager) -> Path:
     """Publish one complete synthetic CfT pair without executing its bytes.
 
     Args:
@@ -42,7 +42,7 @@ def cache_pair(manager: ChromeDriverManager) -> str:
         The published driver executable path.
     """
     version = ChromiumVersion("120.0.6099.71")
-    location = ""
+    location: Path | None = None
     for kind, name, archive_class in (
         ("driver", "chromedriver.exe", ChromeDriverFile),
         ("binary", "chrome.exe", ChromeBinaryFile),
@@ -56,6 +56,7 @@ def cache_pair(manager: ChromeDriverManager) -> str:
         result = getattr(manager._cache_view, "cache_" + kind)(version, artifact)
         if kind == "driver":
             location = result["location"]
+    assert location is not None
     return location
 
 

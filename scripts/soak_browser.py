@@ -20,13 +20,14 @@ import statistics
 import time
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import psutil
 
 from aselenium import Chrome, Edge, Session, errors
 from aselenium.actions import Actions
+from aselenium.options import ChromiumBaseOptions
 from aselenium.service import BaseService
 
 HTML = "<title>Aselenium soak</title><input id='inputbox'>"
@@ -232,9 +233,16 @@ async def soak_long_lived(args: argparse.Namespace) -> dict[str, Any]:
         driver.options.set_profile(template, "Default")
         driver.options.set_timeouts(implicit=0, pageLoad=10, script=5)
         driver.options.session_timeout = 20
-        template_profile = Path(driver.options.profile.directory_temp)
+        configured_profile = driver.options.profile
+        if configured_profile is None or configured_profile.directory_temp is None:
+            raise AssertionError("Chromium profile template was not configured")
+        template_profile = configured_profile.directory_temp
         context = driver.acquire("offline", binary=args.binary)
-        profile = Path(context._options.profile.directory_temp)
+        context_options = cast(ChromiumBaseOptions, context._options)
+        context_profile = context_options.profile
+        if context_profile is None or context_profile.directory_temp is None:
+            raise AssertionError("Acquisition profile snapshot was not created")
+        profile = context_profile.directory_temp
         iterations = 0
         elapsed = 0.0
         try:
@@ -253,9 +261,12 @@ async def soak_long_lived(args: argparse.Namespace) -> dict[str, Any]:
                         mixed_iteration(session, iterations), timeout=30
                     )
                     iterations += 1
+                    service_process = session.service.process
+                    if service_process is None:
+                        raise AssertionError("WebDriver service process disappeared")
                     for process in (
-                        session.service.process,
-                        *session.service.process.children(recursive=True),
+                        service_process,
+                        *service_process.children(recursive=True),
                     ):
                         try:
                             owned_processes.add((process.pid, process.create_time()))

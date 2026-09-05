@@ -10,11 +10,18 @@ from aselenium._async import run_blocking
 
 
 def _write_atomic(path: Path, data: bytes) -> None:
-    """Write bytes to a sibling temporary file and atomically replace the destination.
+    """Write bytes to a sibling temporary file and replace the destination.
+
+    The sibling placement keeps the final replacement on one filesystem, where
+    ``os.replace`` is atomic. The staging file is removed after any failed write
+    or replacement.
 
     Args:
-        path: Filesystem path to inspect or operate on.
+        path: Parsed destination path whose parent directory already exists.
         data: Complete PNG, PDF, or other binary payload to publish.
+
+    Raises:
+        OSError: The staging write, flush, sync, replacement, or cleanup fails.
     """
     destination = path
     # Replaces the output directory entry; never writes through an output link.
@@ -40,14 +47,16 @@ async def save_bytes(path: Path, data: bytes) -> bool:
     """Atomically save binary data without abandoning an in-flight write.
 
     Args:
-        path: Filesystem path to inspect or operate on.
+        path: Parsed destination path whose parent directory already exists.
         data: Complete binary payload to publish.
 
     Returns:
-        True after successful publication; False if the filesystem raises OSError.
+        ``True`` after successful publication; ``False`` if the filesystem
+        raises ``OSError``.
 
     Raises:
-        asyncio.CancelledError: Cancellation propagates after the owned write finishes.
+        asyncio.CancelledError: Cancellation propagates after the owned write
+            finishes.
     """
     try:
         await run_blocking(_write_atomic, path, data)

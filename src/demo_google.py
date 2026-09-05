@@ -1,12 +1,16 @@
-"""Real-world Google website demo (a visible browser by default).
+"""Run a guarded real-world Google demo in a visible browser by default.
 
-    .venv/bin/python src/demo_google.py run --allow-download
-    .venv/bin/python src/demo_google.py run --query "Aselenium Python"
-    .venv/bin/python src/demo_google.py run --headless --hold-seconds 0
+Unlike :mod:`demo_local`, this demo requires Internet access to Google. Running
+without a subcommand prints help and launches nothing. ``--allow-download``
+controls driver provisioning only; it does not disable website access. The demo
+never tries to bypass consent screens, traffic challenges, or CAPTCHAs.
 
-Unlike demo_local.py, this demo requires Internet access to Google. No arguments
-prints help without launching anything. Driver downloads require --allow-download;
-that flag does not control website access. See docs/demo-google.md.
+Example:
+    Parse a headless invocation without provisioning a driver or browser:
+
+    >>> options = parse_args(["run", "--headless", "--hold-seconds", "0"])
+    >>> (options.command, options.browser, options.headless)
+    ('run', 'chrome', True)
 """
 
 from __future__ import annotations
@@ -25,7 +29,14 @@ from time import perf_counter
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
-from _demo_support import BROWSERS, CHROMIUM, acquire_offline, make_driver, provision
+from _demo_support import (
+    BROWSERS,
+    CHROMIUM,
+    acquire_offline,
+    json_default,
+    make_driver,
+    provision,
+)
 from aselenium import Element, KeyboardKeys, Session, WebDriver
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,14 +47,18 @@ GOOGLE_HOSTS = {"google.com", "www.google.com"}
 
 
 class GoogleNeedsAttention(RuntimeError):
-    """The remote page needs attention, not an automated bypass or blind retry."""
+    """Signal that the Google page requires manual review.
+
+    Attributes:
+        reason: Stable machine-readable reason recorded in the JSON report.
+    """
 
     def __init__(self, reason: str, message: str) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create an attention error with a stable reason and readable message.
 
         Args:
             reason: Stable reason code recorded in the attention report.
-            message: Diagnostic message explaining the failed condition.
+            message: Human-readable explanation exposed by :class:`RuntimeError`.
         """
         super().__init__(message)
         self.reason = reason
@@ -53,10 +68,18 @@ def positive_seconds(value: str) -> float:
     """Parse a finite positive command-line duration in seconds.
 
     Args:
-        value: A finite positive command-line duration in seconds supplied for validation.
+        value: Command-line text representing a duration in seconds.
 
     Returns:
-        A finite positive command-line duration in seconds.
+        The parsed finite value, which is strictly greater than zero.
+
+    Raises:
+        ValueError: ``value`` is not numeric.
+        argparse.ArgumentTypeError: The numeric value is non-finite or not positive.
+
+    Example:
+        >>> positive_seconds("2.5")
+        2.5
     """
     number = float(value)
     if not math.isfinite(number) or number <= 0:
@@ -68,10 +91,18 @@ def hold_seconds(value: str) -> float:
     """Parse a browser hold duration between zero and sixty seconds.
 
     Args:
-        value: A browser hold duration between zero and sixty seconds supplied for validation.
+        value: Command-line text representing a browser hold duration.
 
     Returns:
-        A browser hold duration between zero and sixty seconds.
+        The parsed finite value in the inclusive range from zero to sixty.
+
+    Raises:
+        ValueError: ``value`` is not numeric.
+        argparse.ArgumentTypeError: The value is non-finite or outside the allowed range.
+
+    Example:
+        >>> hold_seconds("0")
+        0.0
     """
     number = float(value)
     if not math.isfinite(number) or not 0 <= number <= 60:
@@ -83,10 +114,17 @@ def query_text(value: str) -> str:
     """Validate and trim a search query containing one to 512 characters.
 
     Args:
-        value: And trim a search query containing one to 512 characters supplied for validation.
+        value: Search-query text from the command line.
 
     Returns:
-        And trim a search query containing one to 512 characters.
+        The stripped query, containing between one and 512 characters.
+
+    Raises:
+        argparse.ArgumentTypeError: The stripped query is empty or exceeds 512 characters.
+
+    Example:
+        >>> query_text("  Aselenium Python  ")
+        'Aselenium Python'
     """
     value = value.strip()
     if not value or len(value) > 512:
@@ -101,7 +139,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         argv: Command-line arguments; None reads the current process arguments.
 
     Returns:
-        And validate the command line without launching a browser.
+        The parsed namespace. Its ``command`` is ``None`` when no subcommand was
+        supplied and help was printed.
+
+    Raises:
+        SystemExit: Argument parsing or cross-option validation fails.
+
+    Example:
+        >>> options = parse_args(["run", "--query", "Aselenium"])
+        >>> (options.command, options.query)
+        ('run', 'Aselenium')
     """
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -155,6 +202,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="demo cache parent, shared with demo_local.py",
     )
     run.add_argument(
+        "--profile-root",
+        type=Path,
+        help="existing shared writable Firefox profile root (Snap/Flatpak workaround)",
+    )
+    run.add_argument(
         "--output-dir",
         type=Path,
         default=ROOT / ".demo-output",
@@ -166,17 +218,24 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         return args
     if args.browser in {"firefox", "chromium"} and args.channel != "stable":
         parser.error("Firefox/Chromium use --binary, not release-channel selection")
+    if args.profile_root is not None and args.browser != "firefox":
+        parser.error("--profile-root is only available for Firefox")
     if args.browser == "safari" and (args.headless or args.channel == "beta"):
         parser.error("Safari is always headed and supports only stable/dev channels")
     return args
 
 
 def configure(driver: WebDriver, args: argparse.Namespace) -> None:
-    """Configure.
+    """Apply conservative browser options for the Google demonstration.
+
+    Every browser receives explicit WebDriver timeouts, normal page loading, and
+    certificate verification. Chromium-based browsers also receive deterministic
+    window and first-run flags; Chrome, Chromium, Edge, and Firefox receive their
+    supported headless flag only when requested. Safari remains headed.
 
     Args:
-        driver: Driver object or downloaded driver artifact required by this operation.
-        args: Validated command-line options for the selected browser workflow.
+        driver: Browser facade whose mutable options are configured before acquisition.
+        args: Parsed demo arguments containing ``browser`` and ``headless``.
     """
     options = driver.options
     options.set_timeouts(implicit=0, pageLoad=30, script=5)
@@ -201,10 +260,16 @@ async def page_state(session: Session) -> tuple[str, str]:
     """Check the current page before interacting; never automate challenge solving.
 
     Args:
-        session: Active session that owns the browser or HTTP operation.
+        session: Active browser session displaying a Google-owned page.
 
     Returns:
-        Check the current page before interacting; never automate challenge solving.
+        A pair of the current URL and one of ``"page"``, ``"consent"``, or
+        ``"dialog"``. ``"dialog"`` denotes visible consent-like page UI.
+
+    Raises:
+        GoogleNeedsAttention: The page is a challenge or has left the expected
+            HTTPS Google origins.
+        RuntimeError: The page-inspection script returns an unexpected payload.
     """
     url = await session.url
     parsed = urlsplit(url)
@@ -243,11 +308,15 @@ async def wait_for_search_box(session: Session, timeout: float) -> Element:
     """Wait for an enabled, unobscured Google search field without bypassing challenges.
 
     Args:
-        session: Active session that owns the browser or HTTP operation.
-        timeout: Total time budget in seconds; None follows the documented no-wait/default behavior.
+        session: Active session displaying the Google homepage.
+        timeout: Maximum number of seconds to wait for a usable search field.
 
     Returns:
-        The Element value produced by this operation.
+        The first enabled and unobscured Google search field.
+
+    Raises:
+        GoogleNeedsAttention: A challenge is detected, Google redirects away, or
+            no usable search field appears before the deadline.
     """
     print(
         f"Waiting up to {timeout:g}s for Google's search box. If consent is shown, choose manually in the visible browser.",
@@ -256,10 +325,10 @@ async def wait_for_search_box(session: Session, timeout: float) -> Element:
     last_state = "page"
 
     async def ready() -> Element | None:
-        """Return the ready result for the enclosing poll, or None.
+        """Inspect one poll iteration for an interactable search field.
 
         Returns:
-            The ready result for the enclosing poll, or none.
+            A usable search field, or ``None`` while the page is not ready.
         """
         nonlocal last_state
         _, last_state = await page_state(session)
@@ -290,19 +359,23 @@ async def wait_for_results(
     """Require navigation plus visible result headings, not a guessed page title.
 
     Args:
-        session: Active session that owns the browser or HTTP operation.
+        session: Active session after the query has been submitted.
         query: Search text submitted once to the real Google website.
-        timeout: Total time budget in seconds; None follows the documented no-wait/default behavior.
+        timeout: Maximum number of seconds to wait for a normal result page.
 
     Returns:
-        A mapping containing the wait for results data.
+        The verified result URL and up to five non-empty visible heading samples.
+
+    Raises:
+        GoogleNeedsAttention: A challenge is detected, Google redirects away, or
+            matching visible results do not appear before the deadline.
     """
 
     async def ready() -> dict[str, Any] | None:
-        """Return the ready result for the enclosing poll, or None.
+        """Inspect one poll iteration for the submitted query and result headings.
 
         Returns:
-            The ready result for the enclosing poll, or none.
+            Result metadata when the page is ready, otherwise ``None``.
         """
         url, state = await page_state(session)
         if state != "page":
@@ -334,9 +407,13 @@ async def save_capture(session: Session, path: Path, report: dict[str, Any]) -> 
     """Save a screenshot, validate its PNG header, and add it to the run report.
 
     Args:
-        session: Active session that owns the browser or HTTP operation.
-        path: Filesystem path to inspect or operate on.
-        report: Mutable run report updated with outcomes and diagnostic artifacts.
+        session: Active browser session to capture.
+        path: Destination for the PNG screenshot.
+        report: Mutable run report whose ``artifacts`` list receives the filename.
+
+    Raises:
+        RuntimeError: WebDriver reports failure or the saved file lacks a PNG signature.
+        OSError: The screenshot cannot be read after it is saved.
     """
     if not await session.save_screenshot(path):
         raise RuntimeError("Screenshot was not saved: " + path.name)
@@ -349,13 +426,22 @@ async def save_capture(session: Session, path: Path, report: dict[str, Any]) -> 
 async def browse_google(
     session: Session, args: argparse.Namespace, output: Path, report: dict[str, Any]
 ) -> None:
-    """The actual website example, separated from CLI/provisioning/report plumbing.
+    """Visit Google, capture the homepage, and optionally submit one query.
+
+    The function records verified homepage and search metadata and saves a PNG
+    after each completed stage. It does not click results, ads, account controls,
+    consent controls, or challenge UI.
 
     Args:
-        session: Active session that owns the browser or HTTP operation.
-        args: Validated command-line options for the selected browser workflow.
-        output: Directory for this run's report and captures.
-        report: Mutable run report updated with outcomes and diagnostic artifacts.
+        session: Active browser session used for the website interaction.
+        args: Parsed arguments containing the optional query and wait timeout.
+        output: Existing run directory that receives screenshots.
+        report: Mutable run report receiving page metadata and artifact names.
+
+    Raises:
+        GoogleNeedsAttention: Google requires manual attention or expected UI does
+            not appear.
+        RuntimeError: A diagnostic screenshot cannot be created or validated.
     """
     print("Opening " + GOOGLE_URL, flush=True)
     await session.load(GOOGLE_URL)
@@ -382,12 +468,16 @@ async def browse_google(
 async def run_demo(
     args: argparse.Namespace, output: Path, report: dict[str, Any]
 ) -> None:
-    """Provision a browser, visit Google, and always finish owned resource cleanup.
+    """Provision a browser, visit Google, and release all owned resources.
+
+    Installation and session versions are added to the report. On an interaction
+    failure, the function attempts one diagnostic screenshot without masking the
+    original exception. Session cleanup and options cleanup run on every exit.
 
     Args:
-        args: Validated command-line options for the selected browser workflow.
-        output: Directory for this run's report and captures.
-        report: Mutable run report updated with outcomes and diagnostic artifacts.
+        args: Parsed browser, provisioning, interaction, and hold options.
+        output: Existing run directory that receives screenshots.
+        report: Mutable run report receiving installation and session details.
     """
     driver = make_driver(args)
     context = None
@@ -435,13 +525,19 @@ async def run_demo(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Parse command-line arguments and run the requested program workflow.
+    """Run the Google demo and write a JSON report in a unique directory.
 
     Args:
         argv: Command-line arguments; None reads the current process arguments.
 
     Returns:
-        Process exit code; zero indicates the requested workflow completed successfully.
+        ``0`` after help or a successful run, ``2`` when Google needs manual
+        attention, ``130`` after keyboard interruption, or ``1`` for another
+        handled run failure.
+
+    Raises:
+        SystemExit: Command-line parsing or validation fails.
+        OSError: The output directory or final report cannot be created.
     """
     args = parse_args(argv)
     if args.command is None:
@@ -483,8 +579,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     finally:
         report["seconds_including_cleanup"] = round(perf_counter() - started, 3)
         path = output / "report.json"
-        path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-        print(json.dumps(report, indent=2))
+        path.write_text(
+            json.dumps(report, indent=2, default=json_default) + "\n",
+            encoding="utf-8",
+        )
+        print(json.dumps(report, indent=2, default=json_default))
         print("Report: " + str(path))
     return code
 

@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium connection implementation and supporting types."""
+"""Serialized, deadline-aware HTTP transport for W3C WebDriver commands."""
 
 from __future__ import annotations
 
@@ -58,11 +57,11 @@ class Connection:
     """Represent a connection to a remote server (Browser driver)."""
 
     def __init__(self, session: ClientSession, session_timeout: int | float) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Bind serialized WebDriver commands to one HTTP client session.
 
         Args:
-            session: The async session of the connection.
-            session_timeout: Session timeout used by this operation.
+            session: Owned aiohttp session used for driver requests.
+            session_timeout: Positive per-command response deadline in seconds.
         """
         self._session: ClientSession = session
         self._session_timeout: int | float = session_timeout
@@ -81,13 +80,33 @@ class Connection:
         child tasks inherit it too: await dependent operations sequentially inside
         an explicit transaction instead of gathering them concurrently.
 
+        Admission uses the enclosing command/polling deadline when present,
+        otherwise the configured session timeout. This bounds waiting for
+        ownership, not the complete user-defined transaction body.
+
         Yields:
-            The resource managed by this context; cleanup runs when the context exits.
+            None while the logical async context holds command ownership.
+
+        Raises:
+            errors.SessionTimeoutError: Ownership cannot be acquired before the
+                deadline. The waiting transaction has not dispatched a command.
         """
         if self._owner is not None and self._ownership.get() is self._owner:
             yield
             return
-        async with self._command_lock:
+        deadline = DEADLINE.get()
+        if deadline is None:
+            deadline = monotonic() + self._session_timeout
+        try:
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                raise asyncio.TimeoutError()
+            await asyncio.wait_for(self._command_lock.acquire(), remaining)
+        except asyncio.TimeoutError as cause:
+            raise errors.SessionTimeoutError(
+                "WebDriver transaction admission timed out; no command was sent"
+            ) from cause
+        try:
             self._owner = object()
             token = self._ownership.set(self._owner)
             try:
@@ -95,6 +114,8 @@ class Connection:
             finally:
                 self._ownership.reset(token)
                 self._owner = None
+        finally:
+            self._command_lock.release()
 
     async def execute(
         self,
@@ -111,7 +132,8 @@ class Connection:
             command: Command identifier from aselenium.command.Command.
             body: JSON command parameters, or None when the command has no explicit payload.
             keys: Values substituted into the command URL template.
-            timeout: Total time budget in seconds; None follows the documented no-wait/default behavior.
+            timeout: Positive total budget in seconds. ``None`` uses this
+                connection's configured session timeout.
 
         Returns:
             The decoded W3C response envelope, including its value field.
@@ -222,7 +244,8 @@ class Connection:
             method: Method being wrapped or HTTP verb used for the request.
             url: URL used for the request or browser navigation.
             body: JSON command parameters, or None when the command has no explicit payload.
-            timeout: Total time budget in seconds; None follows the documented no-wait/default behavior.
+            timeout: Positive total budget in seconds. ``None`` uses this
+                connection's configured session timeout.
 
         Returns:
             Decoded response data for the requested transport operation.
@@ -336,20 +359,20 @@ class Connection:
         return "<%s (client_session=%s)>" % (self.__class__.__name__, self._session)
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Return a stable identity hash for this mutable transport owner.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            The connection object's identity.
         """
         return id(self)
 
     def __eq__(self, __o: object) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Return whether another reference is this exact connection owner.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` only for this same object.
         """
-        return hash(self) == hash(__o) if isinstance(__o, Connection) else False
+        return self is __o

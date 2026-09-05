@@ -58,7 +58,7 @@ def _manager(
     monkeypatch.setattr(
         manager, "_detect_browser_version", lambda _path: browser_version
     )
-    return manager, str(browser)
+    return manager, browser
 
 
 def _cache_miss(manager: Any, monkeypatch: pytest.MonkeyPatch, cft: bool) -> None:
@@ -76,7 +76,7 @@ def _cache_miss(manager: Any, monkeypatch: pytest.MonkeyPatch, cft: bool) -> Non
         )
 
 
-async def _install(manager: Any, version: str, browser: str, cft: bool) -> Any:
+async def _install(manager: Any, version: str, browser: Path, cft: bool) -> Any:
     """Install.
 
     Args:
@@ -138,7 +138,7 @@ async def test_exact_version_pin_is_preserved_on_cache_miss(
         Returns:
             Fixture value or simulated response used by the regression.
         """
-        return str(version)
+        return tmp_path / str(version)
 
     monkeypatch.setattr(manager, "_install_driver_executable", download)
     if cft:
@@ -148,7 +148,9 @@ async def test_exact_version_pin_is_preserved_on_cache_miss(
         _install(manager, pinned, browser, cft), _TIMEOUT
     )
 
-    assert installed == pinned, "A full version pin must not depend on cache contents."
+    assert installed == tmp_path / pinned, (
+        "A full version pin must not depend on cache contents."
+    )
 
 
 @pytest.mark.asyncio
@@ -213,7 +215,7 @@ async def test_concurrent_installs_keep_request_versions_isolated(
         if len(downloads) == 1:
             entered.set()
             await release.wait()
-        return str(version)
+        return tmp_path / str(version)
 
     monkeypatch.setattr(manager, "_request_driver_version", resolve)
     monkeypatch.setattr(manager, "_install_driver_executable", download)
@@ -237,7 +239,7 @@ async def test_concurrent_installs_keep_request_versions_isolated(
             await asyncio.sleep(0)
         release.set()
         installed = await asyncio.wait_for(asyncio.gather(*requests), _TIMEOUT)
-        assert installed == versions
+        assert installed == [tmp_path / version for version in versions]
     finally:
         release.set()
         await _drain([*requests, *owned])
@@ -272,7 +274,9 @@ def test_installations_work_across_sequential_event_loops(
         _cache_miss(manager, monkeypatch, False)
         monkeypatch.setattr(manager, "_request_driver_version", resolve)
         monkeypatch.setattr(
-            manager, "_install_driver_executable", AsyncMock(return_value="driver")
+            manager,
+            "_install_driver_executable",
+            AsyncMock(return_value=tmp_path / "driver"),
         )
 
     async def install_pair() -> Any:
@@ -290,7 +294,7 @@ def test_installations_work_across_sequential_event_loops(
         finally:
             await _drain(tasks)
 
-    assert asyncio.run(install_pair()) == ["driver", "driver"]
+    assert asyncio.run(install_pair()) == [tmp_path / "driver", tmp_path / "driver"]
     try:
         result = asyncio.run(install_pair())
     except RuntimeError as error:
@@ -299,7 +303,7 @@ def test_installations_work_across_sequential_event_loops(
         raise AssertionError(
             "A new event loop must not reuse a loop-bound install lock."
         ) from error
-    assert result == ["driver", "driver"]
+    assert result == [tmp_path / "driver", tmp_path / "driver"]
 
 
 class _SyntheticDownloadFailure(Exception):
@@ -421,7 +425,7 @@ async def test_exact_cache_hit_avoids_download(
         if isinstance(manager, FirefoxDriverManager)
         else ChromiumVersion("120.0.1.1")
     )
-    expected = str(tmp_path / "cached driver")
+    expected = tmp_path / "cached driver"
     calls = []
 
     def match(version: Any, match_method: Any) -> Any:

@@ -15,17 +15,16 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-
-
 # Driver Commands ---------------------------------------------------------------------------------
-"""Aselenium command implementation and supporting types."""
+"""WebDriver command identifiers and their HTTP endpoint templates."""
+
+__all__ = ["COMMANDS", "Command"]
 
 
 class Command:
-    """Defines constants for the standard WebDriver commands."""
+    """Name the protocol operations accepted by :data:`COMMANDS`."""
 
-    # Sesssion - Start
+    # Session - Start
     NEW_SESSION: str = "newSession"
     # Session - Quit
     QUIT: str = "quit"
@@ -102,14 +101,8 @@ class Command:
     GET_ELEMENT_VALUE_OF_CSS_PROPERTY: str = "getElementValueOfCssProperty"
     GET_ELEMENT_ATTRIBUTE: str = "getElementAttribute"
     ELEMENT_SCREENSHOT: str = "elementScreenshot"
-    # Element - Element
-    FIND_CHILD_ELEMENT: str = "findChildElement"
-    FIND_CHILD_ELEMENTS: str = "findChildElements"
     # Element - Shadow
     GET_SHADOW_ROOT: str = "getShadowRoot"
-    # Shadow - Element
-    FIND_ELEMENT_FROM_SHADOW_ROOT: str = "findElementFromShadowRoot"
-    FIND_ELEMENTS_FROM_SHADOW_ROOT: str = "findElementsFromShadowRoot"
     # Chromium - Casting
     GET_SINKS: str = "getSinks"
     GET_ISSUE_MESSAGE: str = "getIssueMessage"
@@ -120,22 +113,9 @@ class Command:
     # Chromium - DevTools Protocol
     EXECUTE_CDP_COMMAND: str = "executeCdpCommand"
 
-    ### Not Implemented ###
-    # Element - Upload
-    UPLOAD_FILE: str = "uploadFile"
-    # Authenticator - WebAuthn
-    ADD_VIRTUAL_AUTHENTICATOR: str = "addVirtualAuthenticator"
-    REMOVE_VIRTUAL_AUTHENTICATOR: str = "removeVirtualAuthenticator"
-    ADD_CREDENTIAL: str = "addCredential"
-    GET_CREDENTIALS: str = "getCredentials"
-    REMOVE_CREDENTIAL: str = "removeCredential"
-    REMOVE_ALL_CREDENTIALS: str = "removeAllCredentials"
-    SET_USER_VERIFIED: str = "setUserVerified"
-
     ### Safari Specific ###
     SAFARI_GET_PERMISSIONS: str = "safariGetPermissions"
     SAFARI_SET_PERMISSIONS: str = "safariSetPermissions"
-    SAFARI_ATTACH_DEBUGGER: str = "safariAttachDebugger"
 
     ### Firefox Specific ###
     FIREFOX_GET_CONTEXT: str = "firefoxGetContext"
@@ -146,7 +126,7 @@ class Command:
 
 
 COMMANDS: dict[str, tuple[str, str]] = {
-    # Sesssion - Start | format: "{CMD}"
+    # Session - Start | format: "{CMD}"
     Command.NEW_SESSION: ("POST", "/session"),
     # Session - Quit | format: "/session/$sessionId{CMD}"
     Command.QUIT: ("DELETE", ""),
@@ -223,14 +203,8 @@ COMMANDS: dict[str, tuple[str, str]] = {
     Command.GET_ELEMENT_VALUE_OF_CSS_PROPERTY: ("GET", "/css/$propertyName"),
     Command.GET_ELEMENT_ATTRIBUTE: ("GET", "/attribute/$name"),
     Command.ELEMENT_SCREENSHOT: ("GET", "/screenshot"),
-    # Element - Element | format: "/session/$sessionId/element/$id{CMD}"
-    Command.FIND_CHILD_ELEMENT: ("POST", "/element"),
-    Command.FIND_CHILD_ELEMENTS: ("POST", "/elements"),
     # Element - Shadow | format: "/session/$sessionId/element/$id{CMD}"
     Command.GET_SHADOW_ROOT: ("GET", "/shadow"),
-    # Shadow - Element | format: "/session/$sessionId/shadow/$shadowId{CMD}"
-    Command.FIND_ELEMENT_FROM_SHADOW_ROOT: ("POST", "/element"),
-    Command.FIND_ELEMENTS_FROM_SHADOW_ROOT: ("POST", "/elements"),
     # fmt: off
     # Chromium - Casting | format: "/session/$sessionId{CMD}"
     Command.GET_SINKS: ("GET", "/$vendorPrefix/cast/get_sinks"),
@@ -244,32 +218,6 @@ COMMANDS: dict[str, tuple[str, str]] = {
     Command.STOP_CASTING: ("POST", "/$vendorPrefix/cast/stop_casting"),
     # Chromium - DevTools Protocol | format: "/session/$sessionId{CMD}"
     Command.EXECUTE_CDP_COMMAND: ("POST", "/$vendorPrefix/cdp/execute"),
-    ################# Not Implemented ##################
-    # Element - Upload | format: "/session/$sessionId/{CMD}"
-    Command.UPLOAD_FILE: ("POST", "/se/file"),
-    # Authenticator - WebAuthn | format: "/session/$sessionId{CMD}"
-    Command.ADD_VIRTUAL_AUTHENTICATOR: ("POST", "/webauthn/authenticator"),
-    Command.REMOVE_VIRTUAL_AUTHENTICATOR: (
-        "DELETE",
-        "/webauthn/authenticator/$authenticatorId",
-    ),
-    Command.ADD_CREDENTIAL: (
-        "POST",
-        "/webauthn/authenticator/$authenticatorId/credential",
-    ),
-    Command.GET_CREDENTIALS: (
-        "GET",
-        "/webauthn/authenticator/$authenticatorId/credentials",
-    ),
-    Command.REMOVE_CREDENTIAL: (
-        "DELETE",
-        "/webauthn/authenticator/$authenticatorId/credentials/$credentialId",
-    ),
-    Command.REMOVE_ALL_CREDENTIALS: (
-        "DELETE",
-        "/webauthn/authenticator/$authenticatorId/credentials",
-    ),
-    Command.SET_USER_VERIFIED: ("POST", "/webauthn/authenticator/$authenticatorId/uv"),
     # fmt : on
     ### Firefox Specific ###
     # Session | format: "/session/$sessionId{CMD}"
@@ -282,5 +230,4 @@ COMMANDS: dict[str, tuple[str, str]] = {
     # Session | format: "/session/$sessionId{CMD}"
     Command.SAFARI_GET_PERMISSIONS: ("GET", "/apple/permissions"),
     Command.SAFARI_SET_PERMISSIONS: ("POST", "/apple/permissions"),
-    Command.SAFARI_ATTACH_DEBUGGER: ("POST", "/apple/attach_debugger"),
 }

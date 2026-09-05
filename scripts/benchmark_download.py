@@ -7,12 +7,17 @@ import json
 import platform
 import time
 import tracemalloc
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextvars import ContextVar
 from types import SimpleNamespace
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from aselenium.manager._http import request
+
+if TYPE_CHECKING:
+    from aiohttp import ClientSession
+
+    from aselenium.manager.driver import DriverManager
 
 
 async def measure(mebibytes: int) -> dict[str, Any]:
@@ -26,76 +31,76 @@ async def measure(mebibytes: int) -> dict[str, Any]:
     """
 
     class Response:
-        """Represent Response using the inherited implementation."""
+        """Stream deterministic bytes through the manager's response protocol."""
 
         status = 200
-        headers = {}
+        headers: dict[str, str] = {}
 
         @property
-        def content(self) -> Any:
-            """Content.
+        def content(self) -> Response:
+            """Return the object exposing the response-body iterator.
 
             Returns:
-                The Any value produced by this operation.
+                This synthetic response.
             """
             return self
 
-        async def iter_chunked(self, size: int) -> AsyncIterator[Any]:
-            """Iter chunked.
+        async def iter_chunked(self, size: int) -> AsyncIterator[bytes]:
+            """Yield deterministic body chunks of the requested size.
 
             Args:
-                size: Declared member size in bytes.
+                size: Bytes in each generated chunk.
 
             Yields:
-                Values produced by this iterator in iteration order.
+                Byte chunks until the configured total size is reached.
             """
             for _ in range(mebibytes * 4):
                 yield b"x" * size
 
         async def __aenter__(self) -> Response:
-            """Start the owned asynchronous context and return its managed value.
+            """Enter the synthetic response context.
 
             Returns:
-                The Response value produced by this operation.
+                This response.
             """
             return self
 
         async def __aexit__(self, *args: Any) -> None:
-            """Await owned cleanup when leaving the asynchronous context.
+            """Leave the no-resource synthetic response context.
 
             Args:
-                *args: Positional arguments forwarded to the wrapped operation.
+                *args: Standard asynchronous context-manager exception details.
             """
-            pass
+            return None
 
     class Client:
-        """Represent Client using the inherited implementation."""
+        """Provide the minimal asynchronous HTTP-client protocol for the benchmark."""
 
         async def __aenter__(self) -> Client:
-            """Start the owned asynchronous context and return its managed value.
+            """Enter the synthetic client context.
 
             Returns:
-                The Client value produced by this operation.
+                This client.
             """
             return self
 
         async def __aexit__(self, *args: Any) -> None:
-            """Await owned cleanup when leaving the asynchronous context.
+            """Leave the no-resource synthetic client context.
 
             Args:
-                *args: Positional arguments forwarded to the wrapped operation.
+                *args: Standard asynchronous context-manager exception details.
             """
-            pass
+            return None
 
-        def get(self, *args: Any, **kwargs: Any) -> Any:
-            """Get.
+        def get(self, *args: Any, **kwargs: Any) -> Response:
+            """Return a fresh deterministic response for one request.
 
             Args:
-                *args: Positional arguments forwarded to the wrapped operation.
-                **kwargs: Keyword arguments forwarded to the wrapped operation.
+                *args: Request arguments accepted by the HTTP-client protocol.
+                **kwargs: Request options accepted by the HTTP-client protocol.
 
             Returns:
-                The stored mapping value, or default when the key is absent.
+                A synthetic streamed response.
             """
             return Response()
 
@@ -109,14 +114,23 @@ async def measure(mebibytes: int) -> dict[str, Any]:
     tracemalloc.start()
     started = time.monotonic()
     result = await request(
-        manager, "https://fixture.invalid/archive.zip", "file", Client
+        cast("DriverManager[Any, Any]", manager),
+        "https://fixture.invalid/archive.zip",
+        "file",
+        cast("Callable[[], ClientSession]", Client),
     )
     duration = time.monotonic() - started
     current, peak = tracemalloc.get_traced_memory()
     tracemalloc.stop()
     content = result["content"]
-    assert content.size == mebibytes * 1024 * 1024
-    content.close()
+    expected_size = mebibytes * 1024 * 1024
+    try:
+        if content.size != expected_size:
+            raise RuntimeError(
+                f"Streamed download size {content.size} != expected {expected_size}"
+            )
+    finally:
+        content.close()
     return dict(
         download_bytes=content.size, traced_peak_python_bytes=peak, seconds=duration
     )

@@ -221,29 +221,33 @@ def built_distributions(tmp_path_factory: pytest.TempPathFactory) -> Any:
     }
 
 
-def test_sdist_contains_repeatable_acceptance_fixtures(
+def test_sdist_contains_only_production_sources(
     built_distributions: dict[str, Path],
 ) -> None:
-    """Keep TLS, typing and minimum-version fixtures in the runnable source archive.
+    """Keep the buildable sdist complete without shipping repository-only tooling.
 
     Args:
         built_distributions: Locally built source and wheel artifacts.
     """
     required = {
+        "LICENSE",
+        "NOTICE",
+        "MANIFEST.in",
+        "README.md",
+        "pyproject.toml",
         "requirements.txt",
+        "src/aselenium/__init__.py",
+        "src/aselenium/manager/geckodriver/compatibility.json",
+        "src/aselenium/py.typed",
+    }
+    forbidden_roots = {".github", "docs", "scripts", "tests"}
+    forbidden_files = {
+        "requirements-dev.txt",
         "requirements-minimum.txt",
+        "src/_demo_support.py",
+        "src/demo_google.py",
+        "src/demo_local.py",
         "src/quick_start.py",
-        "docs/release-acceptance.md",
-        "docs/baselines/release-acceptance-validation.json",
-        "tests/fixtures/tls/loopback-cert.pem",
-        "tests/fixtures/tls/loopback-key.pem",
-        "tests/fixtures/tls/README.md",
-        "tests/typing/public_api.py",
-        "scripts/test_installed_browser.py",
-        "scripts/run_reliability.py",
-        "scripts/_owned_subprocess.py",
-        "scripts/check_public_typing.py",
-        "scripts/check_coverage.py",
     }
     with tarfile.open(built_distributions["sdist"], "r:gz") as archive:
         members = {
@@ -256,6 +260,15 @@ def test_sdist_contains_repeatable_acceptance_fixtures(
             if member.isfile()
         }
         assert required <= members.keys()
+        assert not forbidden_files.intersection(members)
+        assert not {
+            name for name in members if PurePosixPath(name).parts[0] in forbidden_roots
+        }
+        assert not any(
+            "__pycache__" in PurePosixPath(name).parts
+            or name.endswith((".pyc", ".pyo"))
+            for name in members
+        )
         for name in required:
             source = archive.extractfile(members[name])
             assert source is not None
@@ -300,32 +313,21 @@ def test_distribution_archives_are_readable(
             }
             assert any(member.name.endswith("/pyproject.toml") for member in members)
             assert any(
-                member.name.endswith("/.github/workflows/tests.yml")
-                for member in members
-            )
-            assert any(
-                member.name.endswith("/.github/workflows/release.yml")
-                for member in members
-            )
-            assert any(
                 member.name.endswith("/src/aselenium/__init__.py") for member in members
             )
-            for asset in (
-                "src/quick_start.py",
-                "src/demo_local.py",
-                "src/demo_google.py",
-                "src/_demo_support.py",
-                "docs/demo.md",
-                "docs/demo-local.md",
-                "docs/demo-google.md",
-                "src/demo_assets/index.html",
-                "src/demo_assets/frame.html",
-                "src/demo_assets/second.html",
-                "src/demo_assets/upload.txt",
-                "src/demo_assets/firefox-addon/manifest.json",
-                "src/demo_assets/firefox-addon/marker.js",
-            ):
-                assert any(member.name.endswith("/" + asset) for member in members)
+            relative_names = {
+                str(
+                    PurePosixPath(member.name).relative_to(
+                        PurePosixPath(member.name).parts[0]
+                    )
+                )
+                for member in members
+            }
+            assert not any(
+                name == root or name.startswith(root + "/")
+                for name in relative_names
+                for root in (".github", "docs", "scripts", "tests", "src/demo_assets")
+            )
     else:
         with zipfile.ZipFile(path) as archive:
             assert archive.testzip() is None
@@ -367,6 +369,7 @@ def test_wheel_metadata_preserves_runtime_contract(
     assert metadata["Version"] == "2.0.0"
     assert metadata["Requires-Python"] == ">=3.10"
     assert metadata["License-Expression"] == "Apache-2.0"
+    assert set(metadata.get_all("License-File", [])) == {"LICENSE", "NOTICE"}
     dependencies = metadata.get_all("Requires-Dist")
     core = [value for value in dependencies if ";" not in value]
     assert set(core) == {"aiohttp>=3.14.3", "psutil>=5.8.0", "orjson>=3.11.6"}

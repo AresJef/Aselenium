@@ -123,11 +123,14 @@ def test_discovery_never_probes_browsers_or_creates_files(
         ],
         ["run", "--browser", "firefox", "--channel", "dev"],
         ["run", "--browser", "chromium", "--channel", "beta"],
+        ["run", "--browser", "chrome", "--profile-root", "/shared/profiles"],
         ["run", "--sections", "unknown"],
         ["run", "--timeout", "nan"],
         ["run", "--timeout", "inf"],
         ["run", "--timeout", "0"],
         ["run", "--timeout", "-1"],
+        ["run", "--session-timeout", "nan"],
+        ["run", "--session-timeout", "0"],
     ],
 )
 def test_invalid_cli_is_rejected_before_side_effects(
@@ -265,8 +268,59 @@ def test_options_and_constructor_work_without_browser_probes(
         assert details["defensive_capabilities"] is True
         assert driver.options.timeouts.implicit == 0
         assert driver.options.session_timeout == 30
+        assert driver._service_timeout == 30
+        assert details["session_timeout_seconds"] == 30
         assert driver.options.proxy is None  # Serialization-only proxy example.
         assert args.cache_dir.exists() == (browser != "safari")
+    finally:
+        driver.options.close()
+
+
+def test_run_accepts_an_explicit_session_timeout(demo: Any, tmp_path: Path) -> None:
+    """Apply a user-selected session deadline through the real options API.
+
+    Args:
+        demo: Imported local demonstration module.
+        tmp_path: Empty profile source used without launching a browser.
+    """
+    args = demo.parse_args(["run", "--browser", "firefox", "--session-timeout", "75"])
+    driver = demo.make_driver(args)
+    source = tmp_path / "source"
+    source.mkdir()
+    try:
+        details = demo.configure(driver, args, source)
+        assert driver.options.session_timeout == 75
+        assert driver._service_timeout == 75
+        assert details["session_timeout_seconds"] == 75
+    finally:
+        driver.options.close()
+
+
+def test_firefox_profile_root_remains_a_path_until_service_start(
+    demo: Any, tmp_path: Path
+) -> None:
+    """Forward the CLI Path without reparsing it in the demonstration layer.
+
+    Args:
+        demo: Imported local demonstration module.
+        tmp_path: Existing shared profile root and dedicated demo cache parent.
+    """
+    profile_root = tmp_path / "shared-profiles"
+    profile_root.mkdir()
+    args = demo.parse_args(
+        [
+            "run",
+            "--browser",
+            "firefox",
+            "--profile-root",
+            str(profile_root),
+        ]
+    )
+    driver = demo.make_driver(args)
+    try:
+        assert args.profile_root == profile_root
+        assert isinstance(driver._service_kwargs["profile_root"], Path)
+        assert driver._service_kwargs["profile_root"] is args.profile_root
     finally:
         driver.options.close()
 
@@ -681,3 +735,41 @@ def test_failure_still_writes_unique_report_and_returns_nonzero(
         assert all(entry["status"] == "not-run" for entry in report["sections"])
         assert report["counts"]["not-run"] == len(demo.SECTIONS) + 2
     assert "Report:" in capsys.readouterr().out
+
+
+def test_install_report_serializes_paths_only_at_json_boundary(
+    demo: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Keep installation paths typed until the CLI encodes its JSON output.
+
+    Args:
+        demo: Imported local demonstration module.
+        monkeypatch: Pytest fixture for reversible dependency replacement.
+        tmp_path: Isolated path used as the synthetic installed executable.
+        capsys: Pytest fixture capturing the emitted installation JSON.
+    """
+
+    @dataclass
+    class Result:
+        """Represent the Path-bearing subset of an installation result."""
+
+        driver_location: Path
+        browser_location: Path | None
+
+    result = Result(tmp_path / "chromedriver", tmp_path / "chrome")
+    driver = SimpleNamespace(options=SimpleNamespace(close=Mock()))
+    monkeypatch.setattr(demo, "make_driver", Mock(return_value=driver))
+    monkeypatch.setattr(demo, "provision", AsyncMock(return_value=result))
+
+    assert demo.main(["install"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {
+        "driver_location": str(result.driver_location),
+        "browser_location": str(result.browser_location),
+    }
+    driver.options.close.assert_called_once()
+    with pytest.raises(TypeError, match="not JSON serializable"):
+        demo.json_default(object())

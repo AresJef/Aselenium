@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium element implementation and supporting types."""
+"""Remote DOM-element handles and element-scoped WebDriver operations."""
 
 from __future__ import annotations
 
@@ -33,7 +32,8 @@ from urllib.parse import quote
 from aselenium import errors, javascript
 from aselenium._output import save_bytes
 from aselenium._paths import PathInput, file_path, save_file_path
-from aselenium._wait import first_match, poll
+from aselenium._response import response_value, string_list, string_mapping, typed_value
+from aselenium._wait import first_match, poll, validate_delay
 from aselenium.command import Command
 from aselenium.shadow import SHADOWROOT_KEY, Shadow
 from aselenium.utils import (
@@ -101,7 +101,7 @@ class Element:
             )
         # Session
         self._session: Session = session
-        self._service: BaseService = session._service
+        self._service: BaseService = session.service
         # Connection
         connection, base_url = session._conn, session._base_url
         if connection is None or base_url is None:
@@ -123,19 +123,19 @@ class Element:
 
     @property
     def id(self) -> str:
-        """Return the ID of the element. e.g. '61A5CAC057B025F22A116E47F7950D24_element_1'.
+        """Return the remote WebDriver element ID.
 
         Returns:
-            The id of the element. e.g. '61a5cac057b025f22a116e47f7950d24_element_1'.
+            The element's W3C remote ID.
         """
         return self._id
 
     @property
     def base_url(self) -> str:
-        """Return the base service URL of the element.
+        """Return the command URL for this remote element.
 
         Returns:
-            The base service url of the element.
+            The percent-encoded element command URL.
         """
         return self._base_url
 
@@ -179,16 +179,17 @@ class Element:
             True if the element still exists in the DOM tree when this attribute is called; otherwise False.
         """
         try:
-            return await self._session._execute_script(
+            value = await self._session._execute_script(
                 javascript.ELEMENT_IS_VALID, self
             )
+            return typed_value(value, bool, "Element existence state")
         except errors.ElementNotFoundError:
             return False
         except errors.InvalidMethodError:
             return False
         except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
-                "<{}>\nFailed to check element existance: {}".format(
+                "<{}>\nFailed to check element existence: {}".format(
                     self.__class__.__name__, err
                 )
             ) from err
@@ -259,10 +260,13 @@ class Element:
         """Click the element.
 
         Args:
-            pause: The pause in seconds after execution. Defaults to `None`.
-                This can be useful to wait for the command to take effect,
-                before executing the next command. Defaults to `None` - no pause.
+            pause: Finite, nonnegative delay after the command, in seconds.
+                ``None`` means no delay. Validated before the click is sent.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` is invalid, including a boolean.
         """
+        validate_delay(pause)
         await self.execute_command(Command.CLICK_ELEMENT)
         await self.pause(pause)
 
@@ -271,13 +275,17 @@ class Element:
         *keys: str,
         pause: int | float | None = None,
     ) -> None:
-        """Simulate typing or keyboard keys pressing into the element. (To send local files, use the `upload()` method.).
+        """Type text or special keyboard keys into the element.
+
+        Use ``upload()`` to send local files instead of keyboard input.
 
         Args:
-            pause: The pause in seconds after execution. Defaults to `None`.
-                This can be useful to wait for the command to take effect,
-                before executing the next command. Defaults to `None` - no pause.
-            *keys: strings to be typed or keyboard keys to be pressed.
+            pause: Finite, nonnegative delay after the command, in seconds.
+                ``None`` means no delay. Validated before keyboard input is sent.
+            *keys: Strings to type or ``KeyboardKeys`` constants to press.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` or a keyboard input is invalid.
 
         Example:
             >>> from aselenium import KeyboardKeys
@@ -296,6 +304,7 @@ class Element:
             >>> # Press Enter
             >>> await inputbox.send(KeyboardKeys.ENTER)
         """
+        validate_delay(pause)
         processed_keys = process_keys(*keys)
         await self.execute_command(
             Command.SEND_KEYS_TO_ELEMENT,
@@ -307,15 +316,21 @@ class Element:
         """Upload local files to the element.
 
         Args:
-            pause: The pause in seconds after execution. Defaults to `None`.
-                This can be useful to wait for the command to take effect,
-                before executing the next command. Defaults to `None` - no pause.
-            *files: The absolute path of the files to upload.
+            pause: Finite, nonnegative delay after the command, in seconds.
+                ``None`` means no delay. Validated before file paths are sent.
+            *files: Existing files supplied as strings, `pathlib.Path` objects,
+                or compatible `os.PathLike[str]` values. Relative paths are
+                resolved from the current working directory and `~` is expanded.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` is invalid or a file path does
+                not identify an existing regular file.
 
         Example:
             >>> await element.upload("~/path/to/image.png")
         """
         # Validate
+        validate_delay(pause)
         try:
             validated_files = [file_path(file) for file in files]
         except Exception as err:
@@ -335,10 +350,14 @@ class Element:
         """Submit a form (must be an element nested inside a form).
 
         Args:
-            pause: The pause in seconds after execution. Defaults to `None`.
-                This can be useful to wait for the command to take effect,
-                before executing the next command. Defaults to `None` - no pause.
+            pause: Finite, nonnegative delay after the command, in seconds.
+                ``None`` means no delay. Validated before form submission.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` is invalid, including a boolean.
+            errors.InvalidResponseError: The form-submission script fails.
         """
+        validate_delay(pause)
         try:
             await self._session._execute_script(javascript.ELEMENT_SUBMIT_FORM, self)
         except errors.InvalidJavaScriptError as err:
@@ -353,10 +372,13 @@ class Element:
         """Clear the text for the text entry element.
 
         Args:
-            pause: The pause in seconds after execution. Defaults to `None`.
-                This can be useful to wait for the command to take effect,
-                before executing the next command. Defaults to `None` - no pause.
+            pause: Finite, nonnegative delay after the command, in seconds.
+                ``None`` means no delay. Validated before clearing the element.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` is invalid, including a boolean.
         """
+        validate_delay(pause)
         await self.execute_command(Command.CLEAR_ELEMENT)
         await self.pause(pause)
 
@@ -496,14 +518,7 @@ class Element:
             res = await self.execute_command(Command.GET_ELEMENT_TAG_NAME)
         except errors.InvalidMethodError:
             return None
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to get element tag name from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+        return response_value(res, str, "Element tag name")
 
     async def wait_until_tag(
         self,
@@ -587,14 +602,7 @@ class Element:
             res = await self.execute_command(Command.GET_ELEMENT_TEXT)
         except errors.InvalidMethodError:
             return None
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to get element text from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+        return response_value(res, str, "Element text")
 
     @property
     async def dom_text(self) -> str:
@@ -603,9 +611,10 @@ class Element:
         Returns:
             The element's current textContent, including hidden descendants.
         """
-        return await self._session._execute_script(
+        value = await self._session._execute_script(
             "return arguments[0].textContent;", self
         )
+        return typed_value(value, str, "Element DOM text")
 
     @property
     async def in_viewport(self) -> bool:
@@ -617,12 +626,11 @@ class Element:
         Example:
             >>> intersects_viewport = await element.in_viewport
         """
-        return bool(
-            await self._session._execute_script(
-                "const r=arguments[0].getBoundingClientRect(); return r.width>0 && r.height>0 && r.bottom>0 && r.right>0 && r.top<innerHeight && r.left<innerWidth;",
-                self,
-            )
+        value = await self._session._execute_script(
+            "const r=arguments[0].getBoundingClientRect(); return r.width>0 && r.height>0 && r.bottom>0 && r.right>0 && r.top<innerHeight && r.left<innerWidth;",
+            self,
         )
+        return typed_value(value, bool, "Element viewport-intersection state")
 
     @property
     async def unobscured(self) -> bool:
@@ -634,18 +642,17 @@ class Element:
         Example:
             >>> reachable_at_center = await element.unobscured
         """
-        return bool(
-            await self._session._execute_script(
-                "const e=arguments[0],r=e.getBoundingClientRect();"
-                "const l=Math.max(0,r.left),t=Math.max(0,r.top),b=Math.min(innerHeight,r.bottom),q=Math.min(innerWidth,r.right);"
-                "if(q<=l||b<=t)return false; const x=(l+q)/2,y=(t+b)/2;let n=document.elementFromPoint(x,y);"
-                "const roots=[];for(let root=e.getRootNode();root&&root.host;root=root.host.getRootNode())roots.unshift(root);"
-                "for(const root of roots){if(!n||(n!==root.host&&!root.host.contains(n)))return false;"
-                "if(typeof root.elementFromPoint!=='function')return false;n=root.elementFromPoint(x,y);}"
-                "while(n){if(n===e)return true;n=n.parentNode||(n.getRootNode&&n.getRootNode().host);}return false;",
-                self,
-            )
+        value = await self._session._execute_script(
+            "const e=arguments[0],r=e.getBoundingClientRect();"
+            "const l=Math.max(0,r.left),t=Math.max(0,r.top),b=Math.min(innerHeight,r.bottom),q=Math.min(innerWidth,r.right);"
+            "if(q<=l||b<=t)return false; const x=(l+q)/2,y=(t+b)/2;let n=document.elementFromPoint(x,y);"
+            "const roots=[];for(let root=e.getRootNode();root&&root.host;root=root.host.getRootNode())roots.unshift(root);"
+            "for(const root of roots){if(!n||(n!==root.host&&!root.host.contains(n)))return false;"
+            "if(typeof root.elementFromPoint!=='function')return false;n=root.elementFromPoint(x,y);}"
+            "while(n){if(n===e)return true;n=n.parentNode||(n.getRootNode&&n.getRootNode().host);}return false;",
+            self,
         )
+        return typed_value(value, bool, "Element center-point hit-test state")
 
     async def wait_until_text(
         self,
@@ -749,43 +756,37 @@ class Element:
 
     @property
     async def aria_role(self) -> str | None:
-        """Acess the aria role of the element.
+        """Return the element's computed accessibility role when supported.
 
         Returns:
-            Acess the aria role of the element. None indicates that no value is available.
+            The computed role, including an empty string when reported by the
+            driver, or ``None`` when the command is unsupported.
+
+        Raises:
+            errors.InvalidResponseError: The driver returns a non-string value.
         """
         try:
             res = await self.execute_command(Command.GET_ELEMENT_ARIA_ROLE)
         except errors.InvalidMethodError:
             return None
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to get element aria role from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+        return response_value(res, str, "Element ARIA role")
 
     @property
     async def aria_label(self) -> str | None:
-        """Return the aria label of the element.
+        """Return the element's computed accessibility label when supported.
 
         Returns:
-            The aria label of the element.
+            The computed label, including an empty string when reported by the
+            driver, or ``None`` when the command is unsupported.
+
+        Raises:
+            errors.InvalidResponseError: The driver returns a non-string value.
         """
         try:
             res = await self.execute_command(Command.GET_ELEMENT_ARIA_LABEL)
         except errors.InvalidMethodError:
             return None
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to get element aria label from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+        return response_value(res, str, "Element ARIA label")
 
     @property
     async def properties(self) -> list[str]:
@@ -798,9 +799,10 @@ class Element:
             >>> names = await element.properties
         """
         try:
-            return await self._session._execute_script(
+            value = await self._session._execute_script(
                 javascript.GET_ELEMENT_PROPERTIES, self
             )
+            return string_list(value, "Element property names")
         except errors.InvalidMethodError:
             return []
         except errors.InvalidJavaScriptError as err:
@@ -850,18 +852,23 @@ class Element:
 
     @property
     async def properties_css(self) -> dict[str, str]:
-        """Acess all the css (style) properties of the element.
+        """Return all computed CSS property names and values for the element.
 
         Returns:
-            A mapping containing the properties css data.
+            A mapping of computed CSS property names to serialized values.
+
+        Raises:
+            errors.InvalidResponseError: The script does not return a
+                string-to-string mapping.
 
         Example:
-            >>> css_props = await element.css_properties
+            >>> css_props = await element.properties_css
         """
         try:
-            return await self._session._execute_script(
+            value = await self._session._execute_script(
                 javascript.GET_ELEMENT_CSS_PROPERTIES, self
             )
+            return string_mapping(value, "Element CSS properties")
         except errors.InvalidMethodError:
             return {}
         except errors.InvalidJavaScriptError as err:
@@ -889,14 +896,7 @@ class Element:
             )
         except errors.InvalidMethodError:
             return None
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to get element css property from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+        return response_value(res, str, "Element CSS property")
 
     @property
     async def attributes(self) -> dict[str, str]:
@@ -909,9 +909,10 @@ class Element:
             >>> attrs = await element.attributes
         """
         try:
-            return await self._session._execute_script(
+            value = await self._session._execute_script(
                 javascript.GET_ELEMENT_ATTRIBUTES, self
             )
+            return string_mapping(value, "Element attributes")
         except errors.InvalidMethodError:
             return {}
         except errors.InvalidJavaScriptError as err:
@@ -942,20 +943,23 @@ class Element:
             )
         except errors.InvalidMethodError:
             return None
-        try:
-            return res["value"]
-        except KeyError as err:
+        if "value" not in res:
             raise errors.InvalidResponseError(
-                "<{}>\nFailed to get element attribute from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+                "Element DOM attribute response must contain a value"
+            )
+        value = res["value"]
+        if value is not None and not isinstance(value, str):
+            raise errors.InvalidResponseError(
+                "Element DOM attribute response value must be str or None, "
+                f"not {type(value).__name__}"
+            )
+        return value
 
     async def take_screenshot(self) -> bytes | None:
-        """Take a screenshot of the element.
+        """Capture the element as PNG data when the driver supports it.
 
         Returns:
-            Take a screenshot of the element. None indicates that no value is available.
+            Decoded PNG bytes, or `None` when the command is unsupported.
         """
         try:
             res = await self.execute_command(Command.ELEMENT_SCREENSHOT)
@@ -977,13 +981,16 @@ class Element:
             ) from err
 
     async def save_screenshot(self, path: PathInput) -> bool:
-        """Take & save the screenshot of the element into local PNG file.
+        """Capture the element and save it as PNG.
 
         Args:
-            path: The absolute path to save the screenshot.
+            path: Destination supplied as a string, `pathlib.Path`, or compatible
+                `os.PathLike[str]`. Relative paths are resolved from the current
+                working directory, `~` is expanded, and `.png` is appended unless
+                the filename already ends with that exact suffix.
 
         Returns:
-            True if the screenshot has been saved, False if failed.
+            `True` if nonempty screenshot data was written; otherwise `False`.
 
         Example:
             >>> await element.save_screenshot("~/path/to/screenshot.png")  # True / False
@@ -1018,9 +1025,9 @@ class Element:
         """Check if an element exists (inside the element). This method ignores the implicit wait timeout, and returns element existence immediately.
 
         Args:
-            value: The selector for the element *OR* an  instance.
+            value: Descendant element or a selector that identifies one.
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-                If the given 'value' is an, this argument will be ignored.
+                This argument is ignored when `value` is an `Element`.
 
         Returns:
             True if the element exists, False otherwise.
@@ -1044,11 +1051,11 @@ class Element:
 
         Args:
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-                For values that are  instances, this argument will be ignored.
+                This argument is ignored for values that are `Element` objects.
             all_: Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
                 - `True`: All elements must exist to return True.
                 - `False`: Any one of the elements exists returns True.
-            *values: The locators for multiple elements *OR*  instances.
+            *values: Descendant elements or selectors that identify them.
 
         Returns:
             True if the elements exist, False otherwise.
@@ -1059,11 +1066,11 @@ class Element:
             ... )  # True / False
         """
 
-        async def check_existance(value: str | Element) -> bool:
+        async def check_existence(value: str | Element) -> bool:
             """Perform one element-existence observation for the enclosing wait.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector to check once.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1075,15 +1082,15 @@ class Element:
 
         # Validate strategy
         strat = self._session._validate_selector_strategy(by)
-        # Check existance
+        # Check existence
         if all_:
             for value in values:
-                if not await check_existance(value):
+                if not await check_existence(value):
                     return False
             return True
         else:
             for value in values:
-                if await check_existance(value):
+                if await check_existence(value):
                     return True
             return False
 
@@ -1214,9 +1221,9 @@ class Element:
                 - `'in_viewport'`: Wait for a nonempty rectangle intersecting the viewport.
                 - `'enabled'`: Wait until an element is enabled.
                 - `'selected'`: Wait until an element is selected.
-            value: The selector for the element *OR* an  instance.
+            value: Descendant element or a selector that identifies one.
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-                If the given 'value' is an, this argument will be ignored.
+                This argument is ignored when `value` is an `Element`.
             timeout: Total seconds to wait until timeout. Defaults to `5`.
 
         Returns:
@@ -1232,7 +1239,7 @@ class Element:
             """Check whether the previously identified element is absent from the DOM.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1246,7 +1253,7 @@ class Element:
             """Check whether a matching element currently exists.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1260,7 +1267,7 @@ class Element:
             """Check the matched element using a center-point hit test.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1275,7 +1282,7 @@ class Element:
             """Check whether the matched element intersects the viewport.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1290,7 +1297,7 @@ class Element:
             """Check whether the matched element is enabled.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1305,7 +1312,7 @@ class Element:
             """Check whether the matched element is selected.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1358,12 +1365,12 @@ class Element:
                 - `'enabled'`: Wait until the elements are enabled.
                 - `'selected'`: Wait until the elements are selected.
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-                For values that are  instances, this argument will be ignored.
+                This argument is ignored for values that are `Element` objects.
             all_: Determine how to satisfy the condition. Defaults to `True (all elements)`.
                 - `True`: All elements must satisfy the condition to return True.
                 - `False`: Any one of the elements satisfies the condition returns True.
             timeout: Total seconds to wait until timeout. Defaults to `5`.
-            *values: The locators for multiple elements *OR*  instances.
+            *values: Descendant elements or selectors that identify them.
 
         Returns:
             True if the elements satisfy the condition, False otherwise.
@@ -1379,7 +1386,7 @@ class Element:
             """Check whether the previously identified element is absent from the DOM.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1393,7 +1400,7 @@ class Element:
             """Check whether a matching element currently exists.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1407,7 +1414,7 @@ class Element:
             """Check the matched element using a center-point hit test.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1422,7 +1429,7 @@ class Element:
             """Check whether the matched element intersects the viewport.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1437,7 +1444,7 @@ class Element:
             """Check whether the matched element is enabled.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1452,7 +1459,7 @@ class Element:
             """Check whether the matched element is selected.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Descendant element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -1471,7 +1478,7 @@ class Element:
 
             Args:
                 values: Input values evaluated in order by this operation.
-                condition_checker: Condition checker used by this operation.
+                condition_checker: Async predicate applied to each candidate.
 
             Returns:
                 True when the requested condition holds for all candidates if all_ is True, or for any candidate otherwise; False if the requirement is not met.
@@ -1513,19 +1520,20 @@ class Element:
     async def _element_exists_no_wait(self, value: str, strat: str) -> bool:
         """Check if an element exists (inside the element) without implicit wait.
 
-        Returns `False` immediately if element not exists.
+        Returns `False` immediately when no matching descendant exists.
 
         Args:
-            value: Value to inspect, normalize, or assign as described above.
-            strat: Strat used by this operation.
+            value: Descendant-element selector.
+            strat: Validated WebDriver selector strategy.
 
         Returns:
             True if an element exists (inside the element) without implicit wait; otherwise False.
         """
         try:
-            return await self._session._execute_script(
+            result = await self._session._execute_script(
                 javascript.ELEMENT_EXISTS_IN_NODE[strat], value, self
             )
+            return typed_value(result, bool, "Descendant-element existence state")
         except errors.ElementNotFoundError:
             return False
         except errors.InvalidElementStateError as err:
@@ -1542,14 +1550,14 @@ class Element:
             ) from err
 
     async def _find_element_no_wait(self, value: str, strat: str) -> Element | None:
-        """Find element (inside the element) without implicit wait. Returns `None` immediately if element not exists.
+        """Find one descendant without applying implicit wait.
 
         Args:
-            value: Value to inspect, normalize, or assign as described above.
-            strat: Strat used by this operation.
+            value: Descendant-element selector.
+            strat: Validated WebDriver selector strategy.
 
         Returns:
-            The Element value produced by this operation. None indicates that no value is available.
+            The matching descendant element, or `None` when no match exists.
         """
         try:
             res = await self._session._execute_script(
@@ -1613,11 +1621,10 @@ class Element:
             ) from err
 
     def _create_shadow(self, shadow_id: str) -> Shadow:
-        """Create the shadow root.
+        """Create a shadow-root handle bound to this host element.
 
         Args:
-            shadow_id: The id of the element.
-                e.g. "289DEC2B8885F15A2BDD2E92AC0404F3_element_1"
+            shadow_id: Nonempty W3C shadow-root ID.
 
         Returns:
             The shadow root.
@@ -1626,66 +1633,46 @@ class Element:
 
     # Utils -------------------------------------------------------------------------------
     async def pause(self, duration: int | float | None) -> None:
-        """Pause the for a given duration.
+        """Pause element command sequencing for a duration in seconds.
 
         Args:
-            duration: The duration to pause in seconds.
+            duration: Finite, nonnegative delay in seconds, or ``None`` for no
+                delay.
+
+        Raises:
+            errors.InvalidArgumentError: ``duration`` is not a finite,
+                nonnegative number or ``None``.
         """
-        if duration is None:
-            return None  # exit
-        try:
+        validate_delay(duration)
+        if duration is not None:
             await sleep(duration)
-        except Exception as err:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'duration' to pause: {}.".format(
-                    self.__class__.__name__, repr(duration)
-                )
-            ) from err
-
-    def _validate_timeout(self, value: Any) -> int | float:
-        """Validate if timeout value `> 0`.
-
-        Args:
-            value: If timeout value `> 0` supplied for validation.
-
-        Returns:
-            If timeout value `> 0`.
-        """
-        if not isinstance(value, (int, float)):
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'timeout'. Must be an integer or float, "
-                "instead got: {}.".format(self.__class__.__name__, type(value))
-            )
-        if value <= 0:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'timeout'. Must be greater than 0, "
-                "instead got: {}.".format(self.__class__.__name__, value)
-            )
-        return value
 
     def _validate_wait_str_value(self, value: Any) -> str:
-        """Validate if wait until 'value' is a non-empty string.
+        """Validate a nonempty string used by a wait condition.
 
         Args:
-            value: If wait until 'value' is a non-empty string supplied for validation.
+            value: Candidate string value.
 
         Returns:
-            If wait until 'value' is a non-empty string.
+            The validated string.
+
+        Raises:
+            errors.InvalidArgumentError: If `value` is not a nonempty string.
         """
         if not isinstance(value, str) or not value:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid wait until value: {} {}. "
-                "Must an non-empty string.".format(
+                "Must be a nonempty string.".format(
                     self.__class__.__name__, repr(value), type(value)
                 )
             )
         return value
 
     def _raise_invalid_wait_condition(self, condition: Any) -> NoReturn:
-        """Raise invalid wait until 'condition' error.
+        """Reject an unsupported descendant-element wait condition.
 
         Args:
-            condition: Asynchronous no-argument predicate whose truthy result completes the wait.
+            condition: Unsupported condition value.
 
         Raises:
             errors.InvalidArgumentError: Always raised with the supplied diagnostic context.
@@ -1698,33 +1685,37 @@ class Element:
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
-        """Return a diagnostic representation of this instance.
+        """Describe the handle without allocating a service endpoint.
 
         Returns:
-            A diagnostic representation of this instance.
+            Element/session IDs and the already allocated service URL, if any.
         """
         return "<%s (id='%s', session='%s', service='%s')>" % (
             self.__class__.__name__,
             self._id,
             self._session._id,
-            self._service.url,
+            getattr(self._service, "_url", None),
         )
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Hash the remote element identity within its owning session.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            A hash derived from the owning session and remote element ID.
         """
-        return hash((self.__class__.__name__, hash(self._session), self._id))
+        return hash((self._session, self._id))
 
     def __eq__(self, __o: Any) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Return whether another handle identifies the same remote element.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` when both handles have the same remote ID and owning session.
         """
-        return hash(self) == hash(__o) if isinstance(__o, Element) else False
+        return (
+            isinstance(__o, Element)
+            and self._session is __o._session
+            and self._id == __o._id
+        )

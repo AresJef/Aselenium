@@ -15,16 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium webdriver implementation and supporting types."""
+"""High-level Safari facade and its session context."""
 
 from __future__ import annotations
 
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-)
+from typing import Any, Literal, cast
 
 from aselenium._paths import PathInput
 from aselenium.manager.driver import SafariDriverManager
@@ -33,45 +28,44 @@ from aselenium.safari.service import SafariService
 from aselenium.safari.session import SafariSession
 from aselenium.webdriver import SessionContext, WebDriver
 
-if TYPE_CHECKING:
-    from aselenium.manager.version import SafariVersion
-
 __all__ = ["Safari"]
 
 
-# Firefox Session Context -------------------------------------------------------------------------
-class SafariSessionContext(SessionContext):
-    """The context manager for a Safari session."""
+# Safari Session Context --------------------------------------------------------------------------
+class SafariSessionContext(SessionContext[SafariSession]):
+    """Locate, start, yield, and clean up one Safari session."""
 
     _SESSION_CLS: type[SafariSession] = SafariSession
 
     def _extra_options_updates(self) -> None:
-        """Extra updates to the browser options."""
-        self._options: SafariOptions
-        tech_preview = self._installation.channel == "dev"
-        if self._options.technology_preview != tech_preview:
-            self._options.technology_preview = tech_preview
+        """Match the Safari capability to the installed release channel."""
+        installation = self._installation
+        assert installation is not None
+        tech_preview = installation.channel == "dev"
+        options = cast(SafariOptions, self._options)
+        if options.technology_preview != tech_preview:
+            options.technology_preview = tech_preview
 
     async def __aenter__(self) -> SafariSession:
-        """Start the owned asynchronous context and return its managed value.
+        """Start and return the Safari session owned by this context.
 
         Returns:
-            The SafariSession value produced by this operation.
+            The running Safari session.
         """
         return await self.start()
 
 
 # Safari Webdriver --------------------------------------------------------------------------------
-class Safari(WebDriver):
-    """The webdriver for Safari."""
+class Safari(WebDriver[SafariDriverManager, SafariOptions, SafariSessionContext]):
+    """Configure and acquire independent asynchronous Safari sessions."""
 
     def __init__(
         self,
-        service_timeout: int = 10,
+        service_timeout: int | float = 10,
         *service_args: Any,
         **service_kwargs: Any,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a reusable Safari facade without launching the browser.
 
         Args:
             service_timeout: Positive timeout in seconds for service startup and shutdown.
@@ -79,7 +73,7 @@ class Safari(WebDriver):
             **service_kwargs: Additional keyword arguments forwarded to the service constructor.
         """
         super().__init__(
-            SafariDriverManager,
+            SafariDriverManager(),
             SafariService,
             SafariOptions,
             SafariSessionContext,
@@ -115,37 +109,34 @@ class Safari(WebDriver):
     # Acquire ---------------------------------------------------------------------
     def acquire(
         self,
-        channel: SafariVersion | Literal["stable", "dev"] = "stable",
+        channel: Literal["stable", "dev"] = "stable",
         driver: PathInput | None = None,
         binary: PathInput | None = None,
     ) -> SafariSessionContext:
-        """Acquire a new Safari session.
+        """Create a single-use context for a new Safari session.
+
+        Options are snapshotted when this method is called. Executable discovery and
+        browser startup occur on entering the context, whose exit awaits cleanup.
 
         Args:
-            channel: Defaults to `'stable'`. Accepts the following values:
-                - `'stable'`: Locate the `STABLE` (normal) Safari binary in the system
-                and use it to determine the webdriver executable.
-                - `'dev'`:    Locate the `DEV` Safari [Technology Preview] binary in the
-                system and use it to determine the webdriver executable.
-            driver: The path to a specific webdriver executable. Defaults to `None`.
-                If specified, will use this given webdriver executable instead of
-                trying to locate the webdriver executable in the system.
-            binary: The path to a specific Safari binary. Defaults to `None`.
-                If specified, will use this given browser binary to determine
-                the webdriver executable.
+            channel: Safari release channel: ``"stable"`` or Technology Preview
+                ``"dev"``.
+            driver: Explicit SafariDriver executable, or ``None`` for discovery.
+                Strings, ``Path`` objects, and ``os.PathLike[str]`` values are accepted.
+            binary: Explicit Safari application executable, or ``None`` for discovery.
+                Strings, ``Path`` objects, and ``os.PathLike[str]`` values are accepted.
 
         Returns:
-            A new single-use session context with an acquisition-time options snapshot.
+            A context yielding ``SafariSession`` after successful startup.
 
         Example:
             >>> from aselenium import Safari
             >>> driver = Safari()
-            >>> # Safari Technology Preview must already be installed and authorized.
-            >>> async with driver.acquire("dev") as session:
-            ...     # explain: use the Safari Technology Preview binary
-            ...     # and the corresponding webdriver executable to start
-            ...     # the session.
-            ...     await session.load("https://www.google.com")
-            ...     print(await session.title)
+            >>> try:
+            ...     async with driver.acquire("stable") as session:
+            ...         await session.load("https://www.google.com")
+            ...         print(await session.title)
+            ... finally:
+            ...     driver.options.close()
         """
         return super().acquire(channel=channel, driver=driver, binary=binary)

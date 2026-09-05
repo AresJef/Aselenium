@@ -20,7 +20,7 @@ from aselenium import ChromeDriverManager
 async def main():
     cache = Path("./browser-cache")
     cache.mkdir(exist_ok=True)
-    manager = ChromeDriverManager(directory=str(cache))
+    manager = ChromeDriverManager(directory=cache)
     # Discover the installed browser; resolve its compatible driver build.
     result = await manager.install_result(version="build")
     print(result.driver_version, result.driver_location)
@@ -31,9 +31,16 @@ async def main():
 asyncio.run(main())
 ```
 
-`install()` still returns a path string. `install_result()` returns immutable
-request/result snapshots; use those in concurrent code. Manager properties and
+`install()` returns an absolute host-native `pathlib.Path`. `install_result()`
+returns immutable request/result snapshots whose executable locations are also
+`Path` objects; use those snapshots in concurrent code. Manager properties and
 `last_result` describe the last successful call, not a particular caller.
+
+All public filesystem arguments accept `str`, `pathlib.Path`, and compatible
+string-valued `os.PathLike[str]` values. Each core boundary parses and validates
+the input once, then passes `Path` objects through the internal workflow. Text is
+used only at external interfaces such as subprocess arguments, WebDriver JSON,
+and persistence records; `PurePosixPath` is reserved for portable archive names.
 
 Policies are `exact`, `compatible-build`, `compatible-major`,
 `latest-compatible`, `cached-compatible`, and `offline`. Full numeric pins are
@@ -141,6 +148,8 @@ async def main():
         await session.load("data:text/html,<title>Local</title><input id='name'>")
         await session.set_timeouts(implicit=0)
         element = await session.find_1st_element("#missing", "#name")
+        if element is None:
+            raise LookupError("The expected input was not found")
         await element.send("Aselenium")
         async with session.transaction():
             assert await session.wait_until_title("equals", "Local", timeout=1)
@@ -210,9 +219,10 @@ python scripts/smoke_browser.py --browser chrome \
   --allow-download
 ```
 
-Dated audit reports record their original versions and unverified matrix cells;
-see the current-only guide for subsequent removals. The typing gate now covers
-fourteen infrastructure/validation modules. All maintained Python signatures are
-annotated, but the entire package is not claimed to pass strict mypy. The
-[API-quality guide](api-quality.md) records the import/docstring conventions,
-example checks, and the distinction between coverage and type correctness.
+Dated audit reports retain their original versions and unverified matrix cells;
+see the current-only guide for subsequent removals. The configured mypy gate now
+checks all maintained Python under `src/` and `scripts/`, and all maintained
+Python signatures are covered by the structural annotation audit. The
+[API-quality guide](api-quality.md)
+records the import/docstring conventions, path-architecture checks, prompted
+example validation, and the distinction between coverage and type correctness.

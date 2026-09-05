@@ -101,6 +101,7 @@ def test_google_defaults_are_headed_homepage_only_and_offline_provisioning(
         ["run", "--browser", "firefox", "--channel", "dev"],
         ["run", "--browser", "chromium", "--channel", "beta"],
         ["run", "--channel", "cft"],
+        ["run", "--browser", "chrome", "--profile-root", "/shared/profiles"],
     ],
 )
 def test_invalid_arguments_fail_before_any_browser_operation(
@@ -156,6 +157,34 @@ def test_display_options_match_the_selected_browser(
             "user-data-dir" in argument or "user-agent" in argument
             for argument in arguments
         )
+    finally:
+        driver.options.close()
+
+
+def test_google_demo_forwards_firefox_profile_root_as_path(
+    demo: Any, tmp_path: Path
+) -> None:
+    """Keep the optional Firefox service directory typed through the demo facade.
+
+    Args:
+        demo: Imported real-world demonstration module.
+        tmp_path: Existing shared profile root and dedicated demo cache parent.
+    """
+    profile_root = tmp_path / "shared-profiles"
+    profile_root.mkdir()
+    args = demo.parse_args(
+        [
+            "run",
+            "--browser",
+            "firefox",
+            "--profile-root",
+            str(profile_root),
+        ]
+    )
+    driver = demo.make_driver(args)
+    try:
+        assert args.profile_root == profile_root
+        assert driver._service_kwargs["profile_root"] is args.profile_root
     finally:
         driver.options.close()
 
@@ -670,3 +699,37 @@ def test_google_import_does_not_import_local_tour_or_its_http_server(demo: Any) 
     assert "fixture_server" not in demo.__dict__
     assert "demo_local" not in demo.__dict__
     assert demo.make_driver.__module__ == "_demo_support"
+
+
+def test_google_report_serializes_paths_only_at_json_boundary(
+    demo: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Serialize retained installation paths when the final report reaches JSON.
+
+    Args:
+        demo: Imported Google demonstration module.
+        monkeypatch: Pytest fixture for reversible workflow replacement.
+        tmp_path: Isolated parent for the generated report directory.
+    """
+
+    async def fake_run(args: Any, output: Path, report: dict[str, Any]) -> None:
+        """Add a Path-bearing installation field without launching a browser.
+
+        Args:
+            args: Parsed Google demo arguments, unused by this synthetic run.
+            output: Unique run directory used to construct the synthetic path.
+            report: Mutable report receiving the Path-bearing installation field.
+        """
+        report["installation"] = {"driver_location": output / "chromedriver"}
+
+    monkeypatch.setattr(demo, "run_demo", fake_run)
+    assert demo.main(["run", "--output-dir", str(tmp_path / "reports")]) == 0
+
+    reports = list((tmp_path / "reports").glob("google-chrome-*/report.json"))
+    assert len(reports) == 1
+    report = json.loads(reports[0].read_text())
+    assert report["installation"]["driver_location"] == str(
+        reports[0].parent / "chromedriver"
+    )

@@ -555,17 +555,18 @@ async def test_explicit_path_installation_passes_normalized_literal_path_to_fake
         return version
 
     monkeypatch.setattr(manager, "_detect_browser_version", fake_probe)
+    cached_driver = tmp_path / "synthetic cached driver"
     monkeypatch.setattr(
-        manager, "_match_driver_executable", lambda *_args: "synthetic cached driver"
+        manager, "_match_driver_executable", lambda *_args: cached_driver
     )
     # Firefox auto uses the packaged table and a fake cache hit, never a network request.
     selector = "auto" if isinstance(manager, drivers.FirefoxDriverManager) else "build"
 
     installed = await manager.install(selector, binary=browser.relative_to(tmp_path))
 
-    assert installed == "synthetic cached driver"
+    assert installed == cached_driver
     assert checked == [browser]
-    assert manager.browser_location == str(browser)
+    assert manager.browser_location == browser
 
 
 @pytest.mark.asyncio
@@ -587,55 +588,70 @@ async def test_result_request_uses_single_parsed_custom_pathlike(
         lambda _path: ChromiumVersion("120.0.6099.71"),
     )
     monkeypatch.setattr(
-        manager, "_match_driver_executable", lambda *_args: "synthetic cached driver"
+        manager,
+        "_match_driver_executable",
+        lambda *_args: tmp_path / "synthetic cached driver",
     )
 
     result = await manager.install_result("build", binary=supplied)
 
     assert supplied.calls == 1
-    assert result.request.binary == str(browser)
+    assert result.request.binary == browser
+    assert isinstance(result.request.binary, Path)
+    assert isinstance(result.driver_location, Path)
+    assert result.browser_location == browser
+    assert isinstance(result.browser_location, Path)
+    assert manager.driver_location == result.driver_location
+    assert manager.browser_location == result.browser_location
     assert manager.last_result == result
 
 
 @pytest.mark.asyncio
-async def test_cft_result_preserves_ignored_pathlike_request(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+async def test_cft_rejects_binary_without_converting_custom_pathlike(
+    tmp_path: Path,
 ) -> None:
-    """Do not relabel an ignored CfT override as the provisioned browser.
+    """Reject an inapplicable CfT override before filesystem conversion.
 
     Args:
         tmp_path: Isolated directory containing synthetic result locations.
-        monkeypatch: Pytest fixture for reversible dependency substitution.
     """
     manager = _manager(tmp_path)
-    requested = _CountingTextPath(tmp_path / "ignored browser override")
-    driver = tmp_path / "cached chromedriver"
-    provisioned_browser = tmp_path / "cached Chrome for Testing"
+    requested = _CountingTextPath(tmp_path / "unsupported browser override")
     version = ChromiumVersion("120.0.6099.71")
 
-    def match(*_args: Any) -> str:
-        """Publish one complete synthetic cached CfT pair.
+    with pytest.raises(errors.InvalidArgumentError, match="channel='cft'"):
+        await manager.install_result(
+            version, channel="cft", binary=requested, policy="compatible-build"
+        )
 
-        Returns:
-            Driver location used by the cache-hit installation path.
-        """
-        manager._driver_version = version
-        manager._driver_location = str(driver)
-        manager._browser_version = version
-        manager._browser_location = str(provisioned_browser)
-        return str(driver)
+    assert requested.calls == 0
+    assert manager.last_result is None
 
-    monkeypatch.setattr(manager, "_match_cft_driver_and_binary", match)
 
-    result = await manager.install_result(
-        version, channel="cft", binary=requested, policy="compatible-build"
-    )
+@pytest.mark.asyncio
+@pytest.mark.parametrize("kind", ["str", "path", "bytes", "object"])
+async def test_cft_rejects_every_non_none_binary_value(
+    tmp_path: Path,
+    kind: str,
+) -> None:
+    """Reject unsupported CfT binary arguments uniformly before provisioning.
 
-    assert requested.calls == 1
-    assert result.request.binary == str(requested.path)
-    assert result.browser_location == str(provisioned_browser)
-    assert result.request.binary != result.browser_location
-    assert manager.last_result == result
+    Args:
+        tmp_path: Isolated cache parent supplied by pytest.
+        kind: Representation used for the unsupported argument.
+    """
+    path = tmp_path / "browser"
+    supplied: Any = {
+        "str": str(path),
+        "path": path,
+        "bytes": bytes(path),
+        "object": object(),
+    }[kind]
+
+    with pytest.raises(errors.InvalidArgumentError, match="channel='cft'"):
+        await _manager(tmp_path).install(
+            "120.0.6099.71", channel="cft", binary=supplied
+        )
 
 
 @pytest.mark.parametrize("manager_class", _MANAGERS)
@@ -656,7 +672,7 @@ def test_invalid_browser_probe_output_preserves_browser_version_cause(
     monkeypatch.setattr(manager, "_read_from_cmd", lambda _command: output)
 
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as failure:
-        manager._detect_browser_version(str(browser))
+        manager._detect_browser_version(browser)
 
     assert isinstance(failure.value.__cause__, errors.InvalidBrowserVersionError)
 
@@ -695,7 +711,7 @@ def test_browser_probe_oserror_is_wrapped_with_original_cause(
     monkeypatch.setattr(manager, "_read_from_cmd", fail_probe)
 
     with pytest.raises(errors.BrowserBinaryNotDetectedError) as failure:
-        manager._detect_browser_version(str(browser))
+        manager._detect_browser_version(browser)
 
     assert failure.value.__cause__ is underlying
 
@@ -728,4 +744,4 @@ def test_unsupported_firefox_version_raises_package_diagnostic(tmp_path: Path) -
     manager = _manager(tmp_path, drivers.FirefoxDriverManager)
 
     with pytest.raises(errors.InvalidBrowserVersionError, match="Firefox"):
-        manager._find_max_compatible_driver_version(FirefoxVersion("77"))
+        manager._compatible_gecko_versions(FirefoxVersion("77"))

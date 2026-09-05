@@ -39,7 +39,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 executable,
                 "-I",
                 "-c",
-                "import aselenium, json, sys; print(json.dumps([aselenium.__file__, sys.prefix]))",
+                "import aselenium, aselenium._paths, json, sys; "
+                "from pathlib import Path; "
+                "root = Path(aselenium.__file__).resolve().parent; "
+                "print(json.dumps({'module': aselenium.__file__, "
+                "'package_paths': list(aselenium.__path__), "
+                "'path_module': aselenium._paths.__file__, "
+                "'typing_marker': str(root / 'py.typed'), 'prefix': sys.prefix}))",
             ],
             capture_output=True,
             text=True,
@@ -48,13 +54,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             timeout=30,
             check=True,
         )
-        location, prefix = map(Path, json.loads(identity.stdout))
-        if location.resolve().is_relative_to(
-            ROOT
-        ) or not location.resolve().is_relative_to(prefix.resolve()):
+        installation = json.loads(identity.stdout)
+        location = Path(installation["module"]).resolve()
+        prefix = Path(installation["prefix"]).resolve()
+        package_paths = [
+            location,
+            Path(installation["path_module"]).resolve(),
+            *(Path(path).resolve() for path in installation["package_paths"]),
+        ]
+        if any(
+            path.is_relative_to(ROOT) or not path.is_relative_to(prefix)
+            for path in package_paths
+        ):
             raise RuntimeError(
                 "Public typing checks require an installed, non-editable wheel"
             )
+        typing_marker = Path(installation["typing_marker"]).resolve()
+        if not typing_marker.is_file() or not typing_marker.is_relative_to(prefix):
+            raise RuntimeError("Installed wheel does not contain its PEP 561 marker")
         shutil.copy2(ROOT / "tests/typing/public_api.py", working / "public_api.py")
         config = working / "mypy.ini"
         config.write_text(
@@ -89,7 +106,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             "async def invalid(session: Session) -> None:\n"
             '    element = await session.find_element("#missing")\n'
             "    await element.click()\n"
-            "    await session.load(123)\n",
+            "    await session.load(123)\n"
+            "    await session.save_screenshot(b'capture')\n",
             encoding="utf-8",
         )
         rejected = subprocess.run(
@@ -105,6 +123,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             rejected.returncode != 1
             or "[union-attr]" not in rejected.stdout
             or "[arg-type]" not in rejected.stdout
+            or "save_screenshot" not in rejected.stdout
+            or "bytes" not in rejected.stdout
         ):
             raise RuntimeError(
                 "Consumer typing negative controls were not correctly rejected:\n"
@@ -115,10 +135,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             json.dumps(
                 {
                     "installed_package": str(location),
+                    "package_paths": [str(path) for path in package_paths],
+                    "typing_marker": str(typing_marker),
                     "valid_consumer": "passed",
                     "negative_controls": [
                         "optional lookup dereference rejected",
                         "invalid navigation argument rejected",
+                        "byte-valued output path rejected",
                     ],
                 },
                 indent=2,

@@ -1,4 +1,3 @@
-# -*- coding: UTF-8 -*-
 """Public exports for the aselenium.safari package."""
 
 from aselenium.safari.options import SafariOptions

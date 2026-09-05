@@ -1,6 +1,6 @@
-# -*- coding: UTF-8 -*-
 """Public exports for the aselenium.manager package."""
 
+from aselenium.manager._installation import InstallationRequest, InstallationResult
 from aselenium.manager.driver import (
     ChromeDriverManager,
     ChromiumDriverManager,
@@ -22,6 +22,9 @@ __all__ = [
     "ChromiumDriverManager",
     "FirefoxDriverManager",
     "SafariDriverManager",
+    # Installation
+    "InstallationRequest",
+    "InstallationResult",
     # Version
     "ChromiumVersion",
     "FirefoxVersion",

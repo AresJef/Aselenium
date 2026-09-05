@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from scripts.report_pytest_failures import (
+    ANNOTATION_LIMIT,
     JUnitIssue,
     format_annotation,
     format_summary,
@@ -72,6 +73,18 @@ def test_annotation_escapes_workflow_control_characters() -> None:
     assert line.startswith("::error::tests::test_case [failure]%0A")
     assert "100%25%0D%0Abad" in line
     assert "\n" not in line
+
+
+def test_annotation_bounds_the_encoded_workflow_payload() -> None:
+    """Apply the size ceiling after expansion of newlines and percent signs."""
+    line = format_annotation(
+        JUnitIssue("tests::test_case", "failure", ("%\n" * 5_000), "")
+    )
+
+    prefix = "::error::"
+    assert line.startswith(prefix)
+    assert len(line.removeprefix(prefix)) <= ANNOTATION_LIMIT
+    assert "... earlier diagnostic text truncated ..." in line
 
 
 def test_reporter_bounds_node_id_before_preserving_diagnostic() -> None:

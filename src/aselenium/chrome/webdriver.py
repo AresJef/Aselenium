@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium webdriver implementation and supporting types."""
+"""High-level Chrome facade and its session context."""
 
 from __future__ import annotations
 
@@ -40,23 +39,25 @@ __all__ = ["Chrome"]
 
 
 # Chrome Session Context --------------------------------------------------------------------------
-class ChromeSessionContext(SessionContext):
-    """The context manager for a Chrome session."""
+class ChromeSessionContext(SessionContext[ChromeSession]):
+    """Provision, start, yield, and clean up one Chrome session."""
 
     _SESSION_CLS: type[ChromeSession] = ChromeSession
 
     async def __aenter__(self) -> ChromeSession:
-        """Start the owned asynchronous context and return its managed value.
+        """Start and return the Chrome session owned by this context.
 
         Returns:
-            The ChromeSession value produced by this operation.
+            The running Chrome session.
         """
         return await self.start()
 
 
 # Chrome Webdriver --------------------------------------------------------------------------------
-class Chrome(ChromiumBaseWebDriver):
-    """The webdriver for Chrome."""
+class Chrome(
+    ChromiumBaseWebDriver[ChromeDriverManager, ChromeOptions, ChromeSessionContext]
+):
+    """Configure and acquire independent asynchronous Chrome sessions."""
 
     def __init__(
         self,
@@ -65,18 +66,19 @@ class Chrome(ChromiumBaseWebDriver):
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
         proxy: str | None = None,
-        service_timeout: int = 10,
+        service_timeout: int | float = 10,
         *service_args: Any,
         **service_kwargs: Any,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a reusable Chrome facade without launching the browser.
 
         Args:
-            directory: Cache parent directory; None uses the default per-user cache location.
-            max_cache_size: Maximum retained artifact count; None leaves retention unbounded.
+            directory: Cache parent directory. ``None`` uses the per-user default.
+                Strings, ``Path`` objects, and ``os.PathLike[str]`` values are accepted.
+            max_cache_size: Maximum retained artifact count, or ``None`` for no limit.
             request_timeout: Positive timeout in seconds for vendor metadata requests.
             download_timeout: Positive total timeout in seconds for an artifact download.
-            proxy: Explicit provisioning proxy URL, or None for a direct connection.
+            proxy: Explicit HTTP provisioning proxy URL, or ``None`` for a direct connection.
             service_timeout: Positive timeout in seconds for service startup and shutdown.
             *service_args: Additional positional arguments forwarded to the service constructor.
             **service_kwargs: Additional keyword arguments forwarded to the service constructor.
@@ -137,7 +139,7 @@ class Chrome(ChromiumBaseWebDriver):
             channel: Installed Chrome channel: stable, beta, or dev. The special cft
                 channel provisions both Chrome for Testing and its matching driver.
             binary: Explicit installed-browser executable, or None for discovery.
-                Ignored for cft, which resolves its own browser binary.
+                This must be ``None`` for cft, which provisions its own browser binary.
 
         Returns:
             A context yielding ChromeSession after successful startup.

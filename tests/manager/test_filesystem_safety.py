@@ -14,6 +14,7 @@ from zipfile import ZipFile
 import pytest
 
 from aselenium import errors
+from aselenium._paths import is_link
 from aselenium.manager import _cache as cache_module
 from aselenium.manager import _filesystem as safety
 from aselenium.manager import file as files
@@ -775,7 +776,300 @@ def test_windows_reparse_attribute_is_treated_as_a_link(
         st_file_attributes = 0x400
 
     monkeypatch.setattr(Path, "lstat", lambda self: ReparseStat())
-    assert safety.is_link(tmp_path / "junction")
+    assert is_link(tmp_path / "junction")
+
+
+def test_checked_path_accepts_a_leaf_that_disappears_during_resolution(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Retry when a volatile SQLite-style leaf disappears after ``lstat()``.
+
+    Args:
+        monkeypatch: Pytest fixture for reversible attribute patches.
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    root = tmp_path.resolve()
+    leaf = root / "index.sqlite3-journal"
+    leaf.touch()
+    original = Path.lstat
+    removed = False
+
+    def disappearing(path: Path, *args: Any, **kwargs: Any) -> os.stat_result:
+        """Remove the selected leaf after returning its first observed status.
+
+        Args:
+            path: Path whose non-following status was requested.
+            *args: Additional positional arguments accepted by ``Path.lstat``.
+            **kwargs: Additional keyword arguments accepted by ``Path.lstat``.
+
+        Returns:
+            The status observed before the simulated concurrent removal.
+        """
+        nonlocal removed
+        info = original(path, *args, **kwargs)
+        if path == leaf and not removed:
+            leaf.unlink()
+            removed = True
+        return info
+
+    monkeypatch.setattr(Path, "lstat", disappearing)
+    assert safety.checked_path(root, leaf) is leaf
+    assert removed
+
+
+def test_checked_path_does_not_resolve_a_stably_absent_leaf(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Resolve the persistent ancestor instead of an absent volatile leaf.
+
+    Args:
+        monkeypatch: Pytest fixture for reversible attribute patches.
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    root = tmp_path.resolve()
+    leaf = root / "index.sqlite3-wal"
+    original = Path.resolve
+
+    def guarded(path: Path, *args: Any, **kwargs: Any) -> Path:
+        """Reject an unnecessary attempt to resolve the absent leaf itself.
+
+        Args:
+            path: Path selected for canonical resolution.
+            *args: Additional positional arguments accepted by ``Path.resolve``.
+            **kwargs: Additional keyword arguments accepted by ``Path.resolve``.
+
+        Returns:
+            Canonical path returned for an existing ancestor.
+        """
+        if path == leaf:
+            pytest.fail("A volatile absent leaf must not be resolved")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", guarded)
+    assert safety.checked_path(root, leaf) is leaf
+
+
+def test_checked_path_rejects_a_reparse_leaf(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Reject a Windows reparse leaf without following its target.
+
+    Args:
+        monkeypatch: Pytest fixture for reversible attribute patches.
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+
+    class ReparseStat:
+        """Represent the Windows reparse attribute returned by ``lstat()``."""
+
+        st_mode = 0o100644
+        st_file_attributes = 0x400
+
+    root = tmp_path.resolve()
+    leaf = root / "index.sqlite3-shm"
+    original = Path.lstat
+
+    def reparse(path: Path, *args: Any, **kwargs: Any) -> Any:
+        """Return a synthetic reparse result only for the selected leaf.
+
+        Args:
+            path: Path whose non-following status was requested.
+            *args: Additional positional arguments accepted by ``Path.lstat``.
+            **kwargs: Additional keyword arguments accepted by ``Path.lstat``.
+
+        Returns:
+            A synthetic or native non-following status result.
+        """
+        if path == leaf:
+            return ReparseStat()
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "lstat", reparse)
+    with pytest.raises(ValueError, match="link/reparse"):
+        safety.checked_path(root, leaf)
+
+
+def test_checked_path_propagates_non_disappearance_errors(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Do not classify permission failures as harmless leaf disappearance.
+
+    Args:
+        monkeypatch: Pytest fixture for reversible attribute patches.
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    root = tmp_path.resolve()
+    leaf = root / "index.sqlite3-journal"
+    original = Path.lstat
+
+    def denied(path: Path, *args: Any, **kwargs: Any) -> os.stat_result:
+        """Raise the selected permission error and delegate all other paths.
+
+        Args:
+            path: Path whose non-following status was requested.
+            *args: Additional positional arguments accepted by ``Path.lstat``.
+            **kwargs: Additional keyword arguments accepted by ``Path.lstat``.
+
+        Returns:
+            Native status for paths other than the selected leaf.
+        """
+        if path == leaf:
+            raise PermissionError(errno.EACCES, "synthetic access denial")
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "lstat", denied)
+    with pytest.raises(PermissionError):
+        safety.checked_path(root, leaf)
+
+
+def test_checked_path_has_a_finite_redirection_retry_budget(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Fail closed after a stable resolution mismatch instead of looping.
+
+    Args:
+        monkeypatch: Pytest fixture for reversible attribute patches.
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    root = tmp_path.resolve()
+    leaf = root / "index.sqlite3-journal"
+    resolutions: list[Path] = []
+
+    def redirected(path: Path, *, strict: bool = False) -> Path:
+        """Return a stable foreign canonical spelling for the anchored root.
+
+        Args:
+            path: Path selected for canonical resolution.
+            strict: Whether every component is required to exist.
+
+        Returns:
+            A different absolute path representing persistent redirection.
+        """
+        assert path == root
+        assert strict
+        resolutions.append(path)
+        return root.parent / "redirected"
+
+    monkeypatch.setattr(Path, "resolve", redirected)
+    with pytest.raises(ValueError, match="changed while it was validated"):
+        safety.checked_path(root, leaf)
+    assert resolutions == [root] * safety.PATH_CHECK_ATTEMPTS
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="Native Windows symlink privileges are not assumed"
+)
+def test_checked_path_rejects_replacement_above_the_anchored_root(
+    tmp_path: Path,
+) -> None:
+    """Detect a symlink swap in a parent above the retained canonical root.
+
+    Args:
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    container = tmp_path / "container"
+    root = container / "cache"
+    root.mkdir(parents=True)
+    anchored = root.resolve(strict=True)
+    container.rename(tmp_path / "original-container")
+    foreign = tmp_path / "foreign"
+    (foreign / "cache").mkdir(parents=True)
+    container.symlink_to(foreign, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="changed while it was validated"):
+        safety.checked_path(anchored, anchored / "index.sqlite3-wal")
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="Native Windows symlink privileges are not assumed"
+)
+def test_checked_path_rechecks_anchor_after_confirming_an_absent_leaf(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Reject a parent replacement between canonical and absence checks.
+
+    Args:
+        monkeypatch: Pytest fixture for reversible attribute patches.
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    container = tmp_path / "container"
+    root = container / "cache"
+    root.mkdir(parents=True)
+    anchored = root.resolve(strict=True)
+    foreign = tmp_path / "foreign"
+    (foreign / "cache").mkdir(parents=True)
+    original = Path.resolve
+    replaced = False
+
+    def replace_after_resolution(path: Path, *args: Any, **kwargs: Any) -> Path:
+        """Replace the root's parent immediately after its first resolution.
+
+        Args:
+            path: Path selected for canonical resolution.
+            *args: Additional positional arguments accepted by ``Path.resolve``.
+            **kwargs: Additional keyword arguments accepted by ``Path.resolve``.
+
+        Returns:
+            Canonical path observed before the simulated concurrent replacement.
+        """
+        nonlocal replaced
+        resolved = original(path, *args, **kwargs)
+        if path == anchored and not replaced:
+            container.rename(tmp_path / "original-container")
+            container.symlink_to(foreign, target_is_directory=True)
+            replaced = True
+        return resolved
+
+    monkeypatch.setattr(Path, "resolve", replace_after_resolution)
+    with pytest.raises(ValueError, match="changed while it was validated"):
+        safety.checked_path(anchored, anchored / "index.sqlite3-shm")
+    assert replaced
+
+
+def test_checked_path_rejects_a_missing_leaf_that_reappears_as_reparse(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Inspect a volatile leaf again when it appears during validation.
+
+    Args:
+        monkeypatch: Pytest fixture for reversible attribute patches.
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+
+    class ReparseStat:
+        """Represent the Windows reparse attribute returned by ``lstat()``."""
+
+        st_mode = 0o100644
+        st_file_attributes = 0x400
+
+    root = tmp_path.resolve()
+    leaf = root / "index.sqlite3-journal"
+    original = Path.lstat
+    observations = 0
+
+    def appear(path: Path, *args: Any, **kwargs: Any) -> Any:
+        """Report one absence followed by a synthetic reparse point.
+
+        Args:
+            path: Path whose non-following status was requested.
+            *args: Additional positional arguments accepted by ``Path.lstat``.
+            **kwargs: Additional keyword arguments accepted by ``Path.lstat``.
+
+        Returns:
+            A synthetic or native non-following status result.
+        """
+        nonlocal observations
+        if path != leaf:
+            return original(path, *args, **kwargs)
+        observations += 1
+        if observations == 1:
+            raise FileNotFoundError(leaf)
+        return ReparseStat()
+
+    monkeypatch.setattr(Path, "lstat", appear)
+    with pytest.raises(ValueError, match="link/reparse"):
+        safety.checked_path(root, leaf)
+    assert observations == 2
 
 
 def test_partial_archive_cleanup_preserves_write_failure(

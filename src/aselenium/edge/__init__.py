@@ -1,4 +1,3 @@
-# -*- coding: UTF-8 -*-
 """Public exports for the aselenium.edge package."""
 
 from aselenium.edge.options import EdgeOptions

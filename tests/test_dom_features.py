@@ -176,6 +176,114 @@ async def test_element_wire_properties_require_value(
         await getattr(element, name)
 
 
+@pytest.mark.parametrize("name", ["tag", "text", "aria_role", "aria_label"])
+@pytest.mark.parametrize("value", [None, 1, False, [], {}])
+@pytest.mark.asyncio
+async def test_element_wire_string_properties_reject_malformed_values(
+    element: Element, name: str, value: Any
+) -> None:
+    """Reject non-string values returned for typed element text properties.
+
+    Args:
+        element: Real element handle with a recording transport.
+        name: Asynchronous string property under test.
+        value: Malformed value supplied by the synthetic driver.
+    """
+    element._conn.execute.return_value = {"value": value}
+
+    with pytest.raises(errors.InvalidResponseError):
+        await getattr(element, name)
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    [
+        ("exists", "true"),
+        ("dom_text", None),
+        ("in_viewport", 1),
+        ("unobscured", []),
+        ("properties", ["valid", 1]),
+        ("properties_css", {"display": 1}),
+        ("attributes", {1: "value"}),
+    ],
+)
+@pytest.mark.asyncio
+async def test_element_script_properties_reject_malformed_values(
+    element: Element, name: str, value: Any
+) -> None:
+    """Validate the documented shape of every typed script-backed property.
+
+    Args:
+        element: Real element handle whose script result is synthesized.
+        name: Asynchronous property under test.
+        value: Malformed script result.
+    """
+    element._conn.execute.return_value = {"value": value}
+
+    with pytest.raises(errors.InvalidResponseError):
+        await getattr(element, name)
+
+
+@pytest.mark.parametrize(
+    "method,arguments,value",
+    [
+        ("get_property_css", ("display",), None),
+        ("get_property_css", ("display",), 1),
+        ("get_attribute_dom", ("hidden",), False),
+        ("get_attribute_dom", ("hidden",), []),
+    ],
+)
+@pytest.mark.asyncio
+async def test_typed_element_getters_reject_malformed_values(
+    element: Element, method: str, arguments: tuple[str, ...], value: Any
+) -> None:
+    """Reject malformed direct CSS and DOM-attribute response values.
+
+    Args:
+        element: Real element handle with a recording transport.
+        method: Typed getter under test.
+        arguments: Getter arguments.
+        value: Malformed driver value.
+    """
+    element._conn.execute.return_value = {"value": value}
+
+    with pytest.raises(errors.InvalidResponseError):
+        await getattr(element, method)(*arguments)
+
+
+@pytest.mark.asyncio
+async def test_dom_attribute_accepts_missing_attribute_none(element: Element) -> None:
+    """Preserve ``None`` as the valid result for an absent DOM attribute.
+
+    Args:
+        element: Real element handle with a recording transport.
+    """
+    element._conn.execute.return_value = {"value": None}
+
+    assert await element.get_attribute_dom("missing") is None
+
+
+@pytest.mark.parametrize("scope_kind", ["element", "shadow"])
+@pytest.mark.asyncio
+async def test_scoped_existence_core_requires_boolean(
+    element: Element, scope_kind: str
+) -> None:
+    """Reject truthy non-booleans from element and shadow lookup scripts.
+
+    Args:
+        element: Real host element for both scoped lookup variants.
+        scope_kind: Descendant scope selected for this regression.
+    """
+    element._conn.execute.return_value = {"value": "false"}
+    if scope_kind == "element":
+        lookup = element._element_exists_no_wait("#child", "css selector")
+    else:
+        lookup = Shadow("root", element)._element_exists_no_wait("#child")
+
+    with pytest.raises(errors.InvalidResponseError):
+        await lookup
+
+
 @pytest.mark.parametrize("name", [entry[0] for entry in _WIRE_PROPERTIES])
 @pytest.mark.asyncio
 async def test_element_unsupported_properties_have_documented_fallbacks(
@@ -933,7 +1041,7 @@ async def test_element_own_wait_conditions(
         ("endswith", "field"),
     ],
 )
-@pytest.mark.parametrize("actual", ["input-field", "other", None])
+@pytest.mark.parametrize("actual", ["input-field", "other"])
 @pytest.mark.asyncio
 async def test_element_text_wait_comparisons(
     element: Element,
@@ -949,7 +1057,7 @@ async def test_element_text_wait_comparisons(
         method: Public text or tag wait entry point.
         condition: Comparison operation.
         expected_value: Required value or fragment.
-        actual: Browser-observed text, including no supported value.
+        actual: Valid browser-observed text.
     """
     element._conn.execute.return_value = {"value": actual}
     assert await getattr(element, method)(condition, expected_value, timeout=0) is (

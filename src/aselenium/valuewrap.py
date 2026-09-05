@@ -15,21 +15,15 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
 """Convert nested Python values and browser handles to W3C command parameters."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import (
-    Any,
-    TypeVar,
-)
+from typing import Any
 
 from aselenium.element import ELEMENT_KEY, Element
 from aselenium.shadow import SHADOWROOT_KEY, Shadow
-
-T = TypeVar("T")
 
 
 def wrap_value(value: Any) -> Any:
@@ -114,18 +108,6 @@ def warp_shadow(value: Shadow) -> dict[str, str]:
         A single-entry mapping from the W3C shadow key to the shadow-root ID.
     """
     return {SHADOWROOT_KEY: value.id}
-
-
-def through(value: T) -> T:
-    """Pass through value.
-
-    Args:
-        value: A value that does not need container or handle conversion.
-
-    Returns:
-        The original value, retaining its identity and concrete type.
-    """
-    return value
 
 
 WARP_MAPPER: dict[type[Any], Callable[[Any], Any]] = {

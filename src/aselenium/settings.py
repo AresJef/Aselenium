@@ -16,15 +16,12 @@
 # under the License.
 
 
-# -*- coding: UTF-8 -*-
-
-
 # Default Timeouts
-"""Aselenium settings implementation and supporting types."""
+"""Immutable protocol constraints and default browser-session settings."""
 
 
 class DefaultTimeouts:
-    """Represent DefaultTimeouts using the inherited implementation."""
+    """Default W3C session timeouts expressed in protocol milliseconds."""
 
     IMPLICIT: int = 0
     PAGE_LOAD: int = 300_000
@@ -33,7 +30,7 @@ class DefaultTimeouts:
 
 # Default Network Conditions
 class DefaultNetworkConditions:
-    """Default Chromium network emulation settings."""
+    """Defaults for Chromium network emulation when no override is supplied."""
 
     OFFLINE: bool = False
     LATENCY: int = 0
@@ -43,7 +40,7 @@ class DefaultNetworkConditions:
 
 # Constraint
 class Constraint:
-    """Allowed values used by browser-option and command validation."""
+    """Closed sets of protocol values accepted by package validation."""
 
     PAGE_LOAD_STRATEGIES: set[str] = {"normal", "eager", "none"}
     UNHANDLED_PROMPT_BEHAVIORS: set[str] = {

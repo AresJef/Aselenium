@@ -15,39 +15,32 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium options implementation and supporting types."""
+"""Firefox capabilities and isolated profile encoding for GeckoDriver."""
 
 from __future__ import annotations
 
 from copy import deepcopy
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-)
+from typing import Any
 
 from aselenium import errors
 from aselenium._paths import PathInput
 from aselenium.firefox.utils import (
     FirefoxAddon,
-    encode_dir_to_firefox_wire_protocol,
-    extract_firefox_addon_details,
+    _encode_dir_to_firefox_wire_protocol,
+    _extract_firefox_addon_details,
 )
 from aselenium.options import BaseOptions, Profile
-
-if TYPE_CHECKING:
-    from aselenium.manager.version import FirefoxVersion
 
 __all__ = ["FirefoxProfile", "FirefoxOptions"]
 
 
 # Option Objects ----------------------------------------------------------------------------------
 class FirefoxProfile(Profile):
-    """Represent the user profile for Firefox."""
+    """Own an isolated clone of a Firefox profile directory."""
 
     def __init__(self, directory: PathInput) -> None:
-        r"""Initialize the instance with the supplied configuration.
+        r"""Clone an existing Firefox profile into an owned temporary directory.
 
         Explanation
         - When creating a `Profile` instance, a cloned temporary profile
@@ -58,7 +51,7 @@ class FirefoxProfile(Profile):
           profile reference does not extend that ownership lifetime.
 
         Default Profile Location:
-        - MacOS: '~/Library/Application Support/Firefox/Profiles/<profile_folder>'
+        - macOS: '~/Library/Application Support/Firefox/Profiles/<profile_folder>'
         - Windows: 'C:\Users\<username>\AppData\Roaming\Mozilla\Firefox\Profiles\<profile_folder>'
         - Linux: '~/.mozilla/firefox/<profile_folder>'
 
@@ -72,7 +65,7 @@ class FirefoxProfile(Profile):
             raise errors.InvalidProfileError(
                 "Temporary Firefox profile was not created"
             )
-        self._extensions_dir: Path = self._temp_profile_dir / "extensions"
+        self._extensions_dir: Path | None = self._temp_profile_dir / "extensions"
         if self._extensions_dir.is_dir():
             self._load_user_extensions()
         # Profile Encode
@@ -80,22 +73,23 @@ class FirefoxProfile(Profile):
 
     # Properties --------------------------------------------------------------------------
     @property
-    def directory(self) -> str:
+    def directory(self) -> Path:
         """Return the directory of the original profile.
 
         Returns:
-            The directory of the original profile.
+            Validated absolute directory of the original Firefox profile.
         """
-        return str(self._profile_dir)
+        assert self._profile_dir is not None
+        return self._profile_dir
 
     @property
-    def directory_temp(self) -> str:
+    def directory_temp(self) -> Path | None:
         """Return the directory of the temporary profile.
 
         Returns:
-            The directory of the temporary profile.
+            Owned temporary Firefox profile directory, or ``None`` after cleanup.
         """
-        return str(self._temp_profile_dir)
+        return self._temp_profile_dir
 
     @property
     def encode(self) -> str:
@@ -110,7 +104,13 @@ class FirefoxProfile(Profile):
 
         # Encode profile
         try:
-            self._encode = encode_dir_to_firefox_wire_protocol(self._temp_profile_dir)
+            profile_dir = self._temp_profile_dir
+            if profile_dir is None:
+                raise errors.InvalidProfileError(
+                    "Temporary Firefox profile is unavailable"
+                )
+            # The profile directory is already a validated, retained ``Path``.
+            self._encode = _encode_dir_to_firefox_wire_protocol(profile_dir)
         except Exception as err:
             raise errors.InvalidProfileError(
                 "<{}>\nFailed to encode the Firefox profile: {}".format(
@@ -122,49 +122,59 @@ class FirefoxProfile(Profile):
     # Extensions --------------------------------------------------------------------------
     @property
     def extensions(self) -> dict[str, FirefoxAddon]:
-        """Return the extension details of the profile.
+        """Return a snapshot of valid add-ons discovered in the cloned profile.
 
         Returns:
-            The extension details of the profile.
+            Add-on identifiers mapped to independent metadata objects.
         """
-        return self._extension_details
+        return {key: value.copy() for key, value in self._extension_details.items()}
 
     def _load_user_extensions(self) -> None:
-        """Load the user extension details from the profile."""
-        for path in self._extensions_dir.iterdir():
+        """Cache valid extension metadata found in the retained profile clone."""
+        extensions_dir = self._extensions_dir
+        if extensions_dir is None:
+            return
+        for path in extensions_dir.iterdir():
             try:
-                details = extract_firefox_addon_details(path)
-                self._extension_details[details.id] = details
+                # ``path`` is derived from the retained clone; do not send it
+                # back through the public path parser.
+                details = _extract_firefox_addon_details(path)
+                addon_id = details.id
+                if addon_id is not None:
+                    self._extension_details[addon_id] = details
             except errors.InvalidExtensionError:
                 pass
+
+    def _delete_temp_profile(self) -> None:
+        """Delete the owned clone and clear Firefox-specific derived state."""
+        super()._delete_temp_profile()
+        self._extensions_dir = None
+        self._encode = None
 
 
 # Firefox Options ---------------------------------------------------------------------------------
 class FirefoxOptions(BaseOptions):
-    """Firefox options."""
+    """Build W3C capabilities and an optional isolated profile for Firefox.
+
+    Attributes:
+        DEFAULT_CAPABILITIES: Firefox's baseline session capabilities.
+        KEY: GeckoDriver's ``moz:firefoxOptions`` capability key.
+    """
 
     DEFAULT_CAPABILITIES: dict[str, Any] = {
         "browserName": "firefox",
         "acceptInsecureCerts": False,
         "moz:debuggerAddress": True,
     }
-    "the default capabilities of the firefox browser `dict[str, Any]`"
     KEY: str = "moz:firefoxOptions"
-    "The unique option key for the firefox browser `str`"
-
-    def __init__(self) -> None:
-        """Initialize the instance."""
-        super().__init__()
-        # Options
-        self._profile: FirefoxProfile | None = None
-        self._extensions: list[str] = []
 
     # Caps: basic -------------------------------------------------------------------------
     def construct(self) -> dict[str, Any]:
-        """Construct the final capabilities for the browser.
+        """Construct an independent Firefox W3C capability mapping.
 
         Returns:
-            A mapping containing the construct data.
+            Base capabilities plus ``moz:firefoxOptions`` preferences,
+            arguments, and an encoded profile when configured.
         """
         # Base caps
         caps = deepcopy(self._capabilities)
@@ -175,40 +185,22 @@ class FirefoxOptions(BaseOptions):
             options["prefs"] = self.preferences
         if self._arguments:
             options["args"] = self.arguments
-        if self._profile is not None:
-            options["profile"] = self._profile.encode
+        profile = self.profile
+        if profile is not None:
+            options["profile"] = profile.encode
         caps[self.KEY] = options
 
         # Return caps
         return caps
 
-    # Caps: browser version ---------------------------------------------------------------
-    @property
-    def browser_version(self) -> str | None:
-        """Return the browser version string recorded for this configuration or session.
-
-        Returns:
-            The version string, or None when no browser version has been recorded.
-            This property does not probe the browser or return a Version object.
-        """
-        return self._capabilities.get("browserVersion")
-
-    @browser_version.setter
-    def browser_version(self, value: FirefoxVersion | None) -> None:
-        """Set the browser version.
-
-        Args:
-            value: New browser version value. None is handled according to the property's reset/ignore semantics.
-        """
-        self._set_browser_version(value)
-
     # Options: accept insecure certs ------------------------------------------------------
     @property
     def accept_insecure_certs(self) -> bool:
-        """Return whether untrusted and self-signed TLS certificates are implicitly trusted on navigation. Defaults to `False <bool>`.
+        """Return whether navigation accepts untrusted TLS certificates.
 
         Returns:
-            True if untrusted and self-signed TLS certificates are implicitly trusted on navigation. Defaults to `False <bool>`; otherwise False.
+            ``True`` when WebDriver should trust otherwise invalid certificates;
+            otherwise ``False``.
         """
         return self._capabilities.get("acceptInsecureCerts", False)
 
@@ -229,15 +221,12 @@ class FirefoxOptions(BaseOptions):
     # Options: profile --------------------------------------------------------------------
     @property
     def profile(self) -> FirefoxProfile | None:
-        """Return the profile of the browser. Returns `None` if profile is not configured.
-
-        Notice
-        - Please use `set_profile()` method to configure the profile.
+        """Return the currently owned Firefox profile clone.
 
         Returns:
-            The profile of the browser. returns `none` if profile is not configured.
+            The configured profile, or ``None`` when no profile is selected.
         """
-        return self._profile
+        return self._profile if isinstance(self._profile, FirefoxProfile) else None
 
     def set_profile(self, directory: PathInput) -> FirefoxProfile:
         r"""Set the user profile for Firefox.
@@ -251,7 +240,7 @@ class FirefoxOptions(BaseOptions):
           Call options.close() after the last use to release the selected clone.
 
         Default Profile Location:
-        - MacOS: '~/Library/Application Support/Firefox/Profiles/<profile_folder>'
+        - macOS: '~/Library/Application Support/Firefox/Profiles/<profile_folder>'
         - Windows: 'C:\Users\<username>\AppData\Roaming\Mozilla\Firefox\Profiles\<profile_folder>'
         - Linux: '~/.mozilla/firefox/<profile_folder>'
 
@@ -259,7 +248,7 @@ class FirefoxOptions(BaseOptions):
             directory: The directory of the Firefox profile.
 
         Returns:
-            The FirefoxProfile value produced by this operation.
+            The new owned profile clone selected by these options.
         """
         # Create profile
         value = FirefoxProfile(directory)

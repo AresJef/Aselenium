@@ -15,23 +15,23 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium session implementation and supporting types."""
+"""Browser-session primitives and W3C WebDriver command orchestration."""
 
 from __future__ import annotations
 
 import asyncio
 from asyncio import sleep
-from base64 import b64decode, b64encode
+from base64 import b64decode
 from collections.abc import Awaitable, Callable
 from copy import deepcopy
-from math import ceil
+from math import ceil, isfinite
 from time import monotonic as unix_time
 from typing import (
     TYPE_CHECKING,
     Any,
     Literal,
     NoReturn,
+    TypeGuard,
     TypeVar,
 )
 from urllib.parse import quote
@@ -41,7 +41,8 @@ from aselenium import errors, javascript
 from aselenium._async import finish_owned, run_blocking
 from aselenium._output import save_bytes
 from aselenium._paths import PathInput, save_file_path
-from aselenium._wait import first_match, poll
+from aselenium._response import response_value, typed_value
+from aselenium._wait import first_match, poll, validate_delay
 from aselenium.actions import Actions
 from aselenium.alert import Alert
 from aselenium.command import Command
@@ -56,6 +57,7 @@ from aselenium.valuewrap import warp_tuple
 
 if TYPE_CHECKING:
     from contextlib import AbstractAsyncContextManager
+    from pathlib import Path
 
     from aselenium.manager.version import ChromiumVersion, Version
     from aselenium.service import BaseService, ChromiumBaseService
@@ -80,23 +82,29 @@ class Cookie(CustomDict):
     """Represent a cookie of the webpage."""
 
     def __init__(self, **data: Any) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a cookie value from WebDriver cookie fields.
 
         Args:
             **data: The cookie data.
+
+        Raises:
+            errors.InvalidArgumentError: The mapping lacks a canonical or
+                vendor-capitalized name, or that name is not nonempty text.
         """
         super().__init__(**data)
         # Validate name
+        self.__nkey: str
         if "name" in self._dict:
-            self.__nkey: str = "name"
+            self.__nkey = "name"
         elif "Name" in self._dict:
-            self.__nkey: str = "Name"
+            self.__nkey = "Name"
         else:
             raise errors.InvalidArgumentError(
                 "<{}>\nLack of required attribute 'name': {}.".format(
                     self.__class__.__name__, repr(self._dict)
                 )
             )
+        self.name = self._dict[self.__nkey]
 
     # Name --------------------------------------------------------------------------------
     @property
@@ -160,12 +168,12 @@ class DevToolsCMD:
         cmd: str,
         **kwargs: Any,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a named, reusable Chrome DevTools Protocol command.
 
         Args:
             name: The name of the command.
-            cmd: The command lines for the devtools protocol.
-            **kwargs: Additional keyword arguments for the command.
+            cmd: Chrome DevTools Protocol method name.
+            **kwargs: Default parameters sent with the command.
         """
         # Command name
         if isinstance(name, str) and name:
@@ -226,28 +234,29 @@ class DevToolsCMD:
         return "<DevToolsCMD (name=%r, payload=<redacted>)>" % self._name
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Hash the immutable local cache name of this command.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            A hash consistent with command equality.
         """
         return hash(self._name)
 
     def __eq__(self, __o: object) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Compare the complete reusable command definition.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` when another command has the same cache name, CDP method,
+            and default parameters; otherwise ``False``.
         """
-        if isinstance(__o, str):
-            return self._name == __o
-        elif isinstance(__o, DevToolsCMD):
-            return self._name == __o._name and self._cmd == __o._cmd
-        else:
-            return False
+        return (
+            isinstance(__o, DevToolsCMD)
+            and self._name == __o._name
+            and self._cmd == __o._cmd
+            and self._kwargs == __o._kwargs
+        )
 
     def __bool__(self) -> bool:
         """Return the truth value of this instance.
@@ -272,12 +281,12 @@ class JavaScript:
     """Represent a cached javascript of the session."""
 
     def __init__(self, name: str, script: str, *args: Any) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a named JavaScript snippet with default arguments.
 
         Args:
             name: The name of the javascript.
-            script: The raw javascript code.
-            *args: The arguments for the javascript.
+            script: JavaScript source code.
+            *args: Default positional arguments passed when executing the script.
         """
         # JavaScript name
         if isinstance(name, str) and name:
@@ -338,28 +347,29 @@ class JavaScript:
         return "<JavaScript (name=%r, payload=<redacted>)>" % self._name
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Hash the immutable local cache name of this script.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            A hash consistent with script equality.
         """
         return hash(self._name)
 
     def __eq__(self, __o: object) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Compare the complete reusable script definition.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` when another script has the same cache name, source, and
+            default arguments; otherwise ``False``.
         """
-        if isinstance(__o, str):
-            return self._name == __o
-        elif isinstance(__o, JavaScript):
-            return self._name == __o._name and self._script == __o._script
-        else:
-            return False
+        return (
+            isinstance(__o, JavaScript)
+            and self._name == __o._name
+            and self._script == __o._script
+            and self._args == __o._args
+        )
 
     def __bool__(self) -> bool:
         """Return the truth value of this instance.
@@ -381,7 +391,7 @@ class JavaScript:
 
 
 class Network:
-    """Represent the network condition of the session."""
+    """Store Chromium network-emulation conditions as a reusable value."""
 
     def __init__(
         self,
@@ -390,17 +400,17 @@ class Network:
         upload_throughput: int | None = None,
         download_throughput: int | None = None,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a network-emulation configuration.
 
         Args:
-            offline: Whether to simulate an offline
-                network condition. If `None`, set to default condition.
-            latency: The minimum latency overhead. If
-                `None`, set to default condition.
-            upload_throughput: The maximum upload throughput
-                in bytes per second. If `None`, set to default condition.
-            download_throughput: The maximum download
-                throughput in bytes per second. If `None`, set to default condition.
+            offline: Whether to simulate an offline network. ``None`` keeps the
+                default of ``False``.
+            latency: Nonnegative minimum latency in milliseconds. ``None`` keeps
+                the default of zero.
+            upload_throughput: Maximum upload throughput in bytes per second;
+                ``-1`` disables the limit and ``None`` keeps that default.
+            download_throughput: Maximum download throughput in bytes per second;
+                ``-1`` disables the limit and ``None`` keeps that default.
         """
         self._offline: bool = DefaultNetworkConditions.OFFLINE
         self._latency: int = DefaultNetworkConditions.LATENCY
@@ -414,7 +424,7 @@ class Network:
 
     # Dict --------------------------------------------------------------------------------
     @property
-    def dict(self) -> dict[str, int]:
+    def dict(self) -> dict[str, bool | int]:
         """Return the network condition as a dictionary.
 
         Returns:
@@ -436,52 +446,48 @@ class Network:
     # Offline -----------------------------------------------------------------------------
     @property
     def offline(self) -> bool:
-        """Return the network offline condition.
+        """Return whether the emulated network is offline.
 
         Returns:
-            True when the checked condition is satisfied; otherwise False.
+            ``True`` when offline mode is enabled; otherwise ``False``.
         """
         return self._offline
 
     @offline.setter
     def offline(self, value: bool | None) -> None:
-        # Value is None
-        """Set the offline.
+        """Set or preserve the emulated offline state.
 
         Args:
-            value: New offline value. None is handled according to the property's reset/ignore semantics.
+            value: New offline state, or ``None`` to keep the current state.
         """
         if value is None:
-            if self._offline is None:
-                self._offline = DefaultNetworkConditions.OFFLINE
-        # Set value
+            return
+        elif not isinstance(value, bool):
+            raise errors.InvalidArgumentError("Network offline state must be a bool")
         else:
-            self._offline = bool(value)
+            self._offline = value
 
     # Latency -----------------------------------------------------------------------------
     @property
     def latency(self) -> int:
-        """Return the network latency condition.
+        """Return the emulated minimum network latency.
 
         Returns:
-            The network latency condition.
+            Latency in milliseconds.
         """
         return self._latency
 
     @latency.setter
     def latency(self, value: int | None) -> None:
-        # Value is None
-        """Set the latency.
+        """Set or preserve the emulated network latency.
 
         Args:
-            value: New latency value. None is handled according to the property's reset/ignore semantics.
+            value: Nonnegative milliseconds, or ``None`` to keep the current value.
         """
         if value is None:
-            if self._latency is None:
-                self._latency = DefaultNetworkConditions.LATENCY
-        # Set value
+            return
         else:
-            if not isinstance(value, int) or value < 0:
+            if isinstance(value, bool) or not isinstance(value, int) or value < 0:
                 raise errors.InvalidArgumentError(
                     "<{}>\nInvalid latency: {} {}.".format(
                         self.__class__.__name__, repr(value), type(value)
@@ -492,27 +498,25 @@ class Network:
     # Upload throughput -------------------------------------------------------------------
     @property
     def upload_throughput(self) -> int:
-        """Return the network upload throughput condition.
+        """Return the emulated upload-throughput limit.
 
         Returns:
-            The network upload throughput condition.
+            Bytes per second, or ``-1`` when the limit is disabled.
         """
         return self._upload_throughput
 
     @upload_throughput.setter
     def upload_throughput(self, value: int | None) -> None:
-        # Value is None
-        """Set the upload throughput.
+        """Set or preserve the emulated upload-throughput limit.
 
         Args:
-            value: New upload throughput value. None is handled according to the property's reset/ignore semantics.
+            value: Bytes per second at or above ``-1``, or ``None`` to keep the
+                current value.
         """
         if value is None:
-            if self._upload_throughput is None:
-                self._upload_throughput = DefaultNetworkConditions.UPLOAD_THROUGHPUT
-        # Set value
+            return
         else:
-            if not isinstance(value, int) or value < -1:
+            if isinstance(value, bool) or not isinstance(value, int) or value < -1:
                 raise errors.InvalidArgumentError(
                     "<{}>\nInvalid upload throughput: {} {}.".format(
                         self.__class__.__name__, repr(value), type(value)
@@ -523,27 +527,25 @@ class Network:
     # Download throughput -----------------------------------------------------------------
     @property
     def download_throughput(self) -> int:
-        """Return the network download throughput condition.
+        """Return the emulated download-throughput limit.
 
         Returns:
-            The network download throughput condition.
+            Bytes per second, or ``-1`` when the limit is disabled.
         """
         return self._download_throughput
 
     @download_throughput.setter
     def download_throughput(self, value: int | None) -> None:
-        # Value is None
-        """Set the download throughput.
+        """Set or preserve the emulated download-throughput limit.
 
         Args:
-            value: New download throughput value. None is handled according to the property's reset/ignore semantics.
+            value: Bytes per second at or above ``-1``, or ``None`` to keep the
+                current value.
         """
         if value is None:
-            if self._download_throughput is None:
-                self._download_throughput = DefaultNetworkConditions.DOWNLOAD_THROUGHPUT
-        # Set value
+            return
         else:
-            if not isinstance(value, int) or value < -1:
+            if isinstance(value, bool) or not isinstance(value, int) or value < -1:
                 raise errors.InvalidArgumentError(
                     "<{}>\nInvalid download throughput: {} {}.".format(
                         self.__class__.__name__, repr(value), type(value)
@@ -569,23 +571,23 @@ class Network:
         )
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Return a stable identity hash for this mutable configuration.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            The network object's identity.
         """
         return id(self)
 
     def __eq__(self, __o: object) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Return whether another reference is this exact session owner.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` only for this same object.
         """
-        return hash(self) == hash(__o) if isinstance(__o, Network) else False
+        return self is __o
 
     def __bool__(self) -> bool:
         """Return the truth value of this instance.
@@ -617,11 +619,11 @@ class Permission:
         name: str,
         state: Literal["granted", "denied", "prompt"],
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a validated browser-permission value.
 
         Args:
-            name: Name identifying the requested item.
-            state: State used by this operation.
+            name: WebDriver permission descriptor name.
+            state: Requested permission state.
         """
         self.name = name
         self.state = state
@@ -631,11 +633,13 @@ class Permission:
     def dict(self) -> dict[str, str]:
         """Return the permission as a dictionary.
 
-        Expected format:
-        >>> {"name": "video_capture", "state": "prompt"}
-
         Returns:
             The permission as a dictionary.
+
+        Example:
+            >>> permission = Permission("geolocation", "prompt")
+            >>> permission.dict
+            {'name': 'geolocation', 'state': 'prompt'}
         """
         return {"name": self._name, "state": self._state}
 
@@ -666,7 +670,7 @@ class Permission:
 
     # State -------------------------------------------------------------------------------
     @property
-    def state(self) -> str:
+    def state(self) -> Literal["granted", "denied", "prompt"]:
         """Return the permission state.
 
         Expected values: `"granted"`, `"denied"`, `"prompt"`
@@ -677,7 +681,7 @@ class Permission:
         return self._state
 
     @state.setter
-    def state(self, value: str) -> None:
+    def state(self, value: Literal["granted", "denied", "prompt"]) -> None:
         """Set the state.
 
         Args:
@@ -689,7 +693,7 @@ class Permission:
                     self.__class__.__name__, repr(value), type(value)
                 )
             )
-        self._state: str = value
+        self._state: Literal["granted", "denied", "prompt"] = value
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
@@ -701,23 +705,23 @@ class Permission:
         return "<Permission (name='%s', state='%s')>" % (self._name, self._state)
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Return a stable identity hash for this mutable permission.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            The permission object's identity.
         """
         return id(self)
 
     def __eq__(self, __o: object) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Return whether another reference is this exact permission object.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` only for this same object.
         """
-        return hash(self) == hash(__o) if isinstance(__o, Permission) else False
+        return self is __o
 
     def __bool__(self) -> bool:
         """Return the truth value of this instance.
@@ -728,7 +732,7 @@ class Permission:
         return True
 
     def copy(self) -> Permission:
-        """Copy the network condition object.
+        """Copy the permission object.
 
         Returns:
             An independent copy of this value object.
@@ -740,7 +744,7 @@ class Viewport(Rectangle):
     """Represent the size and relative position of a window viewport."""
 
     def __init__(self, width: int, height: int, x: int, y: int) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a viewport rectangle from CSS-pixel coordinates.
 
         Args:
             width: The width of the viewport.
@@ -764,7 +768,7 @@ class Window:
     """Represent a window of the session."""
 
     def __init__(self, handle: str, name: str | None = None) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a named local reference to a remote browser window.
 
         Args:
             handle: The unique handle of the window.
@@ -780,10 +784,11 @@ class Window:
                 )
             )
         # Window name
+        self._name: str
         if isinstance(name, str) and name:
-            self._name: str = name
+            self._name = name
         elif name is None:
-            self._name: str = uuid4().hex
+            self._name = uuid4().hex
         else:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid window name: {} {}.".format(
@@ -820,28 +825,28 @@ class Window:
         return "<Window (name='%s', handle='%s')>" % (self._name, self._handle)
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Hash the immutable local name of this window handle.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            A hash consistent with window equality.
         """
         return hash(self._name)
 
     def __eq__(self, __o: object) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Compare a remote handle and its session-local lookup name.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` when another window has the same handle and local name;
+            otherwise ``False``.
         """
-        if isinstance(__o, str):
-            return self._name == __o
-        elif isinstance(__o, Window):
-            return self._name == __o._name and self._handle == __o._handle
-        else:
-            return False
+        return (
+            isinstance(__o, Window)
+            and self._name == __o._name
+            and self._handle == __o._handle
+        )
 
     def __bool__(self) -> bool:
         """Return the truth value of this instance.
@@ -864,7 +869,7 @@ class WindowRect(Rectangle):
     """Represent the size and relative position of a window."""
 
     def __init__(self, width: int, height: int, x: int, y: int) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a browser-window rectangle from CSS-pixel coordinates.
 
         Args:
             width: The width of the window.
@@ -889,22 +894,27 @@ class Session:
     """Represent a session of the browser."""
 
     def __init__(self, options: BaseOptions, service: BaseService) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a not-yet-started browser session.
 
         Args:
             options: The browser options.
-            service: The webdriver service.
+            service: The WebDriver service.
         """
         # Options
-        self._options: BaseOptions = options
-        self._browser_location: str | None = self._options.browser_location
+        self._options: BaseOptions | None = options
+        self._browser_location: Path | None = options.browser_location
         self._browser_version: str | None = self._options.browser_version
         # Service
-        self._service: BaseService = service
+        self._service: BaseService | None = service
         # Connection
         self._conn: Connection | None = None
-        # Vender prefix
-        self._vendor: dict[str, str] = {"vendorPrefix": self._options.VENDOR_PREFIX}
+        # Vendor prefix
+        vendor_prefix = options.VENDOR_PREFIX
+        if vendor_prefix is None:
+            raise errors.InvalidArgumentError(
+                "Session options must define a WebDriver vendor prefix"
+            )
+        self._vendor: dict[str, str] = {"vendorPrefix": vendor_prefix}
         # Session
         self._id: str | None = None
         self._base_url: str | None = None
@@ -927,6 +937,8 @@ class Session:
         Returns:
             The browser options owned by this facade or session.
         """
+        if self._options is None:
+            raise errors.InvalidSessionError("Session options have been released")
         return self._options
 
     @property
@@ -940,68 +952,84 @@ class Session:
         return self._browser_version
 
     @property
-    def browser_location(self) -> str:
+    def browser_location(self) -> Path | None:
         """Return the browser binary location of the session.
 
         Returns:
-            The browser binary location of the session.
+            The browser executable path, or `None` when it was not configured.
         """
         return self._browser_location
 
     @property
     def service(self) -> BaseService:
-        """Return the webdriver service.
+        """Return the WebDriver service.
 
         Returns:
             The driver service owned by the session.
         """
+        if self._service is None:
+            raise errors.InvalidSessionError("Session service has been released")
         return self._service
 
     @property
     def driver_version(self) -> Version:
-        """Return the webdriver binary version of the session.
+        """Return the WebDriver binary version of the session.
 
         Returns:
-            The webdriver binary version of the session.
+            The WebDriver binary version of the session.
         """
-        return self._service._driver_version
+        return self.service.driver_version
 
     @property
-    def driver_location(self) -> str:
-        """Return the webdriver binary location of the session.
+    def driver_location(self) -> Path:
+        """Return the WebDriver binary location of the session.
 
         Returns:
-            The webdriver binary location of the session.
+            The validated WebDriver executable path retained by the service.
         """
-        # Services retain a Path internally; sessions preserve the public text API.
-        return str(self._service._driver_location)
+        return self.service.driver_location
 
     @property
-    def connection(self) -> Connection:
+    def connection(self) -> Connection | None:
         """Return the session connection.
 
         Returns:
-            The session connection.
+            The session connection, or `None` before startup or after cleanup.
         """
         return self._conn
 
     @property
-    def id(self) -> str:
-        """Return the ID of the session.
+    def id(self) -> str | None:
+        """Return the current remote session ID.
 
         Returns:
-            The id of the session.
+            The remote session ID, or `None` when no session is active.
         """
         return self._id
 
     @property
-    def base_url(self) -> str:
-        """Return the base `service` URL of the session.
+    def base_url(self) -> str | None:
+        """Return the current remote session command URL.
 
         Returns:
-            The base `service` url of the session.
+            The command URL for the active remote session, or `None` otherwise.
         """
         return self._base_url
+
+    def _active_transport(self) -> tuple[Connection, str]:
+        """Return the connection and URL for an active remote session.
+
+        Returns:
+            The initialized connection and its session-specific command URL.
+
+        Raises:
+            errors.InvalidSessionError: If the session has not started or has closed.
+        """
+        connection = self._conn
+        base_url = self._base_url
+        if connection is None or base_url is None:
+            raise errors.InvalidSessionError("Browser session is not active")
+        return connection, base_url
 
     # Execute -----------------------------------------------------------------------------
     async def execute_command(
@@ -1026,8 +1054,9 @@ class Session:
         Returns:
             The response from the command.
         """
-        return await self._conn.execute(
-            self._base_url,
+        connection, base_url = self._active_transport()
+        return await connection.execute(
+            base_url,
             command,
             body=body,
             keys=keys,
@@ -1043,9 +1072,18 @@ class Session:
         logical ownership; await dependent operations sequentially rather than
         running them concurrently within the same transaction.
 
+        Admission uses the enclosing command/wait deadline when present, or the
+        configured session timeout otherwise. This bounds waiting for ownership,
+        not the entire context body; commands retain their individual budgets.
+
         Returns:
             An asynchronous context manager that serializes commands issued through
             this session connection. It does not roll back browser state on failure.
+
+        Raises:
+            errors.InvalidSessionError: The session has not started.
+            errors.SessionTimeoutError: Entering the context exceeds its admission
+                deadline before any command in the context is sent.
 
         Example:
             >>> async with session.transaction():
@@ -1100,10 +1138,21 @@ class Session:
                     "Session is closed; acquire a new session"
                 )
             if self._id is not None:
-                return await self.active_window
+                window = await self.active_window
+                if window is None:
+                    raise errors.InvalidSessionError(
+                        "Active session has no focused browser window"
+                    )
+                return window
             try:
-                await self._service.start()
-                self._conn = Connection(self._service.session, self._session_timeout)
+                service = self.service
+                await service.start()
+                client = service.session
+                if client is None:
+                    raise errors.InvalidSessionError(
+                        "WebDriver service started without an HTTP client session"
+                    )
+                self._conn = Connection(client, self._session_timeout)
                 return await self._start_session("default")
             except BaseException:
                 try:
@@ -1117,7 +1166,11 @@ class Session:
         if self.__closed:
             return
         remote_shutdown_is_safe = True
-        capture_children = getattr(self._service, "_capture_session_children", None)
+        service = self._service
+        if service is None:
+            self.__closed = True
+            return
+        capture_children = getattr(service, "_capture_session_children", None)
         if capture_children is not None:
             try:
                 # Capture renderers or helpers created after startup before the
@@ -1134,7 +1187,7 @@ class Session:
                 except Exception:
                     # Deletion is best effort, local owned service teardown is not.
                     pass
-        await self._service.stop()
+        await service.stop()
         self._collect_garbage()
 
     async def quit(self) -> None:
@@ -1152,20 +1205,22 @@ class Session:
         await finish_owned(close())
 
     async def _start_session(self, name: str = "default") -> Window:
-        """Start the default window of session, and returns it. This method should only be called when session service is started or all the windows of the session are closed.
+        """Create a remote session and cache its initial browser window.
+
+        The owned WebDriver service and HTTP connection must already be running.
 
         Args:
             name: The name of the first window for the session. Defaults to `'default'`.
 
         Returns:
-            The Window value produced by this operation.
+            The initial cached browser window.
         """
 
         def parse_session_id(res: dict[str, Any]) -> str:
             """Extract the nested W3C new-session ID or reject the response.
 
             Args:
-                res: Res used by this operation.
+                res: Raw WebDriver new-session response.
 
             Returns:
                 The nonempty ID from value.sessionId in a W3C new-session response.
@@ -1180,16 +1235,22 @@ class Session:
             )
 
         # Validate service
-        if not await run_blocking(lambda: self._service.running):
+        service = self.service
+        if not await run_blocking(lambda: service.running):
             raise errors.InvalidSessionError(
                 "<{}>\nFailed to create new session. Please `start()` "
                 "the service of the session first.".format(self.__class__.__name__)
             )
 
         # Start session
-        capabilities = await run_blocking(lambda: self._options.capabilities)
+        capabilities = await run_blocking(lambda: self.options.capabilities)
+        connection = self._conn
+        if connection is None:
+            raise errors.InvalidSessionError(
+                "Session connection is unavailable during startup"
+            )
         try:
-            res = await self._conn.execute(
+            res = await connection.execute(
                 "",
                 Command.NEW_SESSION,
                 body={"capabilities": {"alwaysMatch": capabilities}},
@@ -1226,7 +1287,10 @@ class Session:
 
     async def _capture_service_children(self) -> None:
         """Retain browser processes launched by the owned driver when supported."""
-        capture_children = getattr(self._service, "_capture_session_children", None)
+        service = self._service
+        if service is None:
+            return
+        capture_children = getattr(service, "_capture_session_children", None)
         if capture_children is not None:
             await capture_children()
 
@@ -1246,7 +1310,7 @@ class Session:
                 which is designed to cope with a frozen session due to unknown
                 errors. For more information about session timeout, please refer
                 to the documentation of `options.session_timeout` attribute. If
-                the webdriver fails to response in time, a `SessionTimeoutError`
+                WebDriver fails to respond in time, a `SessionTimeoutError`
                 will be raised.
             retry: Number of additional attempts after a native page-load timeout.
                 Must be a nonnegative integer or `None`; booleans are rejected.
@@ -1288,7 +1352,7 @@ class Session:
                 which is designed to cope with a frozen session due to unknown
                 errors. For more information about session timeout, please refer
                 to the documentation of `options.session_timeout` attribute. If
-                the webdriver fails to response in time, a `SessionTimeoutError`
+                WebDriver fails to respond in time, a `SessionTimeoutError`
                 will be raised.
             retry: Number of additional attempts after a native page-load timeout.
                 Must be a nonnegative integer or `None`; booleans are rejected.
@@ -1344,7 +1408,7 @@ class Session:
                 which is designed to cope with a frozen session due to unknown
                 errors. For more information about session timeout, please refer
                 to the documentation of `options.session_timeout` attribute. If
-                the webdriver fails to response in time, a `SessionTimeoutError`
+                WebDriver fails to respond in time, a `SessionTimeoutError`
                 will be raised.
 
         Example:
@@ -1361,7 +1425,7 @@ class Session:
                 which is designed to cope with a frozen session due to unknown
                 errors. For more information about session timeout, please refer
                 to the documentation of `options.session_timeout` attribute. If
-                the webdriver fails to response in time, a `SessionTimeoutError`
+                WebDriver fails to respond in time, a `SessionTimeoutError`
                 will be raised.
 
         Example:
@@ -1370,25 +1434,38 @@ class Session:
         await self.execute_command(Command.GO_BACK, timeout=timeout)
 
     # Information -------------------------------------------------------------------------
+    @staticmethod
+    def _typed_response_value(
+        response: object, expected_type: type[T], description: str
+    ) -> T:
+        """Extract a response value only when it has the promised runtime type.
+
+        Args:
+            response: Candidate W3C response envelope.
+            expected_type: Required runtime type for the ``value`` member.
+            description: Short result name included in diagnostics.
+
+        Returns:
+            The validated response value.
+
+        Raises:
+            errors.InvalidResponseError: The response has no ``value`` member or
+                the member has the wrong runtime type.
+        """
+        return response_value(response, expected_type, description)
+
     @property
     async def url(self) -> str:
         """Return the URL of the active page window.
 
         Returns:
-            The url of the active page window.
+            The URL of the active page window.
 
         Example:
             >>> await session.url # "https://www.google.com/"
         """
         res = await self.execute_command(Command.GET_CURRENT_URL)
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse page url from response: {}".format(
-                    self.__class__.__name__, err
-                )
-            ) from err
+        return self._typed_response_value(res, str, "Current URL")
 
     async def wait_until_url(
         self,
@@ -1470,14 +1547,7 @@ class Session:
             >>> await session.title # "Google"
         """
         res = await self.execute_command(Command.GET_TITLE)
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse page title from response: {}".format(
-                    self.__class__.__name__, err
-                )
-            ) from err
+        return self._typed_response_value(res, str, "Page title")
 
     async def wait_until_title(
         self,
@@ -1485,10 +1555,7 @@ class Session:
         value: str,
         timeout: int | float | None = 5,
     ) -> bool:
-        """Wait until the title of the active page window satisfies the given condition.
-
-        >>> await session.load("https://www.google.com/")
-            await session.wait_until_title("contains", "Google", 5)  # True / False
+        """Wait until the active page title satisfies a string condition.
 
         Args:
             condition: The condition the title needs to satisfy.
@@ -1498,6 +1565,12 @@ class Session:
 
         Returns:
             True if the title satisfies the condition, False if timeout.
+
+        Example:
+            >>> await session.load("https://www.google.com/")
+            >>> found = await session.wait_until_title("contains", "Google", 5)
+            >>> isinstance(found, bool)
+            True
         """
 
         async def equals() -> bool:
@@ -1582,10 +1655,11 @@ class Session:
             The width of the active page window.
 
         Example:
-            >>> await session.page_width # 1200
+            >>> await session.page_width  # 1200
         """
         try:
-            return await self._execute_script(javascript.GET_PAGE_WIDTH)
+            value = await self._execute_script(javascript.GET_PAGE_WIDTH)
+            return typed_value(value, int, "Page width")
         except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to request page width: {}".format(
@@ -1601,10 +1675,11 @@ class Session:
             The height of the active page window.
 
         Example:
-            >>> await session.page_height # 800
+            >>> await session.page_height  # 800
         """
         try:
-            return await self._execute_script(javascript.GET_PAGE_HEIGHT)
+            value = await self._execute_script(javascript.GET_PAGE_HEIGHT)
+            return typed_value(value, int, "Page height")
         except errors.InvalidJavaScriptError as err:
             raise errors.InvalidResponseError(
                 "<{}>\nFailed to request page height: {}".format(
@@ -1623,20 +1698,13 @@ class Session:
             >>> source = await session.page_source
         """
         res = await self.execute_command(Command.GET_PAGE_SOURCE)
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse page source from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+        return self._typed_response_value(res, str, "Page source")
 
     async def take_screenshot(self) -> bytes:
-        """Take a screenshot of the active page window.
+        """Capture the active page viewport as PNG data.
 
         Returns:
-            Take a screenshot of the active page window.
+            Decoded PNG bytes for the active viewport.
 
         Example:
             >>> screenshot = await session.take_screenshot()
@@ -1658,13 +1726,16 @@ class Session:
             ) from err
 
     async def save_screenshot(self, path: PathInput) -> bool:
-        """Take & save the screenshot of the active page window into a local PNG file.
+        """Capture the active page and save it as PNG.
 
         Args:
-            path: The path to save the screenshot. e.g. `~/path/to/screenshot.png`.
+            path: Destination supplied as a string, `pathlib.Path`, or compatible
+                `os.PathLike[str]`. Relative paths are resolved from the current
+                working directory, `~` is expanded, and `.png` is appended unless
+                the filename already ends with that exact suffix.
 
         Returns:
-            True if the screenshot has been saved, False if failed.
+            `True` if nonempty screenshot data was written; otherwise `False`.
 
         Example:
             >>> await session.save_screenshot("~/path/to/screenshot.png")  # True / False
@@ -1709,7 +1780,7 @@ class Session:
 
         Args:
             orientation: The print orientation. Accepts: "portrait", "landscape".
-            scale: The scale of the page rendering. Must between 0.1 - 2.
+            scale: Page-rendering scale from 0.1 through 2.0.
             background: Whether to print the CSS backgrounds.
             page_width: Paper width.
             page_height: Paper height.
@@ -1727,11 +1798,11 @@ class Session:
             >>> await session.print_page()
         """
 
-        def orie_validator(param: str, value: str) -> bool:
+        def orie_validator(param: str, value: str | None) -> bool:
             """Validate the page-print orientation.
 
             Args:
-                param: Param used by this operation.
+                param: Name of the option being validated for error reporting.
                 value: The page-print orientation supplied for validation.
 
             Returns:
@@ -1750,31 +1821,31 @@ class Session:
                 )
             return True
 
-        def scal_validator(param: str, value: float) -> bool:
+        def scal_validator(param: str, value: int | float | None) -> bool:
             """Validate the page-print scale range.
 
             Args:
-                param: Param used by this operation.
+                param: Name of the option being validated for error reporting.
                 value: The page-print scale range supplied for validation.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
             """
-            if not nums_validator(param, value):
+            if value is None or not nums_validator(param, value):
                 return False
             if not 0.1 <= value <= 2:
                 raise errors.InvalidArgumentError(
-                    "<{}>\nInvalid print {}: {}. Must between 0.1 and 2.".format(
+                    "<{}>\nInvalid print {}: {}. Must be between 0.1 and 2.".format(
                         self.__class__.__name__, param, repr(value)
                     )
                 )
             return True
 
-        def bool_validator(param: str, value: bool) -> bool:
+        def bool_validator(param: str, value: bool | None) -> bool:
             """Validate a boolean page-print setting.
 
             Args:
-                param: Param used by this operation.
+                param: Name of the option being validated for error reporting.
                 value: A boolean page-print setting supplied for validation.
 
             Returns:
@@ -1790,11 +1861,11 @@ class Session:
                 )
             return True
 
-        def nums_validator(param: str, value: float) -> bool:
+        def nums_validator(param: str, value: int | float | None) -> bool:
             """Validate numeric page dimensions and margins.
 
             Args:
-                param: Param used by this operation.
+                param: Name of the option being validated for error reporting.
                 value: Numeric page dimensions and margins supplied for validation.
 
             Returns:
@@ -1802,7 +1873,11 @@ class Session:
             """
             if value is None:
                 return False
-            if not isinstance(value, (int, float)):
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not isfinite(value)
+            ):
                 raise errors.InvalidArgumentError(
                     "<{}>\nInvalid {} argument: {} {}. Must be an integer or float.".format(
                         self.__class__.__name__, param, repr(value), type(value)
@@ -1816,11 +1891,11 @@ class Session:
                 )
             return True
 
-        def list_validator(param: str, value: list[str]) -> bool:
+        def list_validator(param: str, value: list[str] | None) -> bool:
             """Validate page ranges for the print command.
 
             Args:
-                param: Param used by this operation.
+                param: Name of the option being validated for error reporting.
                 value: Page ranges for the print command supplied for validation.
 
             Returns:
@@ -1828,38 +1903,41 @@ class Session:
             """
             if value is None:
                 return False
-            if not isinstance(value, list):
+            if not isinstance(value, list) or not all(
+                isinstance(page_range, str) and page_range for page_range in value
+            ):
                 raise errors.InvalidArgumentError(
-                    "{}\nInvalid {} argument: {} {}. Must be a list.".format(
+                    "{}\nInvalid {} argument: {} {}. Must be a list of "
+                    "nonempty strings.".format(
                         self.__class__.__name__, param, repr(value), type(value)
                     )
                 )
             return True
 
         # Print options
-        options = {}
-        if orie_validator("orientation", orientation):
+        options: dict[str, Any] = {}
+        if orientation is not None and orie_validator("orientation", orientation):
             options["orientation"] = orientation
-        if scal_validator("scale", scale):
+        if scale is not None and scal_validator("scale", scale):
             options["scale"] = scale
-        if bool_validator("background", background):
+        if background is not None and bool_validator("background", background):
             options["background"] = background
-        if nums_validator("page_width", page_width):
+        if page_width is not None and nums_validator("page_width", page_width):
             options["page"] = options.get("page", {}) | {"width": page_width}
-        if nums_validator("page_height", page_height):
+        if page_height is not None and nums_validator("page_height", page_height):
             options["page"] = options.get("page", {}) | {"height": page_height}
-        if nums_validator("margin_top", margin_top):
+        if margin_top is not None and nums_validator("margin_top", margin_top):
             options["margin"] = options.get("margin", {}) | {"top": margin_top}
-        if nums_validator("margin_bottom", margin_bottom):
+        if margin_bottom is not None and nums_validator("margin_bottom", margin_bottom):
             options["margin"] = options.get("margin", {}) | {"bottom": margin_bottom}
-        if nums_validator("margin_left", margin_left):
+        if margin_left is not None and nums_validator("margin_left", margin_left):
             options["margin"] = options.get("margin", {}) | {"left": margin_left}
-        if nums_validator("margin_right", margin_right):
+        if margin_right is not None and nums_validator("margin_right", margin_right):
             options["margin"] = options.get("margin", {}) | {"right": margin_right}
-        if bool_validator("shrink_to_fit", shrink_to_fit):
+        if shrink_to_fit is not None and bool_validator("shrink_to_fit", shrink_to_fit):
             options["shrinkToFit"] = shrink_to_fit
-        if list_validator("page_ranges", page_ranges):
-            options["pageRanges"] = [str(i) for i in page_ranges]
+        if page_ranges is not None and list_validator("page_ranges", page_ranges):
+            options["pageRanges"] = page_ranges.copy()
 
         # Print request
         res = await self.execute_command(Command.PRINT_PAGE, body=options)
@@ -1893,12 +1971,15 @@ class Session:
         shrink_to_fit: bool | None = None,
         page_ranges: list[str] | None = None,
     ) -> bool:
-        """Print & save the active page window into a local PDF file.
+        """Render the active page and save it as PDF.
 
         Args:
-            path: The path to save the PDF. e.g. `~/path/to/screenshot.png`.
+            path: Destination supplied as a string, `pathlib.Path`, or compatible
+                `os.PathLike[str]`. Relative paths are resolved from the current
+                working directory, `~` is expanded, and `.pdf` is appended unless
+                the filename already ends with that exact suffix.
             orientation: The print orientation. Accepts: "portrait", "landscape".
-            scale: The scale of the page rendering. Must between 0.1 - 2.
+            scale: Page-rendering scale from 0.1 through 2.0.
             background: Whether to print the CSS backgrounds.
             page_width: Paper width.
             page_height: Paper height.
@@ -1910,10 +1991,10 @@ class Session:
             page_ranges: Paper ranges to print, e.g., ['1-5', '8', '11-13'].
 
         Returns:
-            True if the PDF has been saved, False if failed.
+            `True` if nonempty PDF data was written; otherwise `False`.
 
         Example:
-            >>> await session.save_page("~/path/to/screenshot.pdf")  # True / False
+            >>> await session.save_page("~/path/to/page.pdf")  # True / False
         """
         # Validate pdf path
         try:
@@ -1952,16 +2033,13 @@ class Session:
     async def timeouts(self) -> Timeouts:
         """Return the timeouts of the current session.
 
-        Timeouts explain:
+        The three W3C timeout fields are:
 
-        - implicit: The amount of time the current sessions will wait when
-        searching for an element if not immediately present.
+        - `implicit`: Time spent locating an element that is not immediately present.
 
-        - pageLoad: The amount of time the current sessions will wait for
-        a page load to complete before raising an error.
+        - `pageLoad`: Time allowed for a page load to complete.
 
-        - script: The amount of time the current sessions will wait for an
-        asynchronous script to finish execution before raising an error.
+        - `script`: Time allowed for an asynchronous script to finish.
 
         Returns:
             The timeouts of the current session.
@@ -1971,7 +2049,10 @@ class Session:
         """
         if self._timeouts is None:
             await self._refresh_timeouts()
-        return self._timeouts.copy()
+        timeouts = self._timeouts
+        if timeouts is None:
+            raise errors.InvalidResponseError("WebDriver returned no timeout state")
+        return timeouts.copy()
 
     async def set_timeouts(
         self,
@@ -2013,30 +2094,36 @@ class Session:
             if script is not None:
                 timeouts.script = script
             self._timeouts = None
-            await self._conn.execute(
-                self._base_url, Command.SET_TIMEOUTS, body=timeouts.dict
-            )
+            connection, base_url = self._active_transport()
+            await connection.execute(base_url, Command.SET_TIMEOUTS, body=timeouts.dict)
             await self._refresh_timeouts()
-            return self._timeouts.copy()
+            refreshed = self._timeouts
+            if refreshed is None:
+                raise errors.InvalidResponseError("WebDriver returned no timeout state")
+            return refreshed.copy()
 
     async def reset_timeouts(self) -> Timeouts:
         """Reset session timeouts atomically to the original option values.
 
         Returns:
-            The Timeouts value produced by this operation.
+            A copy of the restored session timeouts.
 
         Example:
             >>> timeouts = await session.reset_timeouts()
         """
         async with self.transaction():
             self._timeouts = None
-            await self._conn.execute(
-                self._base_url,
+            connection, base_url = self._active_transport()
+            await connection.execute(
+                base_url,
                 Command.SET_TIMEOUTS,
-                body=self._options.timeouts.dict,
+                body=self.options.timeouts.dict,
             )
             await self._refresh_timeouts()
-            return self._timeouts.copy()
+            refreshed = self._timeouts
+            if refreshed is None:
+                raise errors.InvalidResponseError("WebDriver returned no timeout state")
+            return refreshed.copy()
 
     async def _refresh_timeouts(self) -> None:
         """Refresh the timeouts of the current session."""
@@ -2057,14 +2144,21 @@ class Session:
             ) from err
 
     async def _get_timeouts(self) -> Timeouts:
-        """Get the cached timeouts of the current session.
+        """Return the internal timeout state, refreshing it when absent.
 
         Returns:
-            The stored timeouts.
+            The mutable timeout object retained by this session. Public callers
+            receive a copy through the ``timeouts`` property.
+
+        Raises:
+            errors.InvalidResponseError: Refreshing produces no timeout state.
         """
         if self._timeouts is None:
             await self._refresh_timeouts()
-        return self._timeouts
+        timeouts = self._timeouts
+        if timeouts is None:
+            raise errors.InvalidResponseError("WebDriver returned no timeout state")
+        return timeouts
 
     # Cookies -----------------------------------------------------------------------------
     @property
@@ -2094,10 +2188,10 @@ class Session:
         """Get a specific cookie from the active page window.
 
         Args:
-            name: The name of the cookie or a  instance.
+            name: Cookie name or an existing `Cookie` object.
 
         Returns:
-            The specified cookie, or `None` if not found.
+            The requested cookie, or `None` when it does not exist.
 
         Example:
             >>> cookie = await session.get_cookie("ZFY")
@@ -2124,7 +2218,7 @@ class Session:
         """Add a cookie to the active page window.
 
         Args:
-            cookie: Cookie as a dictionary or a  instance.
+            cookie: Cookie data mapping or an existing `Cookie` object.
 
         Returns:
             The newly added cookie.
@@ -2139,20 +2233,25 @@ class Session:
             cookie = self._create_cookie(cookie)
         else:
             raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'cookie' arguement: {}. Must be "
+                "<{}>\nInvalid 'cookie' argument: {}. Must be "
                 "a dictionary or `<'Cookie'>` instance".format(
                     self.__class__.__name__, cookie
                 )
             )
         # Execute & return
         await self.execute_command(Command.ADD_COOKIE, {"cookie": cookie.dict})
-        return await self.get_cookie(cookie)
+        added = await self.get_cookie(cookie)
+        if added is None:
+            raise errors.InvalidResponseError(
+                "WebDriver did not return the cookie after adding it"
+            )
+        return added
 
     async def delete_cookie(self, name: str | Cookie) -> None:
         """Delete a cookie from the active page window.
 
         Args:
-            name: The name of the cookie or a  instance.
+            name: Cookie name or an existing `Cookie` object.
 
         Example:
             >>> await session.delete_cookie("ZFY")
@@ -2174,12 +2273,12 @@ class Session:
         """Validate the name of a cookie.
 
         Args:
-            name: Name identifying the requested item.
+            name: Cookie name or `Cookie` object to normalize.
 
         Returns:
             The name of a cookie.
         """
-        if isinstance(name, str):
+        if isinstance(name, str) and name:
             return name
         elif isinstance(name, Cookie):
             return name.name
@@ -2262,10 +2361,10 @@ class Session:
 
     @property
     async def active_window(self) -> Window | None:
-        """Return the active (focused) window of the session. Returns `None` if no window is active.
+        """Return the session's focused browser window, if any.
 
         Returns:
-            The active (focused) window of the session. returns `none` if no window is active.
+            The focused window, or `None` when every window is closed.
 
         Example:
             >>> win = await session.active_window
@@ -2287,10 +2386,7 @@ class Session:
         """Get a specific open window of the session.
 
         Args:
-            window: Accepts three kinds of input:
-                -: The name of the window.
-                -: The handle of the window.
-                -: A window instance.
+            window: A cached window, or its name or remote handle.
 
         Returns:
             The matched open window of the session, or `None` if not found.
@@ -2298,12 +2394,14 @@ class Session:
         Example:
             >>> win = await session.get_window("default")
         """
+        name = window.name if isinstance(window, Window) else window
+        handle = window.handle if isinstance(window, Window) else window
         # Match cache by name
-        if window in self._window_by_name:
-            return self._window_by_name[window]
+        if name in self._window_by_name:
+            return self._window_by_name[name]
         # Match cache by handle
-        elif window in self._window_by_handle:
-            return self._window_by_handle[window]
+        elif handle in self._window_by_handle:
+            return self._window_by_handle[handle]
         # Match from session
         else:
             return await self._match_session_window(window)
@@ -2371,10 +2469,7 @@ class Session:
         """Switch to a specific open window of the session.
 
         Args:
-            window: Accepts three kinds of input:
-                -: The name of the window.
-                -: The handle of the window.
-                -: A window instance.
+            window: An open window, or its cached name or remote handle.
 
         Returns:
             The new focused window.
@@ -2385,7 +2480,7 @@ class Session:
         # Get existing window
         win = await self.get_window(window)
         if not win:
-            raise errors.WindowNotFountError(
+            raise errors.WindowNotFoundError(
                 "<{}>\nCan't switch to window {}. Window not found.".format(
                     self.__class__.__name__, repr(window)
                 )
@@ -2398,7 +2493,7 @@ class Session:
                 Command.SWITCH_TO_WINDOW, body={"handle": win.handle}
             )
             return win
-        except errors.WindowNotFountError as err:
+        except errors.WindowNotFoundError as err:
             win = await self._match_session_window(window)
             # . fallback to a session window rematch
             if win:
@@ -2410,17 +2505,13 @@ class Session:
             raise err
 
     async def rename_window(self, window: str | Window, new_name: str) -> Window:
-        """Rename a specific opened window.
+        """Rename a window in the local session cache.
 
-        Notice
-        This method does not affect or make changes to the webdriver,
-        but simple changes the name of the window cached in the program.
+        This changes only Aselenium's lookup name; it does not modify the remote
+        browser window or its WebDriver handle.
 
         Args:
-            window: Accepts three kinds of input:
-                -: The name of the window.
-                -: The handle of the window.
-                -: A window instance.
+            window: An open window, or its cached name or remote handle.
             new_name: The new name for the window.
 
         Returns:
@@ -2440,7 +2531,7 @@ class Session:
         # Get existing window
         win = await self.get_window(window)
         if not win:
-            raise errors.WindowNotFountError(
+            raise errors.WindowNotFoundError(
                 "<{}>\nCannot rename window {}. Window not found".format(
                     self.__class__.__name__, repr(window)
                 )
@@ -2461,13 +2552,9 @@ class Session:
         command ownership; another task cannot switch windows between them.
 
         Args:
-            switch_to: The window to switch to after closing the active window. Accepts four kinds of input:
-                - `None (default)`: Switch to a random open window.
-                -: Switch to an open window by window name.
-                -: Switch to an open window by window handle.
-                -: Switch to an open window by window instance.
-                - `*Notice*` If the specified window does not exist, will automatically
-                switch to a random open window.
+            switch_to: Window to focus after closing, supplied as a `Window`,
+                cached name, or remote handle. If omitted or not found, the first
+                remaining window returned by WebDriver is selected.
 
         Returns:
             The new active (focus) window, or `None` if all windows are closed.
@@ -2485,60 +2572,57 @@ class Session:
                     return await self.switch_window(switch_to)
                 except errors.InvalidSessionError:
                     return None
-                except errors.WindowNotFountError:
+                except errors.WindowNotFoundError:
                     pass
             try:
                 if wins := await self.windows:
                     await self.switch_window(wins[0])
                     return wins[0]
                 return None
-            except (errors.InvalidSessionError, errors.WindowNotFountError):
+            except (errors.InvalidSessionError, errors.WindowNotFoundError):
                 return None
 
     async def _active_window_handle(self) -> str | None:
-        """Request the handle of the active (focus) window. Returns `None` if all windows are closed.
+        """Request the focused window's remote handle.
 
         Returns:
-            Request the handle of the active (focus) window. Returns `None` if all windows are closed.
+            The nonempty handle, or `None` if every window is closed.
         """
         # Get window handle
         try:
             res = await self.execute_command(Command.W3C_GET_CURRENT_WINDOW_HANDLE)
-        except (errors.InvalidSessionError, errors.WindowNotFountError):
+        except (errors.InvalidSessionError, errors.WindowNotFoundError):
             return None
-        # Return window handle
-        try:
-            return res["value"]
-        except KeyError as err:
+        handle = response_value(res, str, "Active window handle")
+        if not handle:
             raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse window handle from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+                "Active window handle response value must be nonempty"
+            )
+        return handle
 
     async def _match_session_window(self, window: str | Window) -> Window | None:
-        """Match window from the current session.
+        """Refresh window metadata and match a name, handle, or window object.
 
         Args:
-            window: Window used by this operation.
+            window: Window reference, cached name, or remote handle to match.
 
         Returns:
-            The Window value produced by this operation. None indicates that no value is available.
+            The matching open window, or `None` when no window matches.
         """
         for win in await self.windows:
             if window == win.handle or window == win.name:
                 return win
         return None
 
-    def _cache_window(self, handle: str, name: str = None) -> Window:
-        """Cache the new window.
+    def _cache_window(self, handle: str, name: str | None = None) -> Window:
+        """Cache a remote window under both its local name and handle.
 
         Args:
-            handle: Handle used by this operation.
-            name: Name identifying the requested item.
+            handle: Nonempty WebDriver window handle.
+            name: Optional local lookup name; a generated name is used when omitted.
 
         Returns:
-            The Window value produced by this operation.
+            The cached window object.
         """
         win = Window(handle, name=name)
         self._window_by_name[win.name] = win
@@ -2546,20 +2630,22 @@ class Session:
         return win
 
     def _remove_window(self, window: str | Window) -> bool:
-        """Remove cached window.
+        """Remove a window from both local lookup indexes.
 
         Args:
-            window: Window used by this operation.
+            window: Window object, local name, or remote handle to remove.
 
         Returns:
-            True when the checked condition is satisfied; otherwise False.
+            `True` if a cached window was removed; otherwise `False`.
         """
-        if window in self._window_by_name:
-            win = self._window_by_name.pop(window)
+        name = window.name if isinstance(window, Window) else window
+        handle = window.handle if isinstance(window, Window) else window
+        if name in self._window_by_name:
+            win = self._window_by_name.pop(name)
             self._window_by_handle.pop(win.handle, None)
             return True
-        elif window in self._window_by_handle:
-            win = self._window_by_handle.pop(window)
+        elif handle in self._window_by_handle:
+            win = self._window_by_handle.pop(handle)
             self._window_by_name.pop(win.name, None)
             return True
         else:
@@ -2569,7 +2655,7 @@ class Session:
         """Validate window name.
 
         Args:
-            name: Name identifying the requested item.
+            name: Candidate local window name.
 
         Returns:
             Window name.
@@ -2620,7 +2706,7 @@ class Session:
             y: The new y coordinate of the window. If `None (default)`, keep the current y coordinate.
 
         Returns:
-            The WindowRect value produced by this operation.
+            The window rectangle reported after the update.
 
         Example:
             >>> rect = await session.set_window_rect(800, 500, 22, 60)
@@ -2675,10 +2761,10 @@ class Session:
         Args:
             command: Command identifier from aselenium.command.Command.
             body: JSON command parameters, or None when the command has no explicit payload.
-            retry: Retry used by this operation.
+            retry: Maximum number of retries after the initial request.
 
         Returns:
-            The Any value produced by this operation.
+            The raw WebDriver response from the successful command.
         """
         window_state_retry = 0
         while True:
@@ -2726,13 +2812,17 @@ class Session:
         Args:
             width: The width to scroll. Defaults to `0`.
             height: The height to scroll. Defaults to `0`.
-            pause: The pause in seconds after execution. Defaults to `None`.
-                This can be useful to wait for the command to take effect,
-                before executing the next command. Defaults to `None` - no pause.
+            pause: Finite, nonnegative delay after scrolling, in seconds.
+                ``None`` means no delay. Validated before the script is sent.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` is invalid, including a boolean.
+            errors.InvalidResponseError: The scrolling script fails.
 
         Example:
             >>> await session.scroll_by(100, 100)
         """
+        validate_delay(pause)
         try:
             await self._execute_script(javascript.PAGE_SCROLL_BY, width, height)
         except errors.InvalidJavaScriptError as err:
@@ -2754,13 +2844,17 @@ class Session:
         Args:
             x: The x-coordinate to scroll to. Defaults to `0`.
             y: The y-coordinate to scroll to. Defaults to `0`.
-            pause: The pause in seconds after execution. Defaults to `None`.
-                This can be useful to wait for the command to take effect,
-                before executing the next command. Defaults to `None` - no pause.
+            pause: Finite, nonnegative delay after scrolling, in seconds.
+                ``None`` means no delay. Validated before the script is sent.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` is invalid, including a boolean.
+            errors.InvalidResponseError: The scrolling script fails.
 
         Example:
             >>> await session.scroll_to(100, 100)
         """
+        validate_delay(pause)
         try:
             await self._execute_script(javascript.PAGE_SCROLL_TO, x, y)
         except errors.InvalidJavaScriptError as err:
@@ -2780,7 +2874,7 @@ class Session:
         """Scroll the viewport to the top of the page. (Does not affect the horizontal position of the viewport.).
 
         Args:
-            value: The value for the sroll 'by' strategy.
+            value: Number of steps or pixels, according to `by`.
             by: The scrolling strategy. Defaults to `'steps'`.
                 - `'steps'`: The 'value' sets the approximate steps it
                 takes to scroll to the top of the page.
@@ -2789,15 +2883,15 @@ class Session:
             pause: Seconds to pause between each scroll. Defaults to `0.2`.
 
         Example:
-            >>> await session.scroll_to_top(12, "count")
+            >>> await session.scroll_to_top(12, "steps")
         """
         # Validate arguments
         value = self._validate_scroll_value(value)
-        by = self._validate_scroll_strategy(by)
+        strategy = self._validate_scroll_strategy(by)
         pause = self._validate_pause(pause)
 
-        # Calculate scroll pixals
-        if by == "steps":
+        # Calculate scroll pixels
+        if strategy == "steps":
             viewport = await self.viewport
             # . fast path - already at top
             if viewport.top <= 0:
@@ -2806,7 +2900,7 @@ class Session:
             if value == 1:
                 await self.scroll_to(x=viewport.x, y=0)
                 return None  # exit
-            # . calculate pixals
+            # . calculate pixels
             pixel = ceil(viewport.top / value)
         else:
             pixel = value
@@ -2840,7 +2934,7 @@ class Session:
         """Scroll the viewport to the bottom of the page. (Does not affect the horizontal position of the viewport.).
 
         Args:
-            value: The value for the sroll 'by' strategy.
+            value: Number of steps or pixels, according to `by`.
             by: The scrolling strategy. Defaults to `'steps'`.
                 - `'steps'`: The 'value' sets the approximate steps it
                 takes to scroll to the bottom of the page.
@@ -2849,21 +2943,21 @@ class Session:
             pause: Seconds to pause between each scroll. Defaults to `0.2`.
 
         Example:
-            >>> await session.scroll_to_bottom(100, "pixel")
+            >>> await session.scroll_to_bottom(100, "pixels")
         """
         # Validate arguments
         value = self._validate_scroll_value(value)
-        by = self._validate_scroll_strategy(by)
+        strategy = self._validate_scroll_strategy(by)
         pause = self._validate_pause(pause)
 
-        # Calculate scroll pixal
-        if by == "steps":
+        # Calculate scroll pixels
+        if strategy == "steps":
             bottom = (await self.viewport).bottom
             height = await self.page_height
             # . fast path - already at bottom
             if height - bottom <= 1:
                 return None
-            # . calculate pixals
+            # . calculate pixels
             pixel = ceil((height - bottom) / value)
         else:
             pixel = value
@@ -2897,7 +2991,7 @@ class Session:
         """Scroll the viewport to the left of the page. (Does not affect the vertical position of the viewport.).
 
         Args:
-            value: The value for the sroll 'by' strategy.
+            value: Number of steps or pixels, according to `by`.
             by: The scrolling strategy. Defaults to `'steps'`.
                 - `'steps'`: The 'value' sets the approximate steps it
                 takes to scroll to the left of the page.
@@ -2906,15 +3000,15 @@ class Session:
             pause: Seconds to pause between each scroll. Defaults to `0.2`.
 
         Example:
-            >>> await session.scroll_to_left(12, "count")
+            >>> await session.scroll_to_left(12, "steps")
         """
         # Validate arguments
         value = self._validate_scroll_value(value)
-        by = self._validate_scroll_strategy(by)
+        strategy = self._validate_scroll_strategy(by)
         pause = self._validate_pause(pause)
 
-        # Calculate scroll pixals
-        if by == "steps":
+        # Calculate scroll pixels
+        if strategy == "steps":
             viewport = await self.viewport
             # . fast path - already at left
             if viewport.left <= 0:
@@ -2923,7 +3017,7 @@ class Session:
             if value == 1:
                 await self.scroll_to(x=0, y=viewport.y)
                 return None  # exit
-            # . calculate pixals
+            # . calculate pixels
             pixel = ceil(viewport.left / value)
         else:
             pixel = value
@@ -2957,7 +3051,7 @@ class Session:
         """Scroll the viewport to the right of the page. (Does not affect the vertical position of the viewport.).
 
         Args:
-            value: The value for the sroll 'by' strategy.
+            value: Number of steps or pixels, according to `by`.
             by: The scrolling strategy. Defaults to `'steps'`.
                 - `'steps'`: The 'value' sets the approximate steps it
                 takes to scroll to the right of the page.
@@ -2966,21 +3060,21 @@ class Session:
             pause: Seconds to pause between each scroll. Defaults to `0.2`.
 
         Example:
-            >>> await session.scroll_to_right(100, "pixel")
+            >>> await session.scroll_to_right(100, "pixels")
         """
         # Validate arguments
         value = self._validate_scroll_value(value)
-        by = self._validate_scroll_strategy(by)
+        strategy = self._validate_scroll_strategy(by)
         pause = self._validate_pause(pause)
 
-        # Calculate scroll pixal
-        if by == "steps":
+        # Calculate scroll pixels
+        if strategy == "steps":
             right = (await self.viewport).right
             width = await self.page_width
             # . fast path - already at right
             if width - right <= 1:
                 return None
-            # . calculate pixals
+            # . calculate pixels
             pixel = ceil((width - right) / value)
         else:
             pixel = value
@@ -3014,13 +3108,13 @@ class Session:
         """Scroll the viewport to the element by the given selector and strategy.
 
         Args:
-            value: The selector for the element, or an  instance.
+            value: Element or selector identifying the scroll target.
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-                If the given 'value' is an, this argument will be ignored.
+                This argument is ignored when `value` is an `Element`.
             timeout: Total seconds to wait for the element to scroll into view. Defaults to `5`.
 
         Returns:
-            True if the element is in the viewport, False if element not exists.
+            `True` if the element was found and scrolled into view; otherwise `False`.
 
         Example:
             >>> in_viewport = await session.scroll_into_view("#element", by="css")
@@ -3042,24 +3136,26 @@ class Session:
 
         return bool(await poll(attempt, timeout))
 
-    def _validate_scroll_strategy(self, by: Any) -> str:
+    def _validate_scroll_strategy(self, by: Any) -> Literal["steps", "pixels"]:
         """Validate the scroll 'by' strategy.
 
         Args:
-            by: By used by this operation.
+            by: Candidate strategy, either `"steps"` or `"pixels"`.
 
         Returns:
             The scroll 'by' strategy.
         """
-        if by not in Constraint.PAGE_SCROLL_BY_STRATEGIES:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid scroll 'by' strategy: {}. Available options: {}".format(
-                    self.__class__.__name__,
-                    repr(by),
-                    sorted(Constraint.PAGE_SCROLL_BY_STRATEGIES),
-                )
+        if by == "steps":
+            return "steps"
+        if by == "pixels":
+            return "pixels"
+        raise errors.InvalidArgumentError(
+            "<{}>\nInvalid scroll 'by' strategy: {}. Available options: {}".format(
+                self.__class__.__name__,
+                repr(by),
+                sorted(Constraint.PAGE_SCROLL_BY_STRATEGIES),
             )
-        return by
+        )
 
     def _validate_scroll_value(self, value: Any) -> int:
         """Validate the scroll by 'value'.
@@ -3092,7 +3188,7 @@ class Session:
             timeout: Total seconds to wait for the alert to pop-up. Defaults to `5`.
 
         Returns:
-            The alert of the active page window, or `None` if alert not exists.
+            The active alert, or `None` when no alert appears before the deadline.
 
         Example:
             >>> alert = await session.get_alert()
@@ -3122,16 +3218,14 @@ class Session:
         """Switch focus to a specific frame in the active page window.
 
         Args:
-            value: Accepts three kinds of input:
-                -: The selector for the element contains the frame.
-                -: An element instance contains the frame.
-                -: The index (id) of the frame.
+            value: A frame element, an element selector, or a nonnegative frame
+                index when `by="index"`.
             by: The selector strategy, accepts `'css'`, `'xpath'` or `'index'`. Defaults to `'css'`.
-                If the given 'value' is an, this argument will be ignored.
+                This argument is ignored when `value` is an `Element`.
             timeout: Total seconds to wait for frame switching. Defaults to `5`.
 
         Returns:
-            True if successfuly switched focus, False if frame not exists.
+            `True` when focus changes to the frame; `False` if it is not found.
 
         Example:
             >>> # . switch by element selector
@@ -3144,15 +3238,23 @@ class Session:
             >>> # . switch by frame index
             >>> await session.switch_frame(1, by="index")  # True / False
         """
-        if by == "index" and (type(value) is not int or value < 0):
-            raise errors.InvalidArgumentError(
-                "Frame index must be a nonnegative integer"
-            )
-        strat = (
-            self._validate_selector_strategy(by)
-            if by != "index" and not isinstance(value, Element)
-            else None
-        )
+        frame_element = value if isinstance(value, Element) else None
+        frame_index: int | None = None
+        selector: str | None = None
+        strategy: str | None = None
+        if frame_element is None and by == "index":
+            if type(value) is not int or value < 0:
+                raise errors.InvalidArgumentError(
+                    "Frame index must be a nonnegative integer"
+                )
+            frame_index = value
+        elif frame_element is None:
+            if not isinstance(value, str) or not value:
+                raise errors.InvalidArgumentError(
+                    "Frame selector must be a nonempty string"
+                )
+            selector = value
+            strategy = self._validate_selector_strategy(by)
 
         async def attempt() -> bool:
             """Attempt one frame switch, treating a missing frame as not ready.
@@ -3161,12 +3263,17 @@ class Session:
                 True when the checked condition is satisfied; otherwise False.
             """
             try:
-                if isinstance(value, Element):
-                    frame_id = {ELEMENT_KEY: value.id}
-                elif by == "index":
-                    frame_id = value
+                frame_id: dict[str, str] | int
+                if frame_element is not None:
+                    frame_id = {ELEMENT_KEY: frame_element.id}
+                elif frame_index is not None:
+                    frame_id = frame_index
                 else:
-                    element = await self._find_element_no_wait(value, strat)
+                    if selector is None or strategy is None:
+                        raise errors.InvalidArgumentError(
+                            "Frame selector and strategy are unavailable"
+                        )
+                    element = await self._find_element_no_wait(selector, strategy)
                     if element is None:
                         return False
                     frame_id = {ELEMENT_KEY: element.id}
@@ -3183,7 +3290,7 @@ class Session:
         """Switch focus to the default frame (the `MAIN` document).
 
         Returns:
-            True if successfuly switched focus, False if failed.
+            `True` when focus changes to the top-level document; otherwise `False`.
 
         Example:
             >>> await session.default_frame()  # True / False
@@ -3198,7 +3305,7 @@ class Session:
         """Switch focus to the parent frame of the current frame.
 
         Returns:
-            True if successfuly switched focus, False if failed.
+            `True` when focus changes to the parent frame; otherwise `False`.
 
         Example:
             >>> await session.parent_frame()  # True / False
@@ -3212,16 +3319,25 @@ class Session:
     # Element -----------------------------------------------------------------------------
     @property
     async def active_element(self) -> Element:
-        """Return the element in focus. If no element is in focus, returns the  element.
+        """Return the element that currently has document focus.
 
         Returns:
-            The element in focus. if no element is in focus, returns the  element.
+            The focused element. WebDriver normally returns the document body when
+            no form control or other focusable element has focus.
+
+        Raises:
+            errors.InvalidResponseError: If WebDriver does not return an element reference.
 
         Example:
-            >>> elements = await session.active_element
+            >>> element = await session.active_element
         """
         res = await self.execute_command(Command.W3C_GET_ACTIVE_ELEMENT)
-        return self._create_element(res.get("value", None))
+        element = self._create_element(res.get("value"))
+        if element is None:
+            raise errors.InvalidResponseError(
+                "Active-element response did not contain an element reference"
+            )
+        return element
 
     async def element_exists(
         self,
@@ -3231,12 +3347,12 @@ class Session:
         """Check if an element exists. This method ignores the implicit wait timeout, and returns element existence immediately.
 
         Args:
-            value: The selector for the element *OR* an  instance.
+            value: An element or a selector that identifies one.
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-                If the given 'value' is an, this argument will be ignored.
+                This argument is ignored when `value` is an `Element`.
 
         Returns:
-            True if the element exists, False otherwise.
+            `True` if the element exists; otherwise `False`.
 
         Example:
             >>> await session.element_exists("#input_box")  # True / False
@@ -3257,14 +3373,14 @@ class Session:
 
         Args:
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-                For values that are  instances, this argument will be ignored.
+                This argument is ignored for values that are `Element` objects.
             all_: Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
                 - `True`: All elements must exist to return True.
                 - `False`: Any one of the elements exists returns True.
-            *values: The locators for multiple elements *OR*  instances.
+            *values: Elements or selectors that identify them.
 
         Returns:
-            True if the elements exist, False otherwise.
+            `True` when the requested all/any existence rule is satisfied.
 
         Example:
             >>> await session.elements_exist(
@@ -3272,11 +3388,11 @@ class Session:
             ... )  # True / False
         """
 
-        async def check_existance(value: str | Element) -> bool:
+        async def check_existence(value: str | Element) -> bool:
             """Perform one element-existence observation for the enclosing wait.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector to check once.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3288,15 +3404,15 @@ class Session:
 
         # Validate strategy
         strat = self._validate_selector_strategy(by)
-        # Check existance
+        # Check existence
         if all_:
             for value in values:
-                if not await check_existance(value):
+                if not await check_existence(value):
                     return False
             return True
         else:
             for value in values:
-                if await check_existance(value):
+                if await check_existence(value):
                     return True
             return False
 
@@ -3312,7 +3428,7 @@ class Session:
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
 
         Returns:
-            The located element, or `None` if not found.
+            The located element, or `None` when no element matches.
 
         Example:
             >>> await session.find_element("#input_box", by="css")
@@ -3353,7 +3469,7 @@ class Session:
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
 
         Returns:
-            A list of located elements (empty if not found).
+            Located elements in response order, or an empty list when none match.
 
         Example:
             >>> await session.find_elements("#input_box", by="css")
@@ -3394,7 +3510,7 @@ class Session:
             *values: The locators for multiple elements.
 
         Returns:
-            The first located element among all locators, or `None` if not found.
+            The first located element in selector order, or `None` when none match.
 
         Example:
             >>> await session.find_1st_element("#input_box", "#input_box2", by="css")
@@ -3427,13 +3543,13 @@ class Session:
                 - `'in_viewport'`: Wait for a nonempty rectangle intersecting the viewport.
                 - `'enabled'`: Wait until an element is enabled.
                 - `'selected'`: Wait until an element is selected.
-            value: The selector for the element *OR* an  instance.
+            value: Element or selector to evaluate.
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-                If the given 'value' is an, this argument will be ignored.
+                This argument is ignored when `value` is an `Element`.
             timeout: Total seconds to wait until timeout. Defaults to `5`.
 
         Returns:
-            True if the element satisfies the condition, False otherwise.
+            `True` if the condition is met before the deadline; otherwise `False`.
 
         Example:
             >>> await session.wait_until_element(
@@ -3445,7 +3561,7 @@ class Session:
             """Check whether the previously identified element is absent from the DOM.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3459,7 +3575,7 @@ class Session:
             """Check whether a matching element currently exists.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3473,7 +3589,7 @@ class Session:
             """Check the matched element using a center-point hit test.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3488,7 +3604,7 @@ class Session:
             """Check whether the matched element intersects the viewport.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3503,7 +3619,7 @@ class Session:
             """Check whether the matched element is enabled.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3518,7 +3634,7 @@ class Session:
             """Check whether the matched element is selected.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3571,15 +3687,15 @@ class Session:
                 - `'enabled'`: Wait until the elements are enabled.
                 - `'selected'`: Wait until the elements are selected.
             by: The selector strategy, accepts `'css'` or `'xpath'`. Defaults to `'css'`.
-                For values that are  instances, this argument will be ignored.
+                This argument is ignored for values that are `Element` objects.
             all_: Determine how to satisfy the condition. Defaults to `True (all elements)`.
                 - `True`: All elements must satisfy the condition to return True.
                 - `False`: Any one of the elements satisfies the condition returns True.
             timeout: Total seconds to wait until timeout. Defaults to `5`.
-            *values: The locators for multiple elements *OR*  instances.
+            *values: Elements or selectors that identify them.
 
         Returns:
-            True if the elements satisfy the condition, False otherwise.
+            `True` if the requested all/any rule is met before the deadline.
 
         Example:
             >>> await session.wait_until_elements(
@@ -3592,7 +3708,7 @@ class Session:
             """Check whether the previously identified element is absent from the DOM.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3606,7 +3722,7 @@ class Session:
             """Check whether a matching element currently exists.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3620,7 +3736,7 @@ class Session:
             """Check the matched element using a center-point hit test.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3635,7 +3751,7 @@ class Session:
             """Check whether the matched element intersects the viewport.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3650,7 +3766,7 @@ class Session:
             """Check whether the matched element is enabled.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3665,7 +3781,7 @@ class Session:
             """Check whether the matched element is selected.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -3684,7 +3800,7 @@ class Session:
 
             Args:
                 values: Input values evaluated in order by this operation.
-                condition_checker: Condition checker used by this operation.
+                condition_checker: Async predicate applied to each candidate.
 
             Returns:
                 True when the requested condition holds for all candidates if all_ is True, or for any candidate otherwise; False if the requirement is not met.
@@ -3724,19 +3840,20 @@ class Session:
         )
 
     async def _element_exists_no_wait(self, value: str, strat: str) -> bool:
-        """Check if an element exists without implicit wait. Returns `False` immediately if element not exists.
+        """Check for a matching element once, without applying implicit wait.
 
         Args:
-            value: Value to inspect, normalize, or assign as described above.
-            strat: Strat used by this operation.
+            value: Element selector.
+            strat: Validated WebDriver selector strategy.
 
         Returns:
             True if an element exists without implicit wait; otherwise False.
         """
         try:
-            return await self._execute_script(
+            result = await self._execute_script(
                 javascript.ELEMENT_EXISTS_IN_PAGE[strat], value
             )
+            return typed_value(result, bool, "Page element existence state")
         except errors.ElementNotFoundError:
             return False
         except errors.InvalidElementStateError as err:
@@ -3753,14 +3870,14 @@ class Session:
             ) from err
 
     async def _find_element_no_wait(self, value: str, strat: str) -> Element | None:
-        """Find element without implicit wait. Returns `None` immediately if element not exists.
+        """Find one matching element without applying implicit wait.
 
         Args:
-            value: Value to inspect, normalize, or assign as described above.
-            strat: Strat used by this operation.
+            value: Element selector.
+            strat: Validated WebDriver selector strategy.
 
         Returns:
-            The Element value produced by this operation. None indicates that no value is available.
+            The matching element, or `None` when no element matches.
         """
         try:
             res = await self._execute_script(
@@ -3793,7 +3910,8 @@ class Session:
         """Validate selector strategy.
 
         Args:
-            by: By used by this operation.
+            by: Public selector name (`"css"` or `"xpath"`) or the internal
+                WebDriver name `"css selector"`.
 
         Returns:
             Selector strategy.
@@ -3871,7 +3989,8 @@ class Session:
             timeout: Total seconds to wait for the shadow root. Defaults to `5`.
 
         Returns:
-            The shadow root of the element, or `None` if not exists.
+            The host element's shadow root, or `None` when no matching host or
+            shadow root appears before the deadline.
 
         Example:
             >>> shadow = await session.get_shadow("#element", by="css")
@@ -3894,10 +4013,10 @@ class Session:
     # Script ------------------------------------------------------------------------------
     @property
     def scripts(self) -> list[JavaScript]:
-        """Return all the cached JavaScripts. `(NOT an asynchronous attribute)`.
+        """Return a snapshot of the locally cached JavaScript snippets.
 
         Returns:
-            All the cached javascripts. `(not an asynchronous attribute)`.
+            Cached JavaScript objects in insertion order.
 
         Example:
             >>> scripts = session.scripts
@@ -3905,13 +4024,13 @@ class Session:
         return list(self._script_by_name.values())
 
     def get_script(self, script: str | JavaScript) -> JavaScript | None:
-        """Get the JavaScript from cache `(NOT an asynchronous method)`.
+        """Look up a locally cached JavaScript snippet.
 
         Args:
             script: Cache name or JavaScript instance, matched by its name.
 
         Returns:
-            The cached JavaScript, or `None` if not exist.
+            The cached JavaScript, or `None` when the name is unknown.
 
         Raises:
             errors.InvalidArgumentError: If script is neither a string nor a JavaScript.
@@ -3923,10 +4042,11 @@ class Session:
             raise errors.InvalidArgumentError(
                 "Script must be a string or a cached JavaScript instance."
             )
-        return self._script_by_name.get(script)
+        name = script.name if isinstance(script, JavaScript) else script
+        return self._script_by_name.get(name)
 
     def cache_script(self, name: str, script: str, *args: Any) -> JavaScript:
-        """Cache a javascript for later execution `(NOT an asynchronous method)`.
+        """Cache a named JavaScript snippet for later execution.
 
         Args:
             name: The name of the javascript (cache accessor).
@@ -3950,28 +4070,29 @@ class Session:
         return js
 
     def remove_script(self, script: str | JavaScript) -> bool:
-        """Remove a previously cached JavaScript `(NOT an asynchronous method)`.
+        """Remove a JavaScript snippet from the local cache.
 
         Args:
-            script: Accepts both the name of the javascript, or the  instance.
+            script: Cached JavaScript object or its cache name.
 
         Returns:
-            True if the script is removed from cache, False if script not exists.
+            `True` if the script was cached and removed; otherwise `False`.
 
         Example:
             >>> session.remove_script("myscript")  # True / False
         """
         try:
-            self._script_by_name.pop(script)
+            name = script.name if isinstance(script, JavaScript) else script
+            self._script_by_name.pop(name)
             return True
         except KeyError:
             return False
 
     def rename_script(self, script: str | JavaScript, new_name: str) -> JavaScript:
-        """Rename a previously cached JavaScript `(NOT an asynchronous method)`.
+        """Replace a cached JavaScript snippet's local lookup name.
 
         Args:
-            script: Accepts both the name of the javascript, or the  instance.
+            script: Cached JavaScript object or its cache name.
             new_name: The new name for the javascript.
 
         Returns:
@@ -3980,7 +4101,8 @@ class Session:
         Example:
             >>> # . cache a script
             >>> js = session.cache_script("script1", "return document.title;")
-            >>> # <JavaScript (name='script1', script='return document.titile;', args=[])>
+            >>> print(js.name)
+            script1
 
             >>> # . rename the script
             >>> js = session.rename_script("script1", "script2")
@@ -3990,7 +4112,8 @@ class Session:
 
         # Pop cached script
         try:
-            js = self._script_by_name.pop(script)
+            script_name = script.name if isinstance(script, JavaScript) else script
+            js = self._script_by_name.pop(script_name)
         except KeyError as err:
             raise errors.JavaScriptNotFoundError(
                 "<{}>\nCannot rename script {}. JavaScript not found.".format(
@@ -4175,7 +4298,7 @@ class Session:
         """Validate script name.
 
         Args:
-            name: Name identifying the requested item.
+            name: Candidate JavaScript cache name.
 
         Returns:
             Script name.
@@ -4199,7 +4322,7 @@ class Session:
         pointer: Literal["mouse", "pen", "touch"] = "mouse",
         duration: int | float = 0.25,
     ) -> Actions:
-        """Start an actions chain to peform (automate) low level interactions such as mouse movements, key presses, and wheel scrolls.
+        """Create an action chain for pointer, keyboard, and wheel input.
 
         Args:
             pointer: The pointer type to use. Defaults to `'mouse'`.
@@ -4212,6 +4335,7 @@ class Session:
         Example:
             >>> from aselenium import KeyboardKeys
             >>> input_box = await session.find_element("#input_box")
+            >>> assert input_box is not None
             >>> (
             ...     await session.actions("mouse")
             ...     .move_to(input_box)
@@ -4225,34 +4349,39 @@ class Session:
 
     # Utils -------------------------------------------------------------------------------
     async def pause(self, duration: int | float | None) -> None:
-        """Pause the for a given duration.
+        """Pause command sequencing for a duration in seconds.
 
         Args:
-            duration: The duration to pause in seconds.
+            duration: Finite, nonnegative delay in seconds, or ``None`` for no
+                delay.
+
+        Raises:
+            errors.InvalidArgumentError: ``duration`` is not a finite,
+                nonnegative number or ``None``.
         """
-        if duration is None:
-            return None  # exit
-        try:
+        validate_delay(duration)
+        if duration is not None:
             await sleep(duration)
-        except Exception as err:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'duration' to pause: {}.".format(
-                    self.__class__.__name__, repr(duration)
-                )
-            ) from err
 
     def _validate_pause(self, value: Any) -> int | float:
-        """Validate if pause value `> 0`.
+        """Validate a positive pause duration.
 
         Args:
-            value: If pause value `> 0` supplied for validation.
+            value: Candidate duration in seconds.
 
         Returns:
-            If pause value `> 0`.
+            The validated positive duration.
+
+        Raises:
+            errors.InvalidArgumentError: If `value` is not a positive number.
         """
-        if not isinstance(value, (int, float)):
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not isfinite(value)
+        ):
             raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'pause'. Must be an integer or float, "
+                "<{}>\nInvalid 'pause'. Must be a finite integer or float, "
                 "instead got: {}.".format(self.__class__.__name__, type(value))
             )
         if value <= 0:
@@ -4262,50 +4391,32 @@ class Session:
             )
         return value
 
-    def _validate_timeout(self, value: Any) -> int | float:
-        """Validate if timeout value `> 0`.
-
-        Args:
-            value: If timeout value `> 0` supplied for validation.
-
-        Returns:
-            If timeout value `> 0`.
-        """
-        if not isinstance(value, (int, float)):
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'timeout'. Must be an integer or float, "
-                "instead got: {}.".format(self.__class__.__name__, type(value))
-            )
-        if value <= 0:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'timeout'. Must be greater than 0, "
-                "instead got: {}.".format(self.__class__.__name__, value)
-            )
-        return value
-
     def _validate_wait_str_value(self, value: Any) -> str:
-        """Validate if wait until 'value' is a non-empty string.
+        """Validate a nonempty string used by a wait condition.
 
         Args:
-            value: If wait until 'value' is a non-empty string supplied for validation.
+            value: Candidate string value.
 
         Returns:
-            If wait until 'value' is a non-empty string.
+            The validated string.
+
+        Raises:
+            errors.InvalidArgumentError: If `value` is not a nonempty string.
         """
         if not isinstance(value, str) or not value:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid wait until value: {} {}. "
-                "Must an non-empty string.".format(
+                "Must be a nonempty string.".format(
                     self.__class__.__name__, repr(value), type(value)
                 )
             )
         return value
 
     def _raise_invalid_wait_condition(self, condition: Any) -> NoReturn:
-        """Raise invalid wait until 'condition' error.
+        """Reject an unsupported element wait condition.
 
         Args:
-            condition: Asynchronous no-argument predicate whose truthy result completes the wait.
+            condition: Unsupported condition value.
 
         Raises:
             errors.InvalidArgumentError: Always raised with the supplied diagnostic context.
@@ -4316,52 +4427,41 @@ class Session:
             )
         )
 
-    def _is_element(self, element: Any) -> bool:
-        """Check if the given object is an  instance.
+    def _is_element(self, element: object) -> TypeGuard[Element]:
+        """Return whether an object is an `Element` instance.
 
         Args:
-            element: Element used by this operation.
+            element: Object to inspect.
 
         Returns:
-            True if the given object is an  instance; otherwise False.
+            `True` when `element` is an `Element`; otherwise `False`.
         """
         return isinstance(element, Element)
 
     def _decode_base64(self, data: str, encoding: str) -> bytes:
-        """Decode base64 string to.
+        """Decode a base64-encoded text payload into bytes.
 
         Args:
-            data: Data used by this operation.
-            encoding: Encoding used by this operation.
+            data: Base64 text returned by WebDriver.
+            encoding: Character encoding used to convert the text to bytes.
 
         Returns:
-            Decode base64 string to.
+            Decoded binary payload.
         """
         return b64decode(data.encode(encoding), validate=True)
 
-    def _encode_base64(self, data: bytes, encoding: str) -> str:
-        """Encode bytes to base64.
-
-        Args:
-            data: Data used by this operation.
-            encoding: Encoding used by this operation.
-
-        Returns:
-            The encode base64 string.
-        """
-        return b64encode(data).decode(encoding)
-
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
-        """Return a diagnostic representation of this instance.
+        """Describe the session without allocating a service endpoint.
 
         Returns:
-            A diagnostic representation of this instance.
+            The session ID and already allocated service URL, if any.
         """
+        service_url = getattr(self._service, "_url", None)
         return "<%s (id='%s', service='%s')>" % (
             self.__class__.__name__,
             self._id,
-            self._service.url,
+            service_url,
         )
 
     def __hash__(self) -> int:
@@ -4381,11 +4481,16 @@ class Session:
         Returns:
             True if this instance compares equal to another object; otherwise False.
         """
-        return hash(self) == hash(__o) if isinstance(__o, self.__class__) else False
+        return self is __o
 
     def __del__(self) -> None:
-        """Release references during finalization; explicit cleanup remains preferred."""
-        self._collect_garbage()
+        """Release references during finalization without emitting unraisable errors."""
+        try:
+            self._collect_garbage()
+        except Exception:
+            # Construction can fail before subclass caches exist. Explicit
+            # ``quit()`` remains the only error-reporting cleanup boundary.
+            pass
 
     def _collect_garbage(self) -> None:
         """Collect garbage."""
@@ -4399,17 +4504,17 @@ class Session:
         self._service = None
         # Connection
         self._conn = None
-        # Vender prefix
-        self._vendor = None
+        # Vendor prefix
+        self._vendor.clear()
         # Session
         self._id = None
         self._base_url = None
         self._timeouts = None
         # Window
-        self._window_by_name = None
-        self._window_by_handle = None
+        self._window_by_name.clear()
+        self._window_by_handle.clear()
         # Script
-        self._script_by_name = None
+        self._script_by_name.clear()
         # Status
         self.__closed = True
 
@@ -4423,13 +4528,15 @@ class ChromiumBaseSession(Session):
         options: ChromiumBaseOptions,
         service: ChromiumBaseService,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a Chromium-family session with CDP command caching.
 
         Args:
-            options: Options used by this operation.
-            service: Service used by this operation.
+            options: Chromium-family browser configuration snapshot.
+            service: Chromium-family WebDriver service owned by the session.
         """
         super().__init__(options, service)
+        self._options: ChromiumBaseOptions | None = options
+        self._service: ChromiumBaseService | None = service
         # Devtools cmd
         self._cdp_cmd_by_name: dict[str, DevToolsCMD] = {}
 
@@ -4441,7 +4548,10 @@ class ChromiumBaseSession(Session):
         Returns:
             The browser options owned by this facade or session.
         """
-        return self._options
+        options = self._options
+        if options is None:
+            raise errors.InvalidSessionError("Session options have been released")
+        return options
 
     @property
     def browser_version(self) -> str | None:
@@ -4455,21 +4565,24 @@ class ChromiumBaseSession(Session):
 
     @property
     def service(self) -> ChromiumBaseService:
-        """Return the webdriver service.
+        """Return the WebDriver service.
 
         Returns:
             The driver service owned by the session.
         """
-        return self._service
+        service = self._service
+        if service is None:
+            raise errors.InvalidSessionError("Session service has been released")
+        return service
 
     @property
     def driver_version(self) -> ChromiumVersion:
-        """Return the webdriver binary version of the session.
+        """Return the WebDriver binary version of the session.
 
         Returns:
-            The webdriver binary version of the session.
+            The WebDriver binary version of the session.
         """
-        return super().driver_version
+        return self.service.driver_version
 
     # Chromium - Permission ---------------------------------------------------------------
     @property
@@ -4492,7 +4605,7 @@ class ChromiumBaseSession(Session):
         """Get a specific permission from the active page window.
 
         Args:
-            name: The name of the permission or a  instance.
+            name: Permission descriptor name or existing `Permission` object.
 
         Returns:
             The specified permission, or `None` if not found.
@@ -4536,7 +4649,11 @@ class ChromiumBaseSession(Session):
         name: str,
         state: Literal["granted", "denied", "prompt"],
     ) -> Permission:
-        """Set a specific permission's state of the active page window.
+        """Set and observe a permission state under shared command ownership.
+
+        The update and observation cannot interleave with another independent
+        task's commands. Use ``session.transaction()`` around additional work
+        that depends on the resulting page or permission state.
 
         Args:
             name: The name of the permission.
@@ -4548,54 +4665,37 @@ class ChromiumBaseSession(Session):
         Example:
             >>> perm = await session.set_permission("geolocation", "granted")
         """
-        # Set permission
         permission = Permission(name, state)
-        try:
-            await self.execute_command(
-                Command.SET_PERMISSION,
-                body={
-                    "descriptor": {"name": permission.name},
-                    "state": permission.state,
-                },
-            )
-        except errors.InvalidArgumentError as err:
-            msg = str(err)
-            if ErrorCode.INVALID_PERMISSION_STATE in msg:
-                raise errors.InvalidPermissionStateError(
-                    "<{}>\nInvalid permission state: {}.".format(
-                        self.__class__.__name__, repr(state)
-                    )
-                ) from err
-            if ErrorCode.INVALID_PERMISSION_NAME in msg:
-                raise errors.InvalidPermissionNameError(
-                    "<{}>\nInvalid permission name: {}.".format(
-                        self.__class__.__name__, repr(name)
-                    )
-                ) from err
-            raise err
-        # Return permission
-        return await self.get_permission(name)
-
-    def _validate_permission_name(self, name: Any) -> str:
-        """Validate the name of a permission.
-
-        Args:
-            name: Name identifying the requested item.
-
-        Returns:
-            The name of a permission.
-        """
-        if isinstance(name, Permission):
-            return name.name
-        if name not in Constraint.PERMISSION_NAMES:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid permission name: {}. Available options: {}".format(
-                    self.__class__.__name__,
-                    repr(name),
-                    sorted(Constraint.PERMISSION_NAMES),
+        async with self.transaction():
+            try:
+                await self.execute_command(
+                    Command.SET_PERMISSION,
+                    body={
+                        "descriptor": {"name": permission.name},
+                        "state": permission.state,
+                    },
                 )
-            )
-        return name
+            except errors.InvalidArgumentError as err:
+                msg = str(err)
+                if ErrorCode.INVALID_PERMISSION_STATE in msg:
+                    raise errors.InvalidPermissionStateError(
+                        "<{}>\nInvalid permission state: {}.".format(
+                            self.__class__.__name__, repr(state)
+                        )
+                    ) from err
+                if ErrorCode.INVALID_PERMISSION_NAME in msg:
+                    raise errors.InvalidPermissionNameError(
+                        "<{}>\nInvalid permission name: {}.".format(
+                            self.__class__.__name__, repr(name)
+                        )
+                    ) from err
+                raise
+            current = await self.get_permission(name)
+            if current is None:
+                raise errors.InvalidResponseError(
+                    "WebDriver did not return the permission after setting it"
+                )
+            return current
 
     # Chromium - Network ------------------------------------------------------------------
     @property
@@ -4689,13 +4789,13 @@ class ChromiumBaseSession(Session):
             return await self.network
 
     async def reset_network(self) -> Network:
-        """Reset the network conditions of the current session to the default configuration, and returns the reset.
+        """Reset Chromium network emulation and return confirmed defaults.
 
         Default conditions:
         <Network (offline=False, latency=0, upload_throughput=-1, download_throughput=-1)>
 
         Returns:
-            The Network value produced by this operation.
+            The confirmed default network conditions.
 
         Example:
             >>> network = await session.reset_network()
@@ -4716,14 +4816,12 @@ class ChromiumBaseSession(Session):
             The available sinks for a cast session.
         """
         res = await self.execute_command(Command.GET_SINKS, keys=self._vendor)
-        try:
-            return res["value"]
-        except KeyError as err:
+        sinks = self._typed_response_value(res, list, "Cast sinks")
+        if not all(isinstance(sink, dict) for sink in sinks):
             raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse cast sinks from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+                "Cast sinks response value must contain only objects"
+            )
+        return sinks
 
     @property
     async def cast_issue(self) -> str:
@@ -4733,12 +4831,7 @@ class ChromiumBaseSession(Session):
             The issue of the cast session.
         """
         res = await self.execute_command(Command.GET_ISSUE_MESSAGE, keys=self._vendor)
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                f"\nFailed to parse cast issue from response: {res}"
-            ) from err
+        return self._typed_response_value(res, str, "Cast issue")
 
     async def set_cast_sink(self, sink_name: str) -> None:
         """Set a specific sink as the Cast session receiver target.
@@ -4807,10 +4900,10 @@ class ChromiumBaseSession(Session):
     # Chromium - DevTools Command ---------------------------------------------------------
     @property
     def cdp_cmds(self) -> list[DevToolsCMD]:
-        """Return all the cached Chrome Devtools Protocol commands. `(NOT an asynchronous attribute)`.
+        """Return a snapshot of locally cached Chrome DevTools commands.
 
         Returns:
-            All the cached chrome devtools protocol commands. `(not an asynchronous attribute)`.
+            Cached DevTools commands in insertion order.
 
         Example:
             >>> cmds = session.cdp_cmds
@@ -4818,13 +4911,13 @@ class ChromiumBaseSession(Session):
         return list(self._cdp_cmd_by_name.values())
 
     def get_cdp_cmd(self, cmd: str | DevToolsCMD) -> DevToolsCMD | None:
-        """Get the Chrome Devtools Protocol command from cache `(NOT an asynchronous method)`.
+        """Look up a locally cached Chrome DevTools command.
 
         Args:
             cmd: Cache name or DevToolsCMD instance, matched by its name.
 
         Returns:
-            The cached DevToolsCMD, or `None` if not exist.
+            The cached command, or `None` when the name is unknown.
 
         Raises:
             errors.InvalidArgumentError: If cmd is neither a string nor a DevToolsCMD.
@@ -4836,77 +4929,77 @@ class ChromiumBaseSession(Session):
             raise errors.InvalidArgumentError(
                 "CDP command must be a string or a cached DevToolsCMD instance."
             )
-        return self._cdp_cmd_by_name.get(cmd)
+        name = cmd.name if isinstance(cmd, DevToolsCMD) else cmd
+        return self._cdp_cmd_by_name.get(name)
 
     def cache_cdp_cmd(self, name: str, cmd: str, **kwargs: Any) -> DevToolsCMD:
-        """Cache a Chrome Devtools Protocol command for later execution `(NOT an asynchronous method)`.
+        """Cache a named Chrome DevTools Protocol command.
 
         Args:
-            name: The name of the command (cache accessor).
-            cmd: The command line.
-            **kwargs: The keyword arguments for the command.
+            name: Unique local cache name.
+            cmd: DevTools Protocol method name, such as `"Browser.getVersion"`.
+            **kwargs: Default command parameters.
 
         Returns:
             The cached CDP command.
 
         Example:
-            >>> # . without arguments
             >>> cmd = session.cache_cdp_cmd("get_version", "Browser.getVersion")
-            >>> # <DevToolsCMD (name='get_version', cmd='Browser.getVersion', kwargs={})>
+            >>> print(cmd.name)
+            get_version
 
-            >>> # . with arguments
             >>> cmd = session.cache_cdp_cmd(
             ...     "get_url",
             ...     "Runtime.evaluate",
             ...     expression="window.location.href",
             ... )
         """
-        cmd = DevToolsCMD(self._validate_cdp_cmd_name(name), cmd, **kwargs)
-        self._cdp_cmd_by_name[name] = cmd
-        return cmd
+        cached_cmd = DevToolsCMD(self._validate_cdp_cmd_name(name), cmd, **kwargs)
+        self._cdp_cmd_by_name[name] = cached_cmd
+        return cached_cmd
 
     def remove_cdp_cmd(self, cmd: str | DevToolsCMD) -> bool:
-        """Remove a previously cached Chrome Devtools Protocol command `(NOT an asynchronous method)`.
+        """Remove a Chrome DevTools command from the local cache.
 
         Args:
-            cmd: Accepts both the name of the DevToolsCMD, or the  instance.
+            cmd: Cached DevTools command or its cache name.
 
         Returns:
-            True if the command is removed from cache, False if command not exist.
+            `True` if the command was cached and removed; otherwise `False`.
 
         Example:
             >>> session.remove_cdp_cmd("mycmd")  # True / False
         """
         try:
-            self._cdp_cmd_by_name.pop(cmd)
+            name = cmd.name if isinstance(cmd, DevToolsCMD) else cmd
+            self._cdp_cmd_by_name.pop(name)
             return True
         except KeyError:
             return False
 
     def rename_cdp_cmd(self, cmd: str | DevToolsCMD, new_name: str) -> DevToolsCMD:
-        """Rename a previously cached Chrome Devtools Protocol command `(NOT an asynchronous method)`.
+        """Replace a cached Chrome DevTools command's local lookup name.
 
         Args:
-            cmd: Accepts both the name of the DevToolsCMD, or the  instance.
+            cmd: Cached DevTools command or its cache name.
             new_name: The new name for the command.
 
         Returns:
             The renamed command.
 
         Example:
-            >>> # . cache a command
             >>> cmd = session.cache_cdp_cmd("cmd1", "Browser.getVersion")
-            >>> # <DevToolsCMD (name='cmd1', cmd='Browser.getVersion', kwargs={})>
-
-            >>> # . rename the command
             >>> cmd = session.rename_cdp_cmd("cmd1", "cmd2")
+            >>> print(cmd.name)
+            cmd2
         """
         # Validate name
         name = self._validate_cdp_cmd_name(new_name)
 
         # Pop cached command
         try:
-            cmd = self._cdp_cmd_by_name.pop(cmd)
+            cmd_name = cmd.name if isinstance(cmd, DevToolsCMD) else cmd
+            cached_cmd = self._cdp_cmd_by_name.pop(cmd_name)
         except KeyError as err:
             raise errors.DevToolsCMDNotFoundError(
                 "<{}>\nCannot rename command {}. Chrome Devtools Protocol "
@@ -4914,22 +5007,18 @@ class ChromiumBaseSession(Session):
             ) from err
 
         # Cache with new name
-        return self.cache_cdp_cmd(name, cmd.cmd, **cmd.kwargs)
+        return self.cache_cdp_cmd(name, cached_cmd.cmd, **cached_cmd.kwargs)
 
     async def execute_cdp_cmd(
         self, cmd: str | DevToolsCMD, **kwargs: Any
     ) -> dict[str, Any]:
-        """Execute Chrome Devtools Protocol command and return the execution result. The command and params should follow chrome devtools protocol domains/commands. For more detail, please refer to: https://chromedevtools.github.io/devtools-protocol/.
+        """Execute a raw or cached Chrome DevTools Protocol command.
 
         Args:
-            cmd: Accepts three kinds of input:
-                -  The command line for chrome devtools protocol.
-                -  The name of a cached Chrome Devtools Protocol command.
-                -  A cached Chrome Devtools Protocol command instance.
-            **kwargs: Additional keyword arguments for the command.
-                - If executing a cached Chrome Devtools Protocol command, the '*kwargs'
-                in this method is always prioritized over the cached arguments. Only
-                when the '*kwargs' is empty, the cached arguments will be used.
+            cmd: Raw DevTools method name, cached command name, or cached
+                `DevToolsCMD` object.
+            **kwargs: Command parameters. For a cached command, nonempty values
+                replace all cached default parameters.
 
         Returns:
             The response from the command execution.
@@ -4939,17 +5028,11 @@ class ChromiumBaseSession(Session):
             errors.InvalidArgumentError: If cmd is neither a string nor a DevToolsCMD.
 
         Example:
-            >>> # . execute command line
-            >>> cmd = "Browser.getVersion"
-            >>> await session.execute_cdp_cmd(cmd)
-
-            >>> # . execute cached command by name
-            >>> session.cache_cdp_cmd("get_version", "Browser.getVersion")
-            >>> await session.execute_cdp_cmd("get_version")
-
-            >>> # . execute cached command by instance
-            >>> cmd = session.cache_cdp_cmd("get_version", "Browser.getVersion")
-            >>> await session.execute_cdp_cmd(cmd)
+            >>> result = await session.execute_cdp_cmd("Browser.getVersion")
+            >>> cached = session.cache_cdp_cmd("page_url", "Runtime.evaluate")
+            >>> result = await session.execute_cdp_cmd(
+            ...     cached, expression="window.location.href"
+            ... )
         """
         # Execute cached command
         command = self.get_cdp_cmd(cmd)
@@ -4963,11 +5046,11 @@ class ChromiumBaseSession(Session):
         )
 
     async def _execute_cdp_cmd(self, cmd: str, **kwargs: Any) -> dict[str, Any]:
-        """Execute Chrome Devtools Protocol command and return the execution result.The command and params should follow chrome devtools protocol domains/commands. For more detail, please refer to: https://chromedevtools.github.io/devtools-protocol/.
+        """Send one Chrome DevTools Protocol method and parse its result.
 
         Args:
-            cmd: The command line for chrome devtools protocol.
-            **kwargs: Additional keyword arguments for the command.
+            cmd: DevTools Protocol method name.
+            **kwargs: Command parameters.
 
         Returns:
             The response from the command execution.
@@ -4982,13 +5065,7 @@ class ChromiumBaseSession(Session):
             body={"cmd": cmd, "params": kwargs},
             keys=self._vendor,
         )
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse Chrome Devtools Protocol command exeuction "
-                "result from response: {}".format(self.__class__.__name__, res)
-            ) from err
+        return self._typed_response_value(res, dict, "DevTools command")
 
     def _validate_cdp_cmd_name(self, name: str) -> str:
         """Validate CDP command name.
@@ -5001,7 +5078,7 @@ class ChromiumBaseSession(Session):
         """
         if not isinstance(name, str) or not name:
             raise errors.InvalidArgumentError(
-                "<{}>\nInvalid Chrome Devtools Protocol command name: {} {}.".format(
+                "<{}>\nInvalid Chrome DevTools Protocol command name: {} {}.".format(
                     self.__class__.__name__, repr(name), type(name)
                 )
             )
@@ -5027,14 +5104,12 @@ class ChromiumBaseSession(Session):
         """
         # Request available log types
         res = await self.execute_command(Command.GET_AVAILABLE_LOG_TYPES)
-        try:
-            return res["value"]
-        except KeyError as err:
+        log_types = self._typed_response_value(res, list, "Log types")
+        if not all(isinstance(log_type, str) for log_type in log_types):
             raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse log types from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+                "Log types response value must contain only strings"
+            )
+        return log_types
 
     async def get_logs(self, log_type: str) -> list[dict[str, Any]]:
         """Get a specific type of logs of the session.
@@ -5055,18 +5130,17 @@ class ChromiumBaseSession(Session):
             res = await self.execute_command(Command.GET_LOG, body={"type": log_type})
         except errors.InvalidArgumentError:
             return []
-        try:
-            return res["value"]
-        except KeyError as err:
+        logs = self._typed_response_value(res, list, "Logs")
+        if not all(isinstance(entry, dict) for entry in logs):
             raise errors.InvalidResponseError(
-                "<{}>\nFailed to parse logs from response: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+                "Logs response value must contain only objects"
+            )
+        return logs
 
     # Special methods ---------------------------------------------------------------------
     def _collect_garbage(self) -> None:
-        """Collect garbage."""
+        """Release Chromium command-cache references after base session cleanup."""
         super()._collect_garbage()
-        # Devtools cmd
-        self._cdp_cmd_by_name = None
+        commands = getattr(self, "_cdp_cmd_by_name", None)
+        if commands is not None:
+            commands.clear()

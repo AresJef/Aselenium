@@ -1,0 +1,352 @@
+{
+  "review_date": "2026-09-05",
+  "package": "aselenium",
+  "version": "2.0.0",
+  "status": "local_gates_pass_with_documented_retries; hosted_candidate_matrix_required",
+  "source": {
+    "base_head": "c02666e79bfb43f2af6bab222a549e9d612303f3",
+    "uncommitted_working_tree": true,
+    "runtime_file_count": 59,
+    "runtime_manifest_sha256": "db6c3d51c135a6f7d9e7bcec64c07969b28323887b86c9ab135b47e2378ff90a",
+    "runtime_manifest_algorithm": "SHA-256 of UTF-8 JSON mapping repository-relative POSIX runtime/resource paths to file SHA-256, sorted keys and compact separators; .py, .json, and py.typed below src/aselenium.",
+    "readme_sha256": "5817a34eddc868fd3062c017a44e6a62c4669fc7fc5ff954e29619777bfcd554",
+    "committed": false,
+    "pushed": false,
+    "tagged": false,
+    "published": false
+  },
+  "environment": {
+    "python": "3.13.12",
+    "platform": "macOS-26.6.2-arm64-arm-64bit-Mach-O",
+    "runtime_dependencies": {
+      "aiohttp": "3.14.3",
+      "psutil": "7.2.2",
+      "orjson": "3.12.0",
+      "aiohappyeyeballs": "2.7.1",
+      "aiosignal": "1.4.0",
+      "attrs": "26.1.0",
+      "frozenlist": "1.8.0",
+      "multidict": "6.7.1",
+      "propcache": "0.5.2",
+      "yarl": "1.24.5",
+      "idna": "3.19"
+    },
+    "wheel_interpreter": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/wheel-env/bin/python",
+    "wheel_installation": "fresh non-editable environment outside checkout; runtime dependencies match audited source environment"
+  },
+  "tests": {
+    "command": ".venv/bin/python -m coverage run --branch --source=aselenium -m pytest --asyncio-debug -q --tb=short",
+    "passed": 3263,
+    "skipped": 1,
+    "failed": 0,
+    "xfailed": 0,
+    "elapsed_seconds": 123.24,
+    "skip_reason": "tests/test_path_core.py:93 Windows drive-relative syntax; inapplicable on macOS",
+    "new_deployment_cases": 36,
+    "final_readme_recipes": {
+      "passed": 83,
+      "elapsed_seconds": 2.18
+    }
+  },
+  "coverage": {
+    "covered_statements": 7199,
+    "total_statements": 7785,
+    "statement_percent": 92.47270391779062,
+    "covered_branches": 1835,
+    "total_branches": 2200,
+    "branch_percent": 83.4090909090909,
+    "combined_percent": 90.47571357035554,
+    "component_floors": "passed"
+  },
+  "quality": {
+    "ruff": "passed",
+    "formatted_python_files": 137,
+    "api_audit": {
+      "files": 136,
+      "functions": 2425,
+      "classes": 294,
+      "examples": 196,
+      "issues": []
+    },
+    "example_contract_issues": [],
+    "mypy_source_files": 78,
+    "public_consumer": "passed",
+    "negative_typing_controls": [
+      "optional lookup dereference rejected",
+      "invalid navigation argument rejected",
+      "byte-valued output path rejected"
+    ],
+    "pip_check": "passed in source and clean wheel environments",
+    "dependency_audit": "No known vulnerabilities; editable Aselenium entry skipped"
+  },
+  "artifacts": {
+    "directory": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/dist",
+    "wheel": {
+      "name": "aselenium-2.0.0-py3-none-any.whl",
+      "sha256": "d322d0111f49a101409be2ae6deb82d092fbd52bb46253a517910129c3affcf3"
+    },
+    "sdist": {
+      "name": "aselenium-2.0.0.tar.gz",
+      "sha256": "5c9e0d0bb685169fea9bf4589b6942f9a8056a6354247eb8e66bde4f24992cd3"
+    },
+    "strict_twine": "passed",
+    "runtime_readme_license_notice_byte_comparison": "passed"
+  },
+  "native_tours": [
+    {
+      "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/native-chrome/installed-chrome-00zdm03z/local-chrome-ihsfob6y/report.json",
+      "sha256": "6e7dca37b2e89985294a09d7e2350f5bb3a3a46c8c330c08b2c9d987d6e29f15",
+      "browser": "chrome",
+      "status": "passed",
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      },
+      "session": {
+        "browser_version": "152.0.7977.76",
+        "driver_version": "152.0.7977.82",
+        "acquisition": "offline"
+      },
+      "allow_download": false,
+      "error": null,
+      "message": null
+    },
+    {
+      "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/native-edge/installed-edge-acniew52/local-edge-em97rkkn/report.json",
+      "sha256": "797266860d702861b168dcbc58250d31aeea2b50277db112d146d0d4a7dfe669",
+      "browser": "edge",
+      "status": "passed",
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      },
+      "session": {
+        "browser_version": "152.0.4191.62",
+        "driver_version": "152.0.4191.62",
+        "acquisition": "offline"
+      },
+      "allow_download": true,
+      "error": null,
+      "message": null
+    },
+    {
+      "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/native-edge/installed-edge-gyqmqriv/local-edge-kuodq_0x/report.json",
+      "sha256": "d9ec2abee2c0e3e20fdaae3409b4c0d50937dde52cda8dc662d6c71de44f94e9",
+      "browser": "edge",
+      "status": "failed",
+      "counts": {
+        "passed": 0,
+        "skipped": 0,
+        "failed": 1,
+        "cancelled": 0,
+        "not-run": 14
+      },
+      "session": null,
+      "allow_download": false,
+      "error": "DriverExecutableNotDetectedError",
+      "message": "No cached Edge driver matches 152.0.4191.62 on mac/64-arm. Provision it online first using the same cache."
+    },
+    {
+      "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/native-firefox/installed-firefox-mae0s7sz/local-firefox-8id_qygh/report.json",
+      "sha256": "6ccb833b9c4a66dcde9ed82c91564b55dc05b9bcafce049139b1b3e7114e5ff7",
+      "browser": "firefox",
+      "status": "passed",
+      "counts": {
+        "passed": 15,
+        "skipped": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      },
+      "session": {
+        "browser_version": "155.0.1",
+        "driver_version": "0.37.1",
+        "acquisition": "offline"
+      },
+      "allow_download": false,
+      "error": null,
+      "message": null
+    },
+    {
+      "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/native-safari/installed-safari-ow8blpb3/local-safari-n0ow2ey2/report.json",
+      "sha256": "8fb4aef06887617889b840c7be25a7d6e17dce1ab388f09e0da1ec3f265f0c6a",
+      "browser": "safari",
+      "status": "passed",
+      "counts": {
+        "passed": 12,
+        "skipped": 3,
+        "failed": 0,
+        "cancelled": 0,
+        "not-run": 0
+      },
+      "session": {
+        "browser_version": "26.6.2",
+        "driver_version": "26.6.2",
+        "acquisition": "offline"
+      },
+      "allow_download": false,
+      "error": null,
+      "message": null
+    }
+  ],
+  "reliability": {
+    "initial_recovery": {
+      "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/reliability-chrome/chrome-b8bng5wv/chrome-recovery.json",
+      "sha256": "6b7013f41cfe5cbc1aab02606185c42c4b38056b986f3377df17300554562b91",
+      "status": "failed",
+      "scenarios": [
+        {
+          "scenario": "browser-crash",
+          "status": "failed",
+          "failure_type": "SessionTimeoutError",
+          "failure": "WebDriver command deadline exceeded; outcome may be unknown",
+          "library_cleanup_survivors": [],
+          "library_profile_removed": true,
+          "harness_emergency_cleanup": [],
+          "remaining_owned_tasks": 0,
+          "remaining_observed_processes": []
+        },
+        {
+          "scenario": "driver-crash",
+          "status": "passed",
+          "command_acknowledged_before_fault": true,
+          "fault_signal_sent": true,
+          "command_failure_type": "SessionClientError",
+          "failure_after_injection_seconds": 0.013983666023705155,
+          "library_cleanup_survivors": [],
+          "library_profile_removed": true,
+          "harness_emergency_cleanup": [],
+          "remaining_owned_tasks": 0,
+          "remaining_observed_processes": []
+        },
+        {
+          "scenario": "browser-hang",
+          "status": "passed",
+          "command_acknowledged_before_fault": true,
+          "fault_signal_sent": true,
+          "command_failure_type": "SessionTimeoutError",
+          "failure_after_injection_seconds": 4.873874166980386,
+          "library_cleanup_survivors": [],
+          "library_profile_removed": true,
+          "harness_emergency_cleanup": [],
+          "remaining_owned_tasks": 0,
+          "remaining_observed_processes": []
+        },
+        {
+          "scenario": "driver-hang",
+          "status": "passed",
+          "command_acknowledged_before_fault": true,
+          "fault_signal_sent": true,
+          "command_failure_type": "SessionTimeoutError",
+          "failure_after_injection_seconds": 4.905641124991234,
+          "library_cleanup_survivors": [],
+          "library_profile_removed": true,
+          "harness_emergency_cleanup": [],
+          "remaining_owned_tasks": 0,
+          "remaining_observed_processes": []
+        }
+      ]
+    },
+    "isolated_recovery": {
+      "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/chrome-recovery-isolated.json",
+      "sha256": "4106ff9f4e1b4a289de8f621f56850d6440b48ce4a00381d37083fbc9da61f34",
+      "status": "passed",
+      "command_timeout_seconds": 5,
+      "scenarios": [
+        {
+          "scenario": "browser-crash",
+          "status": "passed",
+          "command_acknowledged_before_fault": true,
+          "fault_signal_sent": true,
+          "command_failure_type": "InvalidSessionError",
+          "failure_after_injection_seconds": 0.049168333993293345,
+          "library_cleanup_survivors": [],
+          "library_profile_removed": true,
+          "harness_emergency_cleanup": [],
+          "remaining_owned_tasks": 0,
+          "remaining_observed_processes": []
+        },
+        {
+          "scenario": "driver-crash",
+          "status": "passed",
+          "command_acknowledged_before_fault": true,
+          "fault_signal_sent": true,
+          "command_failure_type": "SessionClientError",
+          "failure_after_injection_seconds": 0.011546207999344915,
+          "library_cleanup_survivors": [],
+          "library_profile_removed": true,
+          "harness_emergency_cleanup": [],
+          "remaining_owned_tasks": 0,
+          "remaining_observed_processes": []
+        },
+        {
+          "scenario": "browser-hang",
+          "status": "passed",
+          "command_acknowledged_before_fault": true,
+          "fault_signal_sent": true,
+          "command_failure_type": "SessionTimeoutError",
+          "failure_after_injection_seconds": 4.932844416995067,
+          "library_cleanup_survivors": [],
+          "library_profile_removed": true,
+          "harness_emergency_cleanup": [],
+          "remaining_owned_tasks": 0,
+          "remaining_observed_processes": []
+        },
+        {
+          "scenario": "driver-hang",
+          "status": "passed",
+          "command_acknowledged_before_fault": true,
+          "fault_signal_sent": true,
+          "command_failure_type": "SessionTimeoutError",
+          "failure_after_injection_seconds": 4.936132000002544,
+          "library_cleanup_survivors": [],
+          "library_profile_removed": true,
+          "harness_emergency_cleanup": [],
+          "remaining_owned_tasks": 0,
+          "remaining_observed_processes": []
+        }
+      ]
+    },
+    "other_checks": {
+      "browser-proxy": {
+        "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/reliability-chrome/chrome-b8bng5wv/chrome-browser-proxy.json",
+        "sha256": "5753b8cf55337eccabf83d739c2cf1cf68a60cf372c13aa685fb4f2e4d09ee4b",
+        "status": "passed"
+      },
+      "manager-proxy-auth": {
+        "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/reliability-chrome/chrome-b8bng5wv/chrome-manager-proxy-auth.json",
+        "sha256": "1584ed7c3325edf8a1fd0e9df6db65b233641b02b04f278198804aab2dbeb927",
+        "status": "passed"
+      },
+      "long-lived": {
+        "path": "/private/tmp/aselenium-2.0.0-deployment.4Er0Dq/reliability-chrome/chrome-b8bng5wv/chrome-long-lived.json",
+        "sha256": "78e9a99067f0b67a976ee78791e0842efe6aeacd42004aa3f784f9075efbe3f6",
+        "status": "passed"
+      }
+    },
+    "soak": {
+      "iterations": 34,
+      "requested_duration_seconds": 30,
+      "actual_duration_seconds": 30.776611333014444,
+      "controlled_native_script_timeouts": 4,
+      "remaining_owned_tasks": 0,
+      "remaining_observed_processes": []
+    }
+  },
+  "limitations": [
+    "Initial combined Chrome reliability invocation failed at first session acquisition; isolated recovery retry passed without changing deadlines or assertions. Contention is possible, not a proven cause.",
+    "Edge initial offline tour could not find a compatible cached driver; subsequent official provisioning and installed-wheel tour passed.",
+    "Hosted Python 3.10-3.14, Windows/Linux/macOS, exact-minimum-dependency, and native/reliability matrix must run on exact candidate commit.",
+    "Safari native vendor tour is read-only for permissions; update race is verified through deterministic protocol regression.",
+    "Firefox privileged chrome context, standalone Chromium/CfT bundles, Linux Snap/Flatpak, WebView2, casting hardware, beta/dev channels not freshly native-certified.",
+    "Google live tests were not rerun; dated homepage pass and challenged search remain historical.",
+    "30-second soak is not an unlimited-uptime or zero-leak guarantee.",
+    "GitHub/PyPI publication permissions and final release event were not exercised."
+  ]
+}

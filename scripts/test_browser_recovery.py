@@ -13,23 +13,32 @@ import asyncio
 import json
 import os
 import platform
+import sys
 import threading
 import time
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from secrets import token_hex
 from tempfile import TemporaryDirectory
-from typing import Any, Iterator, cast
+from typing import TYPE_CHECKING, Any, Iterator, cast
 
 import psutil
 
 from aselenium import Chrome, Edge, errors
+from aselenium.command import Command
+
+if TYPE_CHECKING:
+    from aselenium.options import ChromiumBaseOptions
+    from aselenium.session import Session
 
 SCENARIOS = ("browser-crash", "driver-crash", "browser-hang", "driver-hang")
 HOLD_SCRIPT = "fetch(arguments[0], {cache:'no-store'}).then(() => {window.recoveryCommandStarted=true;});"
 PAGE = b"<!doctype html><title>Aselenium recovery fixture</title><link rel='icon' href='data:,'><input id='field'>"
+USER_DATA_DIR_FLAG = "--user-data-dir"
+SETUP_COMMAND_TIMEOUT = 30
+SCENARIO_TIMEOUT = 120
 
 
 @dataclass(frozen=True)
@@ -49,6 +58,19 @@ class OwnedProcess:
     service_pid: int
 
 
+@dataclass(frozen=True)
+class FaultTarget:
+    """Retain one selected process identity and its observed executable.
+
+    Attributes:
+        identity: Revalidated process identity eligible for fault injection.
+        executable: Executable observed while the process was still selectable.
+    """
+
+    identity: OwnedProcess
+    executable: str
+
+
 def capture_owned(service_process: psutil.Process) -> list[OwnedProcess]:
     """Capture only the current harness's direct service and its descendants.
 
@@ -62,11 +84,25 @@ def capture_owned(service_process: psutil.Process) -> list[OwnedProcess]:
         RuntimeError: The supplied service is not a direct child of this harness.
     """
     owner = os.getpid()
-    if service_process.ppid() != owner or service_process.pid == owner:
+    try:
+        parent = service_process.ppid()
+    except psutil.NoSuchProcess as cause:
+        raise RuntimeError(
+            "Owned service exited while its process tree was captured"
+        ) from cause
+    if parent != owner or service_process.pid == owner:
         raise RuntimeError("Refusing a service not directly owned by this harness")
-    processes = [service_process, *service_process.children(recursive=True)]
-    identities = []
-    for process in processes:
+    try:
+        service_created = service_process.create_time()
+        descendants = service_process.children(recursive=True)
+    except psutil.NoSuchProcess as cause:
+        raise RuntimeError(
+            "Owned service exited while its process tree was captured"
+        ) from cause
+    identities = [
+        OwnedProcess(service_process.pid, service_created, owner, service_process.pid)
+    ]
+    for process in descendants:
         try:
             identities.append(
                 OwnedProcess(
@@ -129,9 +165,134 @@ def signal_owned(identity: OwnedProcess, action: str) -> bool:
     return True
 
 
+def _user_data_dir_argument(arguments: list[str]) -> str | None:
+    """Extract one unambiguous Chromium profile argument without shell parsing.
+
+    Args:
+        arguments: Process arguments returned as already-tokenized strings.
+
+    Returns:
+        The profile value from either supported flag form, or None when the flag
+        is absent, malformed, empty, or repeated.
+    """
+    values: list[str] = []
+    index = 0
+    assignment_prefix = USER_DATA_DIR_FLAG + "="
+    while index < len(arguments):
+        argument = arguments[index]
+        if argument == USER_DATA_DIR_FLAG:
+            index += 1
+            if index >= len(arguments):
+                return None
+            values.append(arguments[index])
+        elif argument.startswith(assignment_prefix):
+            values.append(argument[len(assignment_prefix) :])
+        index += 1
+    if len(values) != 1 or not values[0]:
+        return None
+    return values[0]
+
+
+def _windows_profile_path(value: str) -> PureWindowsPath | None:
+    """Create a conservative lexical Windows path for identity comparison.
+
+    Args:
+        value: Native command-line path spelling.
+
+    Returns:
+        An absolute Windows path with a standard drive or UNC anchor, or None
+        for relative, malformed, and unsupported device-namespace paths.
+    """
+    if not value or "\x00" in value:
+        return None
+    normalized = value.replace("/", "\\")
+    if normalized.casefold().startswith("\\\\.\\".casefold()):
+        return None
+    extended_prefix = "\\\\?\\"
+    if normalized.casefold().startswith(extended_prefix.casefold()):
+        remainder = normalized[len(extended_prefix) :]
+        if remainder.casefold().startswith("unc\\"):
+            normalized = "\\\\" + remainder[4:]
+        else:
+            unprefixed = PureWindowsPath(remainder)
+            if not (
+                len(unprefixed.drive) == 2
+                and unprefixed.drive.endswith(":")
+                and bool(unprefixed.root)
+            ):
+                return None
+            normalized = remainder
+    try:
+        parsed = PureWindowsPath(normalized)
+    except ValueError:
+        return None
+    return parsed if parsed.is_absolute() else None
+
+
+def _same_existing_path(candidate: Path, expected: Path) -> bool:
+    """Compare existing paths by filesystem identity without resolving either.
+
+    Args:
+        candidate: Path reported by the owned browser process.
+        expected: Fresh profile path created by this harness.
+
+    Returns:
+        True only when both paths exist and identify the same filesystem object.
+    """
+    try:
+        return candidate.exists() and expected.exists() and candidate.samefile(expected)
+    except (OSError, ValueError):
+        return False
+
+
+def _profile_path_matches(
+    candidate_value: str, expected: Path, *, windows: bool
+) -> bool:
+    """Match a browser-reported profile to the harness-owned profile safely.
+
+    Args:
+        candidate_value: Value extracted from the browser command line.
+        expected: Parsed fresh profile path owned by this acquisition.
+        windows: Whether to apply native Windows lexical path rules.
+
+    Returns:
+        True for the same safe profile pathname or existing filesystem object.
+    """
+    if windows:
+        candidate_lexical = _windows_profile_path(candidate_value)
+        expected_lexical = _windows_profile_path(str(expected))
+        if candidate_lexical is None or expected_lexical is None:
+            return False
+        if candidate_lexical == expected_lexical:
+            return True
+        # Limit filesystem probing to the already-selected drive/share. In
+        # particular, a local expected path must never cause an arbitrary UNC
+        # path from a process command line to be contacted.
+        if candidate_lexical.anchor.casefold() != expected_lexical.anchor.casefold():
+            return False
+        try:
+            candidate = Path(candidate_value)
+        except (OSError, ValueError):
+            return False
+        return _same_existing_path(candidate, expected)
+
+    if candidate_value == str(expected):
+        return True
+    try:
+        candidate = Path(candidate_value)
+    except (OSError, ValueError):
+        return False
+    if not candidate.is_absolute() or not expected.is_absolute():
+        return False
+    return _same_existing_path(candidate, expected)
+
+
 def select_target(
-    identities: list[OwnedProcess], scenario: str, binary: str, profile: Path
-) -> OwnedProcess:
+    identities: list[OwnedProcess],
+    scenario: str,
+    binary: str,
+    profile: str | os.PathLike[str],
+) -> FaultTarget:
     """Select the service or unique fresh-profile browser from captured identities.
 
     Args:
@@ -142,33 +303,78 @@ def select_target(
         profile: Fresh profile directory owned by this acquisition.
 
     Returns:
-        Exactly one validated target for fault injection.
+        Exactly one validated target and its observed executable.
 
     Raises:
         RuntimeError: The scenario does not identify exactly one safe target.
     """
     if scenario not in SCENARIOS:
         raise RuntimeError("Unknown recovery scenario")
-    selected = []
+    profile_path = profile if isinstance(profile, Path) else Path(profile)
+    service_roots = [
+        identity for identity in identities if identity.pid == identity.service_pid
+    ]
+    if len(service_roots) != 1 or current_process(service_roots[0]) is None:
+        raise RuntimeError(
+            "Expected one live owned service root before target selection"
+        )
+    selected: list[FaultTarget] = []
     for identity in identities:
         process = current_process(identity)
         if process is None:
             continue
         if scenario.startswith("driver-"):
             if identity.pid == identity.service_pid:
-                selected.append(identity)
+                try:
+                    selected.append(FaultTarget(identity, process.exe()))
+                except psutil.NoSuchProcess:
+                    continue
         elif identity.pid != identity.service_pid:
-            arguments = process.cmdline()
-            if "--user-data-dir=" + str(profile) in arguments and not any(
-                argument == "--type" or argument.startswith("--type=")
-                for argument in arguments
+            try:
+                arguments = process.cmdline()
+            except psutil.NoSuchProcess:
+                # Chromium creates short-lived helpers. Their normal exit must
+                # not abort selection of the still-live, uniquely owned browser.
+                continue
+            profile_argument = _user_data_dir_argument(arguments)
+            if (
+                profile_argument is not None
+                and _profile_path_matches(
+                    profile_argument, profile_path, windows=os.name == "nt"
+                )
+                and not any(
+                    argument == "--type" or argument.startswith("--type=")
+                    for argument in arguments
+                )
             ):
-                selected.append(identity)
+                try:
+                    selected.append(FaultTarget(identity, process.exe()))
+                except psutil.NoSuchProcess:
+                    continue
     if len(selected) != 1:
         raise RuntimeError(
             f"Expected one safely identified target for launcher {binary!r}, found {len(selected)}"
         )
     return selected[0]
+
+
+async def wait_owned_exit(identity: OwnedProcess, timeout: float) -> bool:
+    """Wait a bounded interval for a signalled process identity to disappear.
+
+    Args:
+        identity: Previously selected and signalled process identity.
+        timeout: Maximum seconds to wait for operating-system exit observation.
+
+    Returns:
+        True when the same process has exited; False when it remains live at the
+        deadline.
+    """
+    deadline = time.monotonic() + timeout
+    while current_process(identity) is not None:
+        if time.monotonic() >= deadline:
+            return False
+        await asyncio.sleep(0.01)
+    return True
 
 
 def alive_owned(identities: list[OwnedProcess]) -> list[int]:
@@ -234,6 +440,25 @@ class RecoveryServer(ThreadingHTTPServer):
         """
         self.state = state
         super().__init__(("127.0.0.1", 0), RecoveryHandler)
+
+    def handle_error(self, request: Any, client_address: tuple[str, int]) -> None:
+        """Ignore only disconnects expected after an injected browser fault.
+
+        Args:
+            request: Client socket being handled when the exception occurred.
+            client_address: Client host and port associated with the request.
+
+        Notes:
+            The recovery fixture deliberately kills or suspends a browser while
+            an HTTP request is outstanding. Windows can surface the resulting
+            socket close while the base handler is still reading the request,
+            before :meth:`RecoveryHandler.do_GET` can catch it. All unrelated
+            server exceptions continue through the standard error handler.
+        """
+        cause = sys.exc_info()[1]
+        if isinstance(cause, (BrokenPipeError, ConnectionResetError, TimeoutError)):
+            return
+        super().handle_error(request, client_address)
 
 
 class RecoveryHandler(BaseHTTPRequestHandler):
@@ -345,6 +570,24 @@ def validate_injection_window(
         )
 
 
+def owned_profile_directory(options: ChromiumBaseOptions) -> Path:
+    """Return the active owned Chromium profile directory as a concrete path.
+
+    Args:
+        options: Chromium options expected to own a cloned temporary profile.
+
+    Returns:
+        The active temporary profile directory.
+
+    Raises:
+        RuntimeError: The recovery fixture has no active owned profile directory.
+    """
+    profile = options.profile
+    if profile is None or profile.directory_temp is None:
+        raise RuntimeError("Recovery fixture requires an active owned profile")
+    return Path(profile.directory_temp)
+
+
 async def verify_fresh_session(
     driver: Chrome | Edge, binary: str, url: str
 ) -> dict[str, Any]:
@@ -360,7 +603,7 @@ async def verify_fresh_session(
     """
     context = driver.acquire("offline", binary=binary)
     async with context as session:
-        profile = Path(session.options.profile.directory_temp)
+        profile = owned_profile_directory(session.options)
         identifier = session.id
         await session.load(url)
         element = await session.find_element("#field")
@@ -381,6 +624,28 @@ async def verify_fresh_session(
     return {"session_id": identifier, "profile_removed": True}
 
 
+async def execute_fault_command(
+    session: Session, acknowledgement: str, timeout: float
+) -> dict[str, Any]:
+    """Dispatch the held script with its own strict transport deadline.
+
+    Args:
+        session: Active disposable session with a separate normal setup budget.
+        acknowledgement: Exact local path proving the script began executing.
+        timeout: Faulted-command deadline in seconds, independent of startup,
+            navigation, teardown, and fresh-session verification.
+
+    Returns:
+        The WebDriver response if the held command unexpectedly succeeds.
+        The recovery scenario requires an expected WebDriver error instead.
+    """
+    return await session.execute_command(
+        Command.W3C_EXECUTE_SCRIPT_ASYNC,
+        body={"script": HOLD_SCRIPT, "args": [acknowledgement]},
+        timeout=timeout,
+    )
+
+
 async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any]:
     """Inject one fault, record library cleanup, and verify independent reacquisition.
 
@@ -393,6 +658,7 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
     """
     state = PageState()
     initial_tasks = set(asyncio.all_tasks())
+    selected_launcher = await asyncio.to_thread(Path(args.binary).resolve)
     result: dict[str, Any] = {"scenario": scenario, "status": "failed"}
     with (
         TemporaryDirectory(prefix="aselenium-recovery-template-") as template,
@@ -412,11 +678,13 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
         )
         driver.options.set_profile(template, "Default")
         driver.options.set_timeouts(implicit=0, pageLoad=10, script=30)
-        driver.options.session_timeout = args.command_timeout
-        template_profile = Path(driver.options.profile.directory_temp)
+        # Cold startup and fixture navigation are not the fault-injection test.
+        # Only the acknowledged held command uses the strict recovery deadline.
+        driver.options.session_timeout = SETUP_COMMAND_TIMEOUT
+        template_profile = owned_profile_directory(driver.options)
         identities: list[OwnedProcess] = []
         context = driver.acquire("offline", binary=args.binary)
-        profile = Path(context._options.profile.directory_temp)
+        profile = owned_profile_directory(cast("ChromiumBaseOptions", context._options))
         pending: asyncio.Task[Any] | None = None
         suspended: OwnedProcess | None = None
         failure: BaseException | None = None
@@ -428,32 +696,36 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
                     identities = capture_owned(session.service.process)
                     command_started = time.monotonic()
                     pending = asyncio.create_task(
-                        session.execute_async_script(
-                            HOLD_SCRIPT, "/started/" + state.token
+                        execute_fault_command(
+                            session, "/started/" + state.token, args.command_timeout
                         )
                     )
                     await await_started(state, pending)
                     identities = capture_owned(session.service.process)
-                    target = select_target(identities, scenario, args.binary, profile)
+                    selected = select_target(identities, scenario, args.binary, profile)
+                    target = selected.identity
                     result["target"] = asdict(target)
-                    observed_target = current_process(target)
-                    if observed_target is None:
-                        raise RuntimeError(
-                            "Target exited before its executable could be recorded"
-                        )
-                    result["target_executable"] = observed_target.exe()
-                    result["selected_launcher"] = str(Path(args.binary).resolve())
+                    result["target_executable"] = selected.executable
+                    result["selected_launcher"] = str(selected_launcher)
                     result["command_acknowledged_before_fault"] = True
                     validate_injection_window(
                         pending, command_started, args.command_timeout
                     )
                     injected = time.monotonic()
                     if scenario.endswith("hang"):
-                        if not signal_owned(target, "suspend"):
+                        result["fault_signal_sent"] = signal_owned(target, "suspend")
+                        if not result["fault_signal_sent"]:
                             raise RuntimeError("Target exited before hang injection")
                         suspended = target
-                    elif not signal_owned(target, "kill"):
-                        raise RuntimeError("Target exited before crash injection")
+                    else:
+                        result["fault_signal_sent"] = signal_owned(target, "kill")
+                        if not result["fault_signal_sent"]:
+                            raise RuntimeError("Target exited before crash injection")
+                        exit_timeout = min(3.0, args.command_timeout - 1)
+                        if not await wait_owned_exit(target, exit_timeout):
+                            raise RuntimeError(
+                                "Target remained live after crash injection"
+                            )
                     try:
                         await asyncio.wait_for(
                             pending, timeout=args.command_timeout + 2
@@ -509,6 +781,7 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
                 if failure is None
                 and not result["library_cleanup_survivors"]
                 and result["library_profile_removed"]
+                and result.get("fault_signal_sent") is True
                 and result.get("command_failure_type")
                 else "failed"
             )
@@ -547,7 +820,9 @@ async def run(args: argparse.Namespace) -> dict[str, Any]:
     results = []
     for scenario in SCENARIOS if args.scenario == "all" else (args.scenario,):
         try:
-            result = await asyncio.wait_for(scenario_run(args, scenario), timeout=45)
+            result = await asyncio.wait_for(
+                scenario_run(args, scenario), timeout=SCENARIO_TIMEOUT
+            )
         except Exception as cause:
             result = {
                 "scenario": scenario,
@@ -579,7 +854,12 @@ def main() -> int:
     parser.add_argument("--binary", required=True)
     parser.add_argument("--cache-dir", required=True)
     parser.add_argument("--scenario", choices=(*SCENARIOS, "all"), default="all")
-    parser.add_argument("--command-timeout", type=float, default=5)
+    parser.add_argument(
+        "--command-timeout",
+        type=float,
+        default=5,
+        help="Faulted-command deadline; setup and fresh sessions retain 30 seconds",
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     if not 4 <= args.command_timeout <= 10:

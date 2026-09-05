@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium webdriver implementation and supporting types."""
+"""High-level Firefox facade and its session context."""
 
 from __future__ import annotations
 
@@ -25,7 +24,7 @@ from typing import (
     Any,
 )
 
-from aselenium._paths import PathInput
+from aselenium._paths import PathInput, directory_path
 from aselenium.firefox.options import FirefoxOptions
 from aselenium.firefox.service import FirefoxService
 from aselenium.firefox.session import FirefoxSession
@@ -39,23 +38,23 @@ __all__ = ["Firefox"]
 
 
 # Firefox Session Context --------------------------------------------------------------------------
-class FirefoxSessionContext(SessionContext):
-    """The context manager for a Firefox session."""
+class FirefoxSessionContext(SessionContext[FirefoxSession]):
+    """Provision, start, yield, and clean up one Firefox session."""
 
     _SESSION_CLS: type[FirefoxSession] = FirefoxSession
 
     async def __aenter__(self) -> FirefoxSession:
-        """Start the owned asynchronous context and return its managed value.
+        """Start and return the Firefox session owned by this context.
 
         Returns:
-            The FirefoxSession value produced by this operation.
+            The running Firefox session.
         """
         return await self.start()
 
 
 # Firefox Webdriver --------------------------------------------------------------------------------
-class Firefox(WebDriver):
-    """The webdriver for Firefox."""
+class Firefox(WebDriver[FirefoxDriverManager, FirefoxOptions, FirefoxSessionContext]):
+    """Configure and acquire independent asynchronous Firefox sessions."""
 
     def __init__(
         self,
@@ -64,22 +63,45 @@ class Firefox(WebDriver):
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
         proxy: str | None = None,
-        service_timeout: int = 10,
+        service_timeout: int | float = 10,
         *service_args: Any,
+        profile_root: PathInput | None = None,
         **service_kwargs: Any,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Initialize a reusable Firefox facade without launching a browser.
 
         Args:
-            directory: Cache parent directory; None uses the default per-user cache location.
-            max_cache_size: Maximum retained artifact count; None leaves retention unbounded.
+            directory: Cache parent directory. ``None`` uses the per-user default.
+                Strings, ``Path`` objects, and ``os.PathLike[str]`` values are accepted.
+            max_cache_size: Maximum retained artifact count, or ``None`` for no limit.
             request_timeout: Positive timeout in seconds for vendor metadata requests.
             download_timeout: Positive total timeout in seconds for an artifact download.
-            proxy: Explicit provisioning proxy URL, or None for a direct connection.
+            proxy: Explicit HTTP provisioning proxy URL, or ``None`` for a direct connection.
             service_timeout: Positive timeout in seconds for service startup and shutdown.
-            *service_args: Additional positional arguments forwarded to the service constructor.
-            **service_kwargs: Additional keyword arguments forwarded to the service constructor.
+            *service_args: Additional GeckoDriver command-line arguments.
+            profile_root: Existing directory in which GeckoDriver may create
+                temporary Firefox profiles. Use a non-hidden, shared writable
+                directory when a Snap or Flatpak Firefox cannot access the host
+                temporary directory. Requires GeckoDriver 0.32.0 or newer. None
+                uses GeckoDriver's default.
+            **service_kwargs: Additional keyword arguments for the GeckoDriver
+                ``subprocess.Popen`` call.
+
+        Example:
+            >>> import tempfile
+            >>> from pathlib import Path
+            >>> from aselenium import Firefox
+            >>> with tempfile.TemporaryDirectory(
+            ...     prefix="aselenium-firefox-", dir=Path.home()
+            ... ) as directory:
+            ...     driver = Firefox(profile_root=Path(directory))
+            ...     driver.options.close()
         """
+        if profile_root is not None:
+            # This reusable facade is the public filesystem boundary. Preserve
+            # the parsed Path across every acquisition instead of repeatedly
+            # invoking a caller's os.PathLike protocol.
+            service_kwargs["profile_root"] = directory_path(profile_root)
         super().__init__(
             FirefoxDriverManager,
             FirefoxService,
@@ -120,31 +142,23 @@ class Firefox(WebDriver):
         version: GeckoVersion | str = "latest",
         binary: PathInput | None = None,
     ) -> FirefoxSessionContext:
-        """Acquire a new Firefox session.
+        """Create a single-use context for a new Firefox session.
+
+        Options are snapshotted when this method is called. Provisioning and browser
+        startup occur on entering the context, whose exit awaits owned cleanup.
 
         Args:
-            version: Defaults to `'latest'`. Accepts the following values:
-                - `'latest'`: Always install the latest available geckodriver that is
-                compatible with the Firefox browser from the [Mozilla Github]
-                repository.
-                - `'auto'`:   Install the latest cached geckodriver that is compatible
-                with the Firefox browser. If compatible geckodriver does
-                not exist in cache, will install the latest compatible
-                geckodriver from the [Mozilla Github] repository.
-                - `'0.32.1'`: Install the exact geckodriver version regardless of the
-                Firefox browser version.
-            binary: The path to a specific Firefox binary. Defaults to `None`.
-                - If `None`, will try to locate the Firefox binary installed in the
-                system and use it to determine the compatible webdriver version.
-                - If specified, will use this given Firefox binary to determine the
-                compatible webdriver version and start the session.
+            version: A ``GeckoVersion``, numeric GeckoDriver version, or selector.
+                ``"latest"`` resolves online, ``"auto"`` prefers a compatible cached
+                artifact, and ``"offline"`` uses only available local artifacts.
+            binary: Explicit installed-browser executable, or ``None`` for discovery.
+                Strings, ``Path`` objects, and ``os.PathLike[str]`` values are accepted.
 
         Returns:
-            A new single-use session context with an acquisition-time options snapshot.
+            A context yielding ``FirefoxSession`` after successful startup.
 
         Example:
             >>> from aselenium import Firefox
-
             >>> driver = Firefox(max_cache_size=10)
             >>> try:
             ...     async with driver.acquire(version="auto") as session:

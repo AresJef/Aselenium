@@ -16,8 +16,7 @@ single-session.
 
 Version 2.0 no longer includes legacy compatibility paths. Chrome/Chromium
 provisioning requires version 115+, Firefox add-ons require WebExtension manifests,
-and browser commands use W3C WebDriver responses. See the
-[breaking-change guide](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/legacy-removal.md) before updating existing scripts.
+and browser commands use W3C WebDriver responses.
 
 To try the package, follow [installation](#installation), then choose the
 [local HTML feature tour](#local-html-feature-tour) or the
@@ -95,7 +94,7 @@ The usual browser must be installed separately, except when provisioning a
 Chrome for Testing browser/driver pair. Safari requires macOS and an existing
 Remote Automation setup.
 
-Install the wheel attached to the GitHub 2.0.0 release:
+After the GitHub 2.0.0 release has been published, install its attached wheel:
 
 ```bash
 python -m pip install --upgrade https://github.com/AresJef/Aselenium/releases/download/v2.0.0/aselenium-2.0.0-py3-none-any.whl
@@ -287,12 +286,20 @@ An important convention: some properties perform browser requests and must be
 awaited (`await session.title`, `await element.text`). Local metadata and
 configuration are synchronous (`session.id`, `driver.options`, `element.id`).
 
-All public filesystem arguments accept either a string or a string-valued
-`os.PathLike` object, including `pathlib.Path`. Aselenium expands `~`, anchors
-relative paths once at the API boundary, validates the resulting path, and keeps
-it as a `Path` throughout the internal workflow. You do not need to call `str()`
-or `resolve()` first; preserving the `Path` also avoids platform-specific parsing
-differences on Windows.
+Filesystem paths follow one package-wide contract:
+
+| Layer | Path behavior |
+| --- | --- |
+| Public and high-level APIs | Accept `str`, `pathlib.Path`, and compatible string-valued `os.PathLike[str]` objects. Byte-valued paths are rejected. |
+| Core-function entry | Convert and validate the supplied value once, expand `~`, and anchor a relative path to the current working directory. |
+| Internal workflow | Retain and pass host-native `pathlib.Path` objects without converting them to strings and parsing them again. Path-valued public results also remain `Path` objects. |
+| Text or portable path boundary | Use `str` only for external interfaces that require text, such as process arguments, JSON/WebDriver payloads, URLs, SQLite/JSON records, and cache keys. Use `PurePosixPath` only for portable archive-member names. |
+
+You do not need to call `str()` or `resolve()` before passing a path. Keeping the
+native `Path` after the boundary avoids platform-specific reparsing differences,
+especially on Windows. Filesystem operations can still perform scoped
+canonicalization when security or ownership checks require it; that is validation
+of an established `Path`, not a return to string-based path handling.
 
 ### Driver management
 
@@ -319,14 +326,17 @@ async def provision_chrome(cache_directory: str | Path, *, offline: bool = False
 The standalone classes are `ChromeDriverManager`, `ChromiumDriverManager`,
 `EdgeDriverManager`, `FirefoxDriverManager`, and `SafariDriverManager`.
 
-`await manager.install(...)` retains the path-string return value.
+`await manager.install(...)` returns an absolute `pathlib.Path` to the selected
+driver executable.
 `await manager.install_result(...)` returns an immutable snapshot with:
 
 | Field | Meaning |
 | --- | --- |
-| `request` | Requested product, selector, channel, executable overrides, platform, policy, and compatibility-validation flag. |
-| `driver_location` / `driver_version` | The selected driver executable and version string. |
-| `browser_location` / `browser_version` | The selected browser executable and version string. |
+| `request` | Requested product, selector, channel, parsed `Path` executable overrides, platform, policy, and compatibility-validation flag. |
+| `driver_location` | Absolute `Path` to the selected driver executable. |
+| `driver_version` | Selected driver version string, or `None` only when a custom manager cannot report it. |
+| `browser_location` | Absolute browser-executable `Path`, or `None` when a custom manager does not select a browser. |
+| `browser_version` | Selected browser version string, or `None` when it cannot be reported. |
 | `channel` | The resolved browser channel. |
 
 Use the returned result when coordinating concurrent calls. Mutable manager
@@ -369,6 +379,8 @@ async def install_exact(driver: Chrome, version: str):
     )
     # Exact installation already pins the artifact against eviction.
     # Explicit pin/unpin is also available:
+    if result.driver_version is None:
+        raise RuntimeError("The driver manager did not report an installed version")
     await driver.manager.pin(result.driver_version, pinned=True)
     return result
 
@@ -456,6 +468,10 @@ Chrome/Chromium/Edge/Firefox constructors accept `directory`, `max_cache_size`,
 `service_timeout`. Safari does **not** accept download/cache constructor settings;
 do not copy those keyword arguments into `Safari()`.
 
+Firefox additionally accepts `profile_root`. This is the parent in which
+GeckoDriver creates temporary browser profiles; it is not the same setting as
+`driver.options.set_profile()`, which selects profile content to clone.
+
 ### Options and proxies
 
 Configure `driver.options` before calling `acquire()`. Importing a separate
@@ -528,6 +544,9 @@ and does not implicitly use environment-proxy discovery.
 `set_profile()` makes a temporary copy instead of launching against the original
 profile. Chromium-family browsers take a user-data directory and profile folder;
 Firefox takes a profile directory directly. Safari does not expose this feature.
+The Chromium profile folder must be a portable single child-directory name, not
+a path: separators, absolute or drive syntax, `.`/`..`, and reserved names are
+rejected.
 
 ```python
 from aselenium import Chrome
@@ -563,6 +582,42 @@ profile synchronously; large profiles can block the event loop during this step.
 
 Do not share a manually supplied `--user-data-dir` between running sessions.
 Same-process active sharing is rejected; cross-process sharing is unsupported.
+
+#### Firefox Snap/Flatpak profile root
+
+Container-packaged Firefox can have a different temporary-filesystem view from
+the host GeckoDriver. On affected Linux systems, pass an existing, non-hidden
+directory under your home directory that both processes can read and write:
+
+```python
+from pathlib import Path
+
+from aselenium import Firefox
+
+
+async def open_google_with_containerized_firefox():
+    profile_root = Path.home() / "aselenium-firefox-profiles"
+    profile_root.mkdir(parents=True, exist_ok=True)
+
+    driver = Firefox(profile_root=profile_root)
+    driver.options.add_arguments("-headless")
+    try:
+        async with driver.acquire("auto") as session:
+            await session.load("https://www.google.com/")
+            return await session.title
+    finally:
+        driver.options.close()
+```
+
+The public argument accepts `str`, `pathlib.Path`, or a string-valued
+`os.PathLike`. The reusable Firefox facade parses and validates it once, then
+retains the resulting `Path` across acquisitions. Each service launch rechecks
+that the retained directory still exists without converting it back to text.
+The directory must already exist and GeckoDriver must be 0.32.0 or newer. It
+remains caller-owned and is never deleted by Aselenium. Do not also pass a raw
+`--profile-root` service argument.
+See Mozilla's [container-package guidance](https://firefox-source-docs.mozilla.org/testing/geckodriver/Usage.html#running-firefox-in-a-container-based-package)
+for the underlying GeckoDriver/Firefox filesystem constraint.
 
 ### Session lifecycle
 
@@ -709,7 +764,7 @@ async def fill_form(session: Session, upload_path: str | Path):
     upload = await session.find_element("#upload")
     if upload is None:
         raise LookupError("File input not found")
-    await upload.upload(Path(upload_path))
+    await upload.upload(upload_path)
     await field.submit()  # Awaited submission of the enclosing form.
 ```
 
@@ -794,6 +849,10 @@ sequence such as switching tabs and reading from the selected tab.
 Transaction ownership follows the inherited async context. Child tasks created
 inside an explicit transaction share that ownership, so await dependent operations
 sequentially there rather than running them concurrently with `asyncio.gather()`.
+Waiting to enter the transaction is bounded by the enclosing command/wait
+deadline, or `options.session_timeout` if there is none. This is an admission
+budget, not a total deadline for the context body, and it provides no rollback.
+If admission expires, no command from that waiting context has been sent.
 
 ### Frames and shadow DOM
 
@@ -952,11 +1011,19 @@ async def type_with_actions(session: Session):
         await chain.reset()
 ```
 
-Dispatched actions are cleared, so reuse does not replay earlier input.
-`reset()` releases remote input state as well as clearing the local chain.
+`perform()` detaches the pending batch before awaiting the browser. Later input
+queued through the builder belongs to a new batch and is retained even if the
+earlier dispatch fails or is cancelled. A dispatched batch is never automatically
+replayed. Overlapping calls do not duplicate the batch, but dependent interactions
+should still be awaited sequentially.
+`reset()` clears the then-pending local batch and requests release of remote input
+state. Input added after reset starts is kept for a later `perform()`.
 `send_key_combo()` accepts `KeyboardKeys` values for modifiers; choose the
 appropriate Control/Command modifier for the operating system. `MouseButtons`
 provides button constants. Durations must be finite and nonnegative.
+Optional `pause=` values on elements, alerts, and scrolling, and `explicit_wait=`
+on `perform()`, are validated before sending a browser mutation. Booleans,
+negative values, and non-finite numbers are rejected; `None` means no delay.
 The current Safari facade disables action chains; Firefox support should be
 validated for the operations and browser versions your application needs.
 
@@ -1094,7 +1161,12 @@ async def chromium_diagnostics(session: ChromeSession | ChromiumSession | EdgeSe
             )
             conditions = await session.network
         finally:
-            await session.set_network(**original.dict)
+            await session.set_network(
+                offline=original.offline,
+                latency=original.latency,
+                download_throughput=original.download_throughput,
+                upload_throughput=original.upload_throughput,
+            )
 
     log_types = await session.log_types
     logs = await session.get_logs("browser") if "browser" in log_types else []
@@ -1110,6 +1182,8 @@ logs from sensitive applications.
 On an appropriate page origin, `get_permission(name)` returns a `Permission` or
 `None`; `set_permission(name, state)` accepts `granted`, `denied`, or `prompt`.
 For example, use `geolocation` and restore its previous state in `finally`.
+The setter owns its update and confirming observation as one transaction. Use
+your own `session.transaction()` when subsequent operations depend on that state.
 CDP command availability depends on the Chromium version; Aselenium does not
 guarantee every command across releases.
 
@@ -1127,8 +1201,7 @@ from aselenium import FirefoxSession
 
 async def use_temporary_addon(session: FirefoxSession, addon_path: str | Path):
     # Use a trusted .xpi file or an unpacked extension directory.
-    path = Path(addon_path)
-    addons = await session.install_addons(path, temporary=True)
+    addons = await session.install_addons(addon_path, temporary=True)
     try:
         return [addon.id for addon in addons]
     finally:
@@ -1143,7 +1216,9 @@ when a manifest ID is absent. Install only trusted extensions: they can access
 data according to their browser permissions.
 
 `await session.context` reports `"content"` or `"chrome"`. `set_context()` and
-`reset_context()` switch/restore it. Firefox's `"chrome"` context means privileged
+`reset_context()` switch/restore it and observe the result under one transaction.
+Wrap any dependent browser work in your own transaction as well.
+Firefox's `"chrome"` context means privileged
 browser UI, **not Google Chrome**; it may need browser-specific startup permission
 and is not required for ordinary webpage automation. Prefer the content context.
 
@@ -1157,9 +1232,12 @@ system/browser automation settings.
 Safari has its own `permissions`, `get_permission(name)`, and
 `set_permission(name, value)` APIs, with **boolean values**, not Chromium's
 permission-state strings. Its options include `automatic_inspection`,
-`automatic_profiling`, and `technology_preview`. Frames, W3C action chains, custom
-proxies, and PDF printing are disabled by the current facade; do not interpret a
-no-op/falsey return as successful automation.
+`automatic_profiling`, and `technology_preview`. Permission updates serialize
+their read/merge/write/observation sequence to preserve other concurrent updates.
+Frames, W3C action chains, custom proxies, and PDF printing are disabled by the
+current facade. `switch_frame()` returns `False`; `parent_frame()` and
+`default_frame()` are no-ops that return `True`. Those return values do
+not establish that Safari changed frame focus.
 
 ### Errors and logging
 
@@ -1170,7 +1248,7 @@ from application-level element misses and ambiguous command timeouts.
 | --- | --- |
 | Browser/driver unavailable | `BrowserBinaryNotDetectedError`, `DriverExecutableNotDetectedError`; check executable, platform, selector, and cache. |
 | Vendor request or download failed | `DriverRequestFailedError`, `DriverDownloadFailedError`, `DriverManagerTimeoutError`; inspect the cause and network configuration. |
-| Incompatible version | `InvalidDriverVersionError`, `IncompatibleWebdriverError`; resolve a supported pair rather than suppress the error. |
+| Incompatible version | `InvalidDriverVersionError`, `IncompatibleWebDriverError`; resolve a supported pair rather than suppress the error. |
 | Driver service problem | `ServiceError` and subclasses; inspect permissions, executable health, and service startup/cleanup. |
 | Command budget expired | `SessionTimeoutError`; the remote operation may have executed. Inspect state before deciding to retry. |
 | Page interaction failed | `ElementStaleReferenceError`, `ElementClickInterceptedError`, other `WebDriverError` subclasses; re-locate/wait or adjust the interaction. |
@@ -1242,12 +1320,24 @@ Once provisioned, run offline, make the browser visible, or select chapters:
 .venv/bin/python src/demo_local.py run --sections concurrency cancellation --profile-demo
 ```
 
+For a Snap/Flatpak Firefox, create a shared directory once and pass it explicitly:
+
+```bash
+mkdir -p "$HOME/aselenium-firefox-profiles"
+.venv/bin/python src/demo_local.py run --browser firefox --allow-download \
+  --profile-root "$HOME/aselenium-firefox-profiles" --session-timeout 60
+```
+
 Driver management and options run first. The 13 selectable chapters cover
 navigation, elements, waits, cookies, windows, frames, alerts, scripts, actions,
 artifacts, vendor commands, concurrency, and cancellation: **15 stages** in a full
 tour. Browser-specific limitations are reported as skipped, not counted as passes.
 The `--profile-demo` option clones a new empty profile template, never your
 personal profile.
+The local tour's `--session-timeout` option is the per-command and session-start
+deadline (30 seconds by default); a cold Snap/Flatpak Firefox launch may need a
+larger value such as 60 seconds. Its separate `--timeout` option bounds the whole
+tour and defaults to 240 seconds.
 
 To provision without opening a browser:
 
@@ -1346,8 +1436,9 @@ diagnostics; review them before sharing.
 
 Use `src/demo_local.py` or `src/demo_google.py` in scripts and documentation;
 the former `src/demo.py` entry point is no longer present in this checkout. The
-demos, shared helper, and fixtures are included in the source distribution;
-they are not installed as public modules in the runtime wheel. See the
+demos, shared helper, and fixtures remain repository examples; production wheels
+and source distributions intentionally contain only the package and its required
+metadata and runtime resources. See the
 [demo overview](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/demo.md) to compare the two workflows.
 
 ## Troubleshooting
@@ -1407,42 +1498,38 @@ durability are outside the verified support boundary.
 
 ## Compatibility and verification
 
-The public API targets Python 3.10+ and five browser facades. That is distinct
-from native validation of every Python/browser/OS combination.
+The public API targets Python 3.10+ and five browser facades. Declared support,
+configured CI jobs, and results from a particular machine are different things.
+See the [pre-deployment review](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/pre-deployment-review.md)
+for the latest tested candidate, exact counts, installed-wheel checks, and
+remaining deployment gates. Older reports are dated snapshots, not current badges.
 
-| Area | Verified boundary for this modernization work |
+| Area | Capability and verification boundary |
 | --- | --- |
-| Final production review | **2,823 tests passed with no failures or skips in each of three environments**: Python 3.13, Python 3.11, and exact runtime minima on 3.11. Added 171 regressions for driver selection, configuration/profile ownership, concurrent state updates, protocol validation and partial-startup cleanup. Statement/branch coverage: **92.55% / 83.25%**. Fresh installed-wheel tours and Chrome/Edge 120-second reliability gates passed. See the [final review](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/final-production-review.md) and [validation record](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/baselines/final-production-review-validation.json) for changes, compatibility notes and limits. |
-| Release-acceptance expansion | Real HTTPS provisioning, interrupted-command recovery, installed-wheel browser tours, authenticated CONNECT, sustained sessions, executable docstrings and public typing checks. Native testing exposed Safari acquisition, driver-crash cleanup and timeout-exception identity defects; each now has a targeted fix and regression. See the [acceptance guide](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/release-acceptance.md) and its dated validation record for exact results and limits. |
-| Previous known-issue fixes | All 10 issues found by the earlier testing expansion were fixed. That snapshot had **2,277 passed, no expected failures or skips** on Python 3.11/3.13 and exact runtime minima on 3.11. See the [historical fix report](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/known-issue-fixes.md). |
-| Earlier feature-testing expansion | All 550 source-defined public callables/constructors had measured body execution. That pass found 23 expected-failure cases across 10 issues, now resolved above, and verified real Chrome/Edge HTTP proxy routing plus 100-session soaks. See the [historical feature-testing report](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/feature-testing.md). |
-| Earlier production-readiness pass | Structural checks covered 94 Python files, 1,561 functions/methods, 238 classes, and 178 prompted example sections. Chrome/Edge each passed all 15 local-demo stages and a 20-session soak. These are historical observations; see the [readiness report](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/production-readiness.md). |
-| Current-only cleanup | 974 tests passed with asyncio debugging on Python 3.11.15. Chrome and Edge each passed all 15 local-demo stages with fresh profiles on Python 3.13.12, including the replacement element/wait APIs. See the [cleanup validation record](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/baselines/legacy-removal-validation.json). |
-| Chrome | Installed-wheel full headless local tour on macOS 26.6.2 ARM64: Chrome `152.0.7977.76`, driver `152.0.7977.82`; fresh and cloned-profile runs. |
-| Edge | Installed-wheel full headless local tour on the same platform: Edge and driver `152.0.4191.62`; cloned-profile run. Edge updated during acceptance; the obsolete cached pair was rejected before a matching driver was provisioned. |
-| Firefox | Installed-wheel full local tour: Firefox `155.0.1`, GeckoDriver `0.37.1`, Python 3.13.12 on macOS ARM64; 15 stages, including temporary add-ons, actions and full-page screenshots. |
-| Safari | Installed-wheel full local tour: Safari and system driver `26.6.2` on macOS ARM64; 12 applicable stages pass. Frames, actions and concurrency are explicitly skipped because the current facade disables them. |
-| Renamed local demo | All 15 stages passed using `src/demo_local.py`, Python 3.13.12, and headless Chrome on the platform above. |
-| Real Google website | Homepage-only run passed in visible Chrome. One optional search stopped at CAPTCHA with `needs-attention`; no normal live results-page pass is claimed. |
-| Python | The current full offline suite passes on Python 3.13.12 and 3.11.15. Exact runtime lower bounds are additionally tested on 3.11.15. The declared Python minimum remains 3.10; other runtime combinations require their own runs. |
-| Other native combinations | Standalone Chromium, separate CfT browser bundles, Windows/Linux native browser runs, WebView2 and beta/dev channels are not live-certified by these local results. |
-| CI configuration | Python/OS and exact-minimum-dependency jobs, installed-wheel native browser jobs, public-consumer typing, critical-component coverage floors, and Chrome/Edge reliability checks are configured. Scheduled runs extend the sustained workload to 600 seconds. Local validation does not establish a remote CI pass. |
+| Chrome and Edge | Shared Chromium automation, CDP, network emulation, permissions, logging, and PDF output. Installed-wheel local tours and reliability harnesses exist; the latest review identifies which were rerun. |
+| Chromium and Chrome for Testing | Standalone Chromium and managed CfT browser/driver pairs are supported by the manager. Provider, cache, and command regressions do not substitute for native acceptance of a separate browser bundle. |
+| Firefox | WebDriver automation, action chains, add-ons, contexts, and full-page screenshots. The local tour checks the applicable features; driver resolution fails closed for unrecorded future Gecko releases. |
+| Safari | macOS system automation with Remote Automation enabled beforehand. The current facade disables frames, action chains, and concurrent acquisitions; the tour records these as three exclusions, not passes. Custom proxies and PDF printing are also unavailable. |
+| Python and operating systems | The configured CI matrix covers Python 3.10–3.14, Linux/Windows/macOS, and exact runtime minimum dependencies. A local Python/macOS pass does not establish a pass for the other jobs. |
+| Native CI | Installed-wheel jobs cover Chrome/Firefox on Linux and macOS, Edge on Windows, and Safari on macOS. Chrome/Edge reliability checks include recovery, proxy routing, and sustained use; scheduled and release runs request a 600-second soak. |
+| Real Google website | A dated visible-Chrome homepage run passed. An optional search encountered CAPTCHA and stopped with `needs-attention`; a normal live results-page pass is not claimed. |
+| Not locally certified | Other OS/browser/version combinations, Linux Snap/Flatpak profile access, separate Chromium/CfT bundles, WebView2, beta/dev channels, and casting hardware need environment-specific acceptance. |
 
-The latest acceptance observations are dated **2026-09-05**, not rolling compatibility
-promises. Firefox driver resolution checks recorded browser-version ranges and
-fails closed for unknown future Gecko releases. Earlier Linux Snap profile-access
-reports are not considered resolved merely because macOS tests pass. Firefox
-action chains now have native macOS evidence. Test the distribution and platform
-you deploy.
+The regular test suite includes deterministic regressions and real disposable
+loopback HTTP/TCP/TLS tests. Native acceptance imports a built wheel from outside
+the checkout and checks its origin. Coverage, typing, executable examples, and
+metadata checks are separate gates; none alone proves full feature correctness.
 
-See the [original local-demo validation record](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/baselines/demo-validation.json),
-[named-demo and Google validation record](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/baselines/demo-google-validation.json),
-[current-only cleanup validation](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/baselines/legacy-removal-validation.json),
-and [second-pass package review](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/original-12-step-second-pass.md) for evidence,
-changes, and limitations. Counts and filenames in historical records describe
-those runs, not a continuously updated test badge. SHA checks, safe extraction,
-bounded work, and cleanup tests improve reliability; they do not make browsers
-or untrusted websites a security sandbox.
+Before deployment, run the configured CI/release gates on the exact commit and
+test the installed distribution on your target platform. A bounded soak does not
+prove unlimited uptime or an absence of leaks. SHA checks and safe extraction do
+not turn browser automation into a security sandbox for untrusted websites.
+
+The [earlier production review](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/final-production-review.md),
+[release-acceptance guide](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/release-acceptance.md),
+and [Google validation record](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/baselines/demo-google-validation.json)
+retain the history and reproduction instructions without implying that every
+earlier environment was rerun for the latest source changes.
 
 ## Development
 
@@ -1499,8 +1586,10 @@ and local links, and exercise selected recipes without launching browsers.
 All maintained Python definitions have Google-style docstrings and annotated
 signatures. Ruff enforces import ordering, unused-import detection, documentation
 style, and annotation coverage. The structural audit additionally rejects imports
-inside functions. Module-level platform guards and `TYPE_CHECKING` imports remain
-intentional. See the [contributor API-quality guide](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/api-quality.md).
+inside functions and enforces the public-`PathInput`/internal-`Path` architecture,
+including a guard against stringifying and reparsing paths. Module-level platform
+guards and `TYPE_CHECKING` imports remain intentional. See the [contributor
+API-quality guide](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/api-quality.md).
 
 Docstring examples use singular `Example:` with Python `>>>` and `...` prompts.
 They are syntax-checked and checked against resolvable API signatures. The added
@@ -1508,13 +1597,12 @@ runtime suite executes 38 distinct docstrings verbatim with controlled fixtures,
 in addition to existing pure examples and README recipe checks. See the guide for
 required setup and execution limits.
 
-Mypy currently checks nineteen infrastructure/API modules, not the entire
-package under strict typing. Complete annotation coverage is not the same as a
-package-wide clean type check: the broader diagnostic run still has open issues.
-An additional installed-wheel consumer gate verifies public asynchronous return
-types and requires deliberate API misuse to fail type checking.
-Dynamic WebDriver/JavaScript data, extension
-arguments, and test doubles still use `Any` where their shape is not fixed.
+Mypy checks the complete package, both executable demos, their shared support
+module, the quick-start program, and all maintained release/acceptance scripts
+under `src/` and `scripts/`. An additional installed-wheel consumer gate verifies
+public asynchronous and path return types and requires deliberate API misuse to
+fail type checking. Dynamic WebDriver/JavaScript data, extension arguments, and
+test doubles still use `Any` only where their shape is intentionally open.
 Runtime/resource metadata lives in `pyproject.toml`.
 Distribution tests build a wheel and sdist, rebuild the wheel from the sdist, and
 verify imports/resources outside the checkout. Local builds do not publish a
@@ -1523,7 +1611,8 @@ settings before publishing.
 
 ## Further documentation
 
-- [Final production review](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/final-production-review.md): latest fixes, 2,823-test validation, clean-wheel native results, stricter input/profile contracts and remaining release boundaries.
+- [Pre-deployment review](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/pre-deployment-review.md): latest concurrency/deadline fixes, current candidate verification, README reconciliation, and remaining deployment gates.
+- [Earlier production review](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/final-production-review.md): preceding local and multi-environment evidence, path/input/profile contracts, and packaging checks.
 - [Release acceptance](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/release-acceptance.md): real transport, installed-wheel/browser, crash/proxy/soak, typing, docstring and CI gates, with current validation evidence.
 - [Known-issue fixes](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/known-issue-fixes.md): the preceding 10 fixes, passing regressions and historical validation evidence.
 - [Feature-testing expansion](https://github.com/AresJef/Aselenium/blob/v2.0.0/docs/feature-testing.md): historical coverage expansion, original defect findings, real local transport/proxy tests and unavailable checks.
@@ -1542,6 +1631,8 @@ settings before publishing.
 ## License and acknowledgements
 
 Aselenium is distributed under the [Apache License 2.0](https://github.com/AresJef/Aselenium/blob/v2.0.0/LICENSE).
+The accompanying [NOTICE](https://github.com/AresJef/Aselenium/blob/v2.0.0/NOTICE)
+preserves the attribution referenced by inherited source headers.
 
 It uses [aiohttp](https://github.com/aio-libs/aiohttp),
 [psutil](https://github.com/giampaolo/psutil), and
@@ -1549,4 +1640,4 @@ It uses [aiohttp](https://github.com/aio-libs/aiohttp),
 from [arsenic](https://github.com/HENNGE/arsenic),
 [Selenium](https://github.com/SeleniumHQ/selenium), and
 [webdriver-manager](https://github.com/SergeyPirogov/webdriver_manager).
-Original source-file license notices are retained.
+Original source-file license and attribution notices are retained.

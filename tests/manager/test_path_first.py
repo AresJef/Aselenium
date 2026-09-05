@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from io import BytesIO
 from os import PathLike
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
 import pytest
@@ -68,6 +68,25 @@ def test_cache_boundary_converts_pathlike_once_and_retains_paths(
     assert isinstance(cache._database, Path)
 
 
+def test_cache_entries_retain_executable_paths_across_lookup(tmp_path: Path) -> None:
+    """Return ``Path`` values from publication and subsequent cache matching.
+
+    Args:
+        tmp_path: Isolated cache parent supplied by pytest.
+    """
+    cache = ChromeFileManager(tmp_path).for_platform("linux", "64")
+    version = "120.0.6099.71"
+
+    published = cache.cache_driver(version, driver_archive())
+    matched = cache.match_driver(version, "patch")
+
+    assert isinstance(published["location"], Path)
+    assert published["location"].is_file()
+    assert matched == published
+    assert matched is not None
+    assert isinstance(matched["location"], Path)
+
+
 def test_default_cache_boundary_uses_path_home(tmp_path: Path) -> None:
     """Anchor the default cache in the disposable platform home directory.
 
@@ -122,10 +141,10 @@ def test_default_cache_classifies_unresolvable_platform_home(
     assert isinstance(caught.value.__cause__, RuntimeError)
 
 
-def test_archive_boundary_converts_pathlike_once_and_returns_text(
+def test_archive_boundary_converts_pathlike_once_and_returns_path(
     tmp_path: Path,
 ) -> None:
-    """Parse a custom destination once while preserving the public text result.
+    """Parse a custom destination once and retain ``Path`` through publication.
 
     Args:
         tmp_path: Isolated temporary directory supplied by pytest.
@@ -135,8 +154,8 @@ def test_archive_boundary_converts_pathlike_once_and_returns_text(
     result = driver_archive().unpack(supplied)
 
     assert supplied.calls == 1
-    assert isinstance(result, str)
-    assert Path(result).read_bytes() == b"fixture-never-executed"
+    assert isinstance(result, Path)
+    assert result.read_bytes() == b"fixture-never-executed"
 
 
 def test_private_archive_helpers_exchange_paths(tmp_path: Path) -> None:
@@ -152,9 +171,46 @@ def test_private_archive_helpers_exchange_paths(tmp_path: Path) -> None:
     executable.write_bytes(b"fixture-never-executed")
     selected = ChromeDriverFile(
         "win", "https://example.invalid/chromedriver.zip", b""
-    )._find_target_executable(extracted, [executable.name])
+    )._find_target_executable(extracted, [PurePosixPath(executable.name)])
 
     assert isinstance(saved, Path)
     assert saved.is_file()
     assert selected == executable
     assert isinstance(selected, Path)
+
+
+def test_archive_members_remain_parsed_between_private_stages(
+    tmp_path: Path,
+) -> None:
+    """Retain each validated archive member as ``PurePosixPath`` internally.
+
+    Args:
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    archive = driver_archive()
+    saved = archive._save_file(tmp_path / "download")
+    extracted = tmp_path / "extracted"
+
+    members = archive._extract_zip_file(saved, extracted)
+    selected = archive._find_target_executable(extracted, members)
+
+    assert members == [PurePosixPath("chromedriver")]
+    assert all(isinstance(member, PurePosixPath) for member in members)
+    assert selected == extracted / "chromedriver"
+
+
+def test_generated_archive_basename_uses_its_parsed_parts(tmp_path: Path) -> None:
+    """Preserve a portable Unicode basename through the native ``Path`` join.
+
+    Args:
+        tmp_path: Isolated temporary directory supplied by pytest.
+    """
+    archive = ChromeDriverFile(
+        "linux", "https://example.invalid/chromedriver.zip", b"fixture"
+    )
+    archive._name = "driver package 驱动"
+
+    saved = archive._save_file(tmp_path / "download")
+
+    assert saved == tmp_path / "download" / "driver package 驱动.zip"
+    assert saved.read_bytes() == b"fixture"

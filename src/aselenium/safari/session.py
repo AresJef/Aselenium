@@ -15,16 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium session implementation and supporting types."""
+"""SafariDriver session behavior and Safari-specific permission commands."""
 
 from __future__ import annotations
 
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Literal,
-)
+from typing import TYPE_CHECKING, Literal, cast
 
 from aselenium import errors
 from aselenium.command import Command
@@ -32,6 +27,7 @@ from aselenium.logs import logger
 from aselenium.session import Session
 
 if TYPE_CHECKING:
+    from aselenium.actions import Actions
     from aselenium.element import Element
     from aselenium.manager.version import SafariVersion
     from aselenium.safari.options import SafariOptions
@@ -45,11 +41,11 @@ class SafariSession(Session):
     """Represent a session of the Safari browser."""
 
     def __init__(self, options: SafariOptions, service: SafariService) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a not-yet-started Safari session.
 
         Args:
-            options: Options used by this operation.
-            service: Service used by this operation.
+            options: Safari capability snapshot owned by this session.
+            service: SafariDriver service owned by this session.
         """
         super().__init__(options, service)
 
@@ -61,7 +57,7 @@ class SafariSession(Session):
         Returns:
             The browser options owned by this facade or session.
         """
-        return self._options
+        return cast("SafariOptions", super().options)
 
     @property
     def browser_version(self) -> str | None:
@@ -80,47 +76,16 @@ class SafariSession(Session):
         Returns:
             The driver service owned by the session.
         """
-        return self._service
+        return cast("SafariService", super().service)
 
     @property
     def driver_version(self) -> SafariVersion:
-        """Return the webdriver binary version of the session.
+        """Return the WebDriver binary version of the session.
 
         Returns:
-            The webdriver binary version of the session.
+            The WebDriver binary version of the session.
         """
-        return super().driver_version
-
-    # Execute -----------------------------------------------------------------------------
-    async def execute_command(
-        self,
-        command: str,
-        body: dict[str, Any] | None = None,
-        keys: dict[str, Any] | None = None,
-        timeout: int | float | None = None,
-    ) -> dict[str, Any]:
-        """Executes a command from the session.
-
-        Args:
-            command: The command to execute.
-            body: The body of the command. Defaults to `None`.
-            keys: The keys to substitute in the command. Defaults to `None`.
-            timeout: Force timeout of the command. Defaults to `None`.
-                For some webdriver versions, the browser will be frozen when
-                executing certain commands. This parameter sets an extra
-                timeout to throw the `SessionTimeoutError` exception if
-                timeout is reached.
-
-        Returns:
-            The response from the command.
-        """
-        return await self._conn.execute(
-            self._base_url,
-            command,
-            body=body,
-            keys=keys,
-            timeout=timeout,
-        )
+        return cast("SafariVersion", super().driver_version)
 
     # Disable - Information ---------------------------------------------------------------
     async def print_page(
@@ -136,28 +101,29 @@ class SafariSession(Session):
         margin_right: int | float | None = None,
         shrink_to_fit: bool | None = None,
         page_ranges: list[str] | None = None,
-    ) -> None:
-        """Safari automation does not support print page commands `None`.
+    ) -> bytes:
+        """Reject PDF printing, which SafariDriver does not implement.
 
         Args:
-            orientation: Orientation used by this operation.
-            scale: Scale used by this operation.
-            background: Background used by this operation.
-            page_width: Page width used by this operation.
-            page_height: Page height used by this operation.
-            margin_top: Margin top used by this operation.
-            margin_bottom: Margin bottom used by this operation.
-            margin_left: Margin left used by this operation.
-            margin_right: Margin right used by this operation.
-            shrink_to_fit: Shrink to fit used by this operation.
-            page_ranges: Page ranges used by this operation.
+            orientation: Requested page orientation; retained for API compatibility.
+            scale: Requested page scale; retained for API compatibility.
+            background: Whether backgrounds should print; retained for compatibility.
+            page_width: Requested page width in centimeters.
+            page_height: Requested page height in centimeters.
+            margin_top: Requested top margin in centimeters.
+            margin_bottom: Requested bottom margin in centimeters.
+            margin_left: Requested left margin in centimeters.
+            margin_right: Requested right margin in centimeters.
+            shrink_to_fit: Whether content should shrink to fit the page.
+            page_ranges: Requested page ranges.
+
+        Raises:
+            errors.InvalidMethodError: Always; SafariDriver exposes no W3C print
+                endpoint.
         """
-        logger.warning(
-            "<{}>\nSafari automation does not support print page commands.".format(
-                self.__class__.__name__
-            )
+        raise errors.InvalidMethodError(
+            "SafariDriver does not support the W3C print-page command"
         )
-        return None
 
     # Disable - Frame ---------------------------------------------------------------------
     async def switch_frame(
@@ -166,15 +132,17 @@ class SafariSession(Session):
         by: Literal["css", "xpath", "index"] = "css",
         timeout: int | float | None = None,
     ) -> bool:
-        """Safari automation does not support frame commands `False`.
+        """Leave the current frame unchanged because this facade disables switching.
 
         Args:
-            value: Value to inspect, normalize, or assign as described above.
-            by: By used by this operation.
-            timeout: Total time budget in seconds; None follows the documented no-wait/default behavior.
+            value: Frame selector, element, or index that would be selected by
+                the shared session API.
+            by: Selector strategy for string values: ``css``, ``xpath``, or
+                ``index``.
+            timeout: Optional lookup budget in seconds.
 
         Returns:
-            True when the checked condition is satisfied; otherwise False.
+            Always ``False`` because no frame switch was attempted.
         """
         logger.warning(
             "<{}>\nSafari automation does not support frame switching.".format(
@@ -184,10 +152,10 @@ class SafariSession(Session):
         return False
 
     async def default_frame(self) -> bool:
-        """Safari automation does not support frame commands `True`.
+        """Report the default frame as unchanged because frame commands are disabled.
 
         Returns:
-            True when the checked condition is satisfied; otherwise False.
+            Always ``True`` for compatibility with the shared session API.
         """
         logger.warning(
             "<{}>\nSafari automation does not support frame switching.".format(
@@ -197,10 +165,10 @@ class SafariSession(Session):
         return True
 
     async def parent_frame(self) -> bool:
-        """Safari automation does not support frame commands `True`.
+        """Report the parent frame as unchanged because frame commands are disabled.
 
         Returns:
-            True when the checked condition is satisfied; otherwise False.
+            Always ``True`` for compatibility with the shared session API.
         """
         logger.warning(
             "<{}>\nSafari automation does not support frame switching.".format(
@@ -214,19 +182,20 @@ class SafariSession(Session):
         self,
         pointer: Literal["mouse", "pen", "touch"] = "mouse",
         duration: int | float = 0.25,
-    ) -> None:
-        """Safari automation does not support actions commands `None`.
+    ) -> Actions:
+        """Reject low-level actions, which this Safari facade does not implement.
 
         Args:
-            pointer: Pointer used by this operation.
-            duration: Duration used by this operation.
+            pointer: Requested pointer source type; retained for API compatibility.
+            duration: Requested default pointer-move duration in seconds.
+
+        Raises:
+            errors.InvalidMethodError: Always; actions are intentionally disabled
+                until SafariDriver support is validated.
         """
-        logger.warning(
-            "<{}>\nSafari automation does not support actions commands.".format(
-                self.__class__.__name__
-            )
+        raise errors.InvalidMethodError(
+            "Low-level actions are not supported by the Safari facade"
         )
-        return None
 
     # Safari - Permission -----------------------------------------------------------------
     @property
@@ -271,7 +240,11 @@ class SafariSession(Session):
         return (await self.permissions).get(name, None)
 
     async def set_permission(self, name: str, value: bool) -> dict[str, bool]:
-        """Set a specific permission of the active page window.
+        """Update one permission without overwriting concurrent permission changes.
+
+        Read, merge, mutation, and observation share command ownership. Wrap
+        additional page work in ``session.transaction()`` when it must use the
+        same active window and permission state.
 
         Args:
             name: The name of the permission.
@@ -293,9 +266,10 @@ class SafariSession(Session):
             )
         if not isinstance(value, bool):
             raise errors.InvalidPermissionStateError("Permission state must be a bool")
-        permissions = await self.permissions
-        await self.execute_command(
-            Command.SAFARI_SET_PERMISSIONS,
-            body={"permissions": permissions | {name: value}},
-        )
-        return await self.permissions
+        async with self.transaction():
+            permissions = await self.permissions
+            await self.execute_command(
+                Command.SAFARI_SET_PERMISSIONS,
+                body={"permissions": permissions | {name: value}},
+            )
+            return await self.permissions

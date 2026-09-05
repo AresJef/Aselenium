@@ -1,13 +1,17 @@
-"""Local HTML feature tour of the modernized Aselenium package (headless by default).
+"""Exercise modern Aselenium features against local HTML fixtures.
 
-    python src/demo_local.py list
-    python src/demo_local.py install --browser chrome --allow-download
-    python src/demo_local.py run --browser chrome
+The tour is headless by default. Running without a subcommand prints help, and
+``list`` reports available sections without probing any executable. ``install``
+and ``run`` may inspect installed browsers; vendor requests occur only with
+``--allow-download``. Browser navigation and the upload demonstration remain on
+an ephemeral loopback server. Use :mod:`demo_google` for a real-world website.
 
-No arguments prints help. Only `install`/`run` probe executables; vendor requests
-require --allow-download. Browser pages and uploads stay on a loopback fixture.
-See docs/demo-local.md for policies, browser prerequisites, and feature boundaries.
-For a real-world website and a visible browser, use src/demo_google.py instead.
+Example:
+    Inspect the section-list command without launching a browser:
+
+    >>> options = parse_args(["list"])
+    >>> options.command
+    'list'
 """
 
 from __future__ import annotations
@@ -27,11 +31,28 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 from time import perf_counter
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 from urllib.parse import urlsplit
 
-from _demo_support import BROWSERS, CHROMIUM, acquire_offline, make_driver, provision
-from aselenium import Element, Proxy, Session, WebDriver
+from _demo_support import (
+    BROWSERS,
+    CHROMIUM,
+    acquire_offline,
+    json_default,
+    make_driver,
+    provision,
+)
+from aselenium import (
+    ChromeSession,
+    ChromiumSession,
+    EdgeSession,
+    Element,
+    FirefoxSession,
+    Proxy,
+    SafariSession,
+    Session,
+    WebDriver,
+)
 
 if TYPE_CHECKING:
     from aselenium.manager._installation import InstallationResult
@@ -65,19 +86,28 @@ SECTIONS = {
 
 
 class DemoFailure(RuntimeError):
-    """A feature did not produce the expected result."""
+    """Signal that a demonstrated feature violated an expected invariant."""
 
 
 class DemoSkipped(Exception):
-    """A documented browser limitation, not a successful check."""
+    """Signal that a demo section is unsupported by the selected browser."""
 
 
 def check(condition: object, message: str) -> None:
-    """Unlike assert, demo checks remain enabled under `python -O`.
+    """Raise a demo failure when an observed condition is false.
+
+    Unlike an ``assert`` statement, this validation remains active under
+    ``python -O``.
 
     Args:
-        condition: Asynchronous no-argument predicate whose truthy result completes the wait.
-        message: Diagnostic message explaining the failed condition.
+        condition: Observed value whose truthiness determines success.
+        message: Diagnostic text attached to a failed check.
+
+    Raises:
+        DemoFailure: ``condition`` is false.
+
+    Example:
+        >>> check(2 + 2 == 4, "arithmetic changed")
     """
     if not condition:
         raise DemoFailure(message)
@@ -87,10 +117,18 @@ def fixture_response(target: str) -> tuple[int, bytes]:
     """Serve only an explicit allowlist, never a directory or user-supplied path.
 
     Args:
-        target: Target used by this operation.
+        target: Request target or URL. Only its parsed path is considered.
 
     Returns:
-        Serve only an explicit allowlist, never a directory or user-supplied path.
+        A pair containing the HTTP status and response body. Unknown paths return
+        ``404`` and the favicon path returns an empty ``204`` response.
+
+    Raises:
+        OSError: An allowlisted fixture file cannot be read.
+
+    Example:
+        >>> fixture_response("/favicon.ico")
+        (204, b'')
     """
     path = urlsplit(target).path
     pages = {
@@ -111,14 +149,17 @@ def fixture_server() -> Iterator[str]:
     """An ephemeral loopback server with no external assets or upload endpoint.
 
     Yields:
-        The resource managed by this context; cleanup runs when the context exits.
+        The HTTP origin of a server bound to an ephemeral IPv4 loopback port.
+
+    Raises:
+        OSError: The loopback server cannot bind or close cleanly.
     """
 
     class Handler(BaseHTTPRequestHandler):
         """Serve only the allowlisted local HTML demonstration fixtures."""
 
         def do_GET(self) -> None:
-            """Write the allowlisted fixture response for the incoming GET request."""
+            """Write the allowlisted response for the current HTTP GET request."""
             status, content = fixture_response(self.path)
             self.send_response(status)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -131,8 +172,8 @@ def fixture_server() -> Iterator[str]:
             """Suppress request logging for the local demonstration server.
 
             Args:
-                format: Format used by this operation.
-                *args: Validated command-line options for the selected browser workflow.
+                format: ``printf``-style message supplied by the base handler.
+                *args: Values that the base handler would interpolate into ``format``.
             """
             pass
 
@@ -153,10 +194,18 @@ def positive_seconds(value: str) -> float:
     """Parse a finite positive command-line duration in seconds.
 
     Args:
-        value: A finite positive command-line duration in seconds supplied for validation.
+        value: Command-line text representing a duration in seconds.
 
     Returns:
-        A finite positive command-line duration in seconds.
+        The parsed finite value, which is strictly greater than zero.
+
+    Raises:
+        ValueError: ``value`` is not numeric.
+        argparse.ArgumentTypeError: The numeric value is non-finite or not positive.
+
+    Example:
+        >>> positive_seconds("30")
+        30.0
     """
     number = float(value)
     if not math.isfinite(number) or number <= 0:
@@ -171,7 +220,16 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         argv: Command-line arguments; None reads the current process arguments.
 
     Returns:
-        And validate the command line without launching a browser.
+        The parsed namespace. Its ``command`` is ``None`` when no subcommand was
+        supplied and help was printed.
+
+    Raises:
+        SystemExit: Argument parsing or cross-option validation fails.
+
+    Example:
+        >>> options = parse_args(["run", "--sections", "navigation", "cookies"])
+        >>> (options.browser, options.sections)
+        ('chrome', ['navigation', 'cookies'])
     """
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
@@ -230,6 +288,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--sections", nargs="+", choices=("all", *SECTIONS), default=["all"]
     )
     run.add_argument(
+        "--session-timeout",
+        type=positive_seconds,
+        default=30,
+        help="per-command and session-start deadline in seconds; default 30",
+    )
+    run.add_argument(
         "--headed",
         action="store_true",
         help="show browser UI (Safari is always headed)",
@@ -238,6 +302,11 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         "--profile-demo",
         action="store_true",
         help="clone a new, empty demo profile; never reads a personal profile",
+    )
+    run.add_argument(
+        "--profile-root",
+        type=Path,
+        help="existing shared writable Firefox profile root (Snap/Flatpak workaround)",
     )
     run.add_argument(
         "--output-dir",
@@ -257,6 +326,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         )
     if args.browser == "edge" and args.channel == "cft":
         parser.error("--channel cft is only available for Chrome")
+    if (
+        args.command == "run"
+        and args.profile_root is not None
+        and args.browser != "firefox"
+    ):
+        parser.error("--profile-root is only available for Firefox")
     if args.channel == "cft":
         if args.command == "run":
             parser.error(
@@ -314,18 +389,30 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 def configure(
     driver: WebDriver, args: argparse.Namespace, profile_source: Path | None
 ) -> dict[str, Any]:
-    """Configure.
+    """Configure options and return the options-section report details.
+
+    The function applies deterministic timeouts and browser-specific arguments,
+    verifies that capabilities are defensive copies, and demonstrates proxy
+    serialization without enabling the proxy. When ``profile_demo`` is selected,
+    it configures an empty source profile for cloning during each acquisition.
 
     Args:
-        driver: Driver object or downloaded driver artifact required by this operation.
-        args: Validated command-line options for the selected browser workflow.
-        profile_source: Empty demonstration profile to clone, or None for a fresh profile.
+        driver: Browser facade whose mutable options are configured before acquisition.
+        args: Parsed local-demo browser, timeout, display, and profile options.
+        profile_source: Empty directory used as the clone source. It must be a
+            path when ``args.profile_demo`` is true; otherwise it is ignored.
 
     Returns:
-        A mapping containing the configure data.
+        Report fields describing timeouts, defensive capabilities, the serialized
+        proxy example, and the selected profile mode.
+
+    Raises:
+        DemoFailure: A configuration invariant fails or profile demonstration
+            was requested without its source directory.
+        OSError: The empty Chromium profile directory cannot be prepared.
     """
     options = driver.options
-    options.session_timeout = 30
+    options.session_timeout = args.session_timeout
     options.set_timeouts(
         implicit=0, pageLoad=20, script=5
     )  # Public setters use seconds.
@@ -373,6 +460,8 @@ def configure(
         "proxy bypass serialization",
     )
     if args.profile_demo:
+        if profile_source is None:
+            raise DemoFailure("Profile demonstration requires a source directory")
         if args.browser in CHROMIUM:
             (profile_source / "Default").mkdir()
             options.set_profile(profile_source, "Default")
@@ -380,7 +469,7 @@ def configure(
             options.set_profile(profile_source)
     return {
         "implicit_wait_seconds": 0,
-        "session_timeout_seconds": 30,
+        "session_timeout_seconds": args.session_timeout,
         "defensive_capabilities": True,
         "proxy": "serialization only; not enabled",
         "profile": "empty template cloned per acquisition"
@@ -394,11 +483,11 @@ class Tour:
     """Session, local fixture URL, and artifact context for one browser tour.
 
     Attributes:
-        session: Active session that owns the browser or HTTP operation.
-        url: URL used for the request or browser navigation.
-        output: Directory for this run's report and captures.
-        browser: Browser captured for this operation.
-        headed: Headed captured for this operation.
+        session: Active browser session for the current ordinary demo sections.
+        url: Base URL of the ephemeral loopback fixture server.
+        output: Run-specific directory for screenshots and PDFs.
+        browser: Normalized browser name selected on the command line.
+        headed: Whether the demo requested a visible browser window.
     """
 
     session: Session
@@ -408,27 +497,34 @@ class Tour:
     headed: bool
 
     async def element(self, selector: str) -> Element:
-        """Element.
+        """Find one required fixture element by CSS selector.
 
         Args:
-            selector: Selector used by this operation.
+            selector: CSS selector evaluated in the current browsing context.
 
         Returns:
-            The Element value produced by this operation.
+            The matching element.
+
+        Raises:
+            DemoFailure: No element matches ``selector``.
         """
         element = await self.session.find_element(selector)
-        check(element is not None, "Missing fixture element: " + selector)
+        if element is None:
+            raise DemoFailure("Missing fixture element: " + selector)
         return element
 
 
 async def navigation(tour: Tour) -> dict[str, Any]:
-    """Navigation.
+    """Demonstrate navigation, page metadata, and runtime timeouts.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the navigation data.
+        Observed page dimensions, source length, and reset timeout values.
+
+    Raises:
+        DemoFailure: A navigation, title, URL, or timeout check fails.
     """
     s = tour.session
     check(await s.title == "Aselenium local demo", "initial title")
@@ -456,13 +552,17 @@ async def navigation(tour: Tour) -> dict[str, Any]:
 
 
 async def elements(tour: Tour) -> dict[str, Any]:
-    """Elements.
+    """Demonstrate forms, upload selection, visibility, and shadow DOM.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the elements data.
+        Report details confirming local form submission, local file selection,
+        and the visibility cases that were checked.
+
+    Raises:
+        DemoFailure: Any element behavior differs from the fixture contract.
     """
     s = tour.session
     field = await tour.element("#name")
@@ -505,11 +605,12 @@ async def elements(tour: Tour) -> dict[str, Any]:
         await covered.in_viewport and not await covered.unobscured, "covered hit-test"
     )
     shadow = await (await tour.element("#host")).shadow
-    check(shadow is not None, "open shadow root")
+    if shadow is None:
+        raise DemoFailure("open shadow root")
     child = await shadow.find_element("#shadow-text")
-    check(
-        child is not None and await child.text == "Inside shadow DOM", "shadow lookup"
-    )
+    if child is None:
+        raise DemoFailure("shadow lookup")
+    check(await child.text == "Inside shadow DOM", "shadow lookup")
     check(await child.unobscured, "shadow-root-aware hit-test")
     check(await child.wait_until("unobscured", timeout=2), "element hit-test wait")
     check(
@@ -526,13 +627,16 @@ async def elements(tour: Tour) -> dict[str, Any]:
 
 
 async def waits(tour: Tour) -> dict[str, Any]:
-    """Waits.
+    """Demonstrate explicit waits and a shared-session transaction.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the waits data.
+        Report details for truthy-result, zero-timeout, viewport, and hit-test waits.
+
+    Raises:
+        DemoFailure: A wait result violates the demonstrated deadline semantics.
     """
     s = tour.session
     check(
@@ -561,13 +665,16 @@ async def waits(tour: Tour) -> dict[str, Any]:
 
 
 async def cookies(tour: Tour) -> dict[str, Any]:
-    """Cookies.
+    """Create, retrieve, and delete a cookie on the loopback origin.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the cookies data.
+        The cookie origin and confirmation that the temporary cookie was deleted.
+
+    Raises:
+        DemoFailure: Cookie retrieval or deletion does not match the expected value.
     """
     s = tour.session
     await s.add_cookie(
@@ -588,13 +695,16 @@ async def cookies(tour: Tour) -> dict[str, Any]:
 
 
 async def windows(tour: Tour) -> dict[str, Any]:
-    """Windows.
+    """Open a named tab, close it, and restore the original browsing context.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the windows data.
+        Confirmation that the temporary tab was closed.
+
+    Raises:
+        DemoFailure: Tab count, title, or focus restoration is incorrect.
     """
     s = tour.session
     original = await s.active_window
@@ -611,13 +721,17 @@ async def windows(tour: Tour) -> dict[str, Any]:
 
 
 async def frames(tour: Tour) -> dict[str, Any]:
-    """Frames.
+    """Enter the local iframe and restore the top-level document.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the frames data.
+        Confirmation that the default frame was restored.
+
+    Raises:
+        DemoSkipped: Safari is selected because its facade disables frame switching.
+        DemoFailure: Frame entry, content, or top-level restoration fails.
     """
     if tour.browser == "safari":
         raise DemoSkipped("The current Safari facade disables frame switching")
@@ -634,13 +748,16 @@ async def frames(tour: Tour) -> dict[str, Any]:
 
 
 async def alerts(tour: Tour) -> dict[str, Any]:
-    """Alerts.
+    """Inspect a local prompt, send text, and accept it safely.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the alerts data.
+        Confirmation that prompt text was submitted and accepted.
+
+    Raises:
+        DemoFailure: The prompt, its text, or submitted result is incorrect.
     """
     s = tour.session
     # Schedule the prompt after this script returns so the WebDriver call can finish.
@@ -648,7 +765,8 @@ async def alerts(tour: Tour) -> dict[str, Any]:
         "setTimeout(() => {document.querySelector('#prompt-result').textContent = prompt('Local demo prompt', '') || 'dismissed'}, 100)"
     )
     alert = await s.get_alert(timeout=3)
-    check(alert is not None, "prompt appeared")
+    if alert is None:
+        raise DemoFailure("prompt appeared")
     try:
         check(await alert.text == "Local demo prompt", "prompt text")
         await alert.send("accepted locally")
@@ -662,13 +780,17 @@ async def alerts(tour: Tour) -> dict[str, Any]:
 
 
 async def scripts(tour: Tour) -> dict[str, Any]:
-    """Scripts.
+    """Demonstrate cached, synchronous, and asynchronous JavaScript execution.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the scripts data.
+        Report details confirming script-cache lifecycle and preservation of an
+        application payload that resembles a WebDriver error.
+
+    Raises:
+        DemoFailure: Script results or cache removal differ from expectations.
     """
     s = tour.session
     cached = s.cache_script("demo-sum", "return arguments[0] + arguments[1]", 2, 3)
@@ -697,13 +819,17 @@ async def scripts(tour: Tour) -> dict[str, Any]:
 
 
 async def actions(tour: Tour) -> dict[str, Any]:
-    """Actions.
+    """Demonstrate a reusable action chain and remote input-state reset.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the actions data.
+        Confirmation that performed actions were not replayed and input state was reset.
+
+    Raises:
+        DemoSkipped: Safari is selected because its facade disables W3C actions.
+        DemoFailure: Reusing the chain produces an unexpected input value.
     """
     if tour.browser == "safari":
         raise DemoSkipped("The current Safari facade disables W3C action chains")
@@ -723,13 +849,17 @@ async def actions(tour: Tour) -> dict[str, Any]:
 
 
 async def artifacts(tour: Tour) -> dict[str, Any]:
-    """Artifacts.
+    """Save and validate browser-supported PNG and PDF artifacts.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the artifacts data.
+        Saved artifact filenames and notes explaining any intentional PDF skip.
+
+    Raises:
+        DemoFailure: Saving fails or an artifact has the wrong file signature.
+        OSError: A saved artifact cannot be read for validation.
     """
     s = tour.session
     capture = tour.output / "page.png"
@@ -753,8 +883,9 @@ async def artifacts(tour: Tour) -> dict[str, Any]:
         )
         files.append(pdf.name)
     if tour.browser == "firefox":
+        firefox = cast(FirefoxSession, s)
         full = tour.output / "full-page.png"
-        check(await s.save_full_screenshot(full), "Firefox full-page screenshot")
+        check(await firefox.save_full_screenshot(full), "Firefox full-page screenshot")
         check(
             (await asyncio.to_thread(full.read_bytes)).startswith(b"\x89PNG"),
             "full-page PNG signature",
@@ -764,41 +895,53 @@ async def artifacts(tour: Tour) -> dict[str, Any]:
 
 
 async def vendor(tour: Tour) -> dict[str, Any]:
-    """Vendor.
+    """Demonstrate browser-specific extension APIs without persistent changes.
+
+    Chromium browsers exercise CDP, permissions, network emulation, and browser
+    logs while restoring the original permission and network state. Firefox
+    installs a local add-on temporarily and removes it in ``finally``. Safari
+    performs read-only permission inspection.
 
     Args:
         tour: Active local-demo session and its fixture/output context.
 
     Returns:
-        A mapping containing the vendor data.
+        Browser-specific results describing the exercised APIs and restored state.
+
+    Raises:
+        DemoFailure: A vendor API result or cleanup invariant is incorrect.
     """
     s = tour.session
     if tour.browser in CHROMIUM:
-        command = s.cache_cdp_cmd("demo-version", "Browser.getVersion")
-        version = await s.execute_cdp_cmd(command)
+        chromium = cast(ChromeSession | ChromiumSession | EdgeSession, s)
+        command = chromium.cache_cdp_cmd("demo-version", "Browser.getVersion")
+        version = await chromium.execute_cdp_cmd(command)
         check(
             isinstance(version, dict) and "product" in version, "CDP Browser.getVersion"
         )
-        original = await s.get_permission("geolocation")
-        check(original is not None, "geolocation permission query")
+        original = await chromium.get_permission("geolocation")
+        if original is None:
+            raise DemoFailure("geolocation permission query")
         try:
-            permission = await s.set_permission("geolocation", "denied")
+            permission = await chromium.set_permission("geolocation", "denied")
             check(
                 permission is not None and permission.state == "denied",
                 "permission readback",
             )
         finally:
-            await s.set_permission("geolocation", original.state)
+            await chromium.set_permission("geolocation", original.state)
         try:
-            conditions = await s.set_network(
+            conditions = await chromium.set_network(
                 offline=False, latency=10, download_throughput=1024 * 1024
             )
             check(conditions.latency == 10, "network emulation readback")
         finally:
-            await s.reset_network()
-        log_types = await s.log_types
+            await chromium.reset_network()
+        log_types = await chromium.log_types
         counts = {
-            kind: len(await s.get_logs(kind)) for kind in log_types if kind == "browser"
+            kind: len(await chromium.get_logs(kind))
+            for kind in log_types
+            if kind == "browser"
         }
         return {
             "cdp_product": version["product"],
@@ -808,19 +951,20 @@ async def vendor(tour: Tour) -> dict[str, Any]:
             "casting": "not invoked; requires explicit device selection",
         }
     if tour.browser == "firefox":
-        check(await s.context == "content", "Firefox content context")
-        addons = await s.install_addons(ASSETS / "firefox-addon", temporary=True)
+        firefox = cast(FirefoxSession, s)
+        check(await firefox.context == "content", "Firefox content context")
+        addons = await firefox.install_addons(ASSETS / "firefox-addon", temporary=True)
         try:
             check(len(addons) == 1, "temporary add-on installation")
-            await s.refresh()
+            await firefox.refresh()
 
             async def addon_marker() -> Any:
-                """Addon marker.
+                """Read whether the temporary add-on marked the fixture document.
 
                 Returns:
-                    The Any value produced by this operation.
+                    The script result, expected to be truthy after the content script runs.
                 """
-                return await s.execute_script(
+                return await firefox.execute_script(
                     "return document.documentElement.dataset.aseleniumAddon === 'ready'"
                 )
 
@@ -829,14 +973,15 @@ async def vendor(tour: Tour) -> dict[str, Any]:
             )
         finally:
             for addon in addons:
-                await s.uninstall_addon(addon)
+                await firefox.uninstall_addon(addon)
         return {
             "content_context": True,
             "temporary_addons_removed": len(addons),
             "privileged_chrome_context": "not entered",
         }
+    safari = cast(SafariSession, s)
     return {
-        "safari_permissions": await s.permissions,
+        "safari_permissions": await safari.permissions,
         "note": "Read-only Safari permission inspection; automation settings are never changed",
     }
 
@@ -845,10 +990,10 @@ async def drain_tasks(tasks: Sequence[asyncio.Task[Any]]) -> list[Any | BaseExce
     """Own every task on Python 3.10 too; repeated cancellation cannot orphan cleanup.
 
     Args:
-        tasks: Tasks owned by this operation and drained during teardown.
+        tasks: Owned tasks to cancel if unfinished and await to completion.
 
     Returns:
-        The drain tasks values in order.
+        Each task's result or raised exception, in input order.
     """
     for task in tasks:
         if not task.done():
@@ -865,15 +1010,23 @@ async def drain_tasks(tasks: Sequence[asyncio.Task[Any]]) -> list[Any | BaseExce
 async def concurrency(
     driver: WebDriver, args: argparse.Namespace, url: str
 ) -> dict[str, Any]:
-    """Concurrency.
+    """Run two isolated sessions with acquisition-time option snapshots.
+
+    Each worker receives a distinct session timeout, profile, session ID, and
+    cookie store. All created tasks and contexts are drained before returning or
+    propagating a failure, and the facade's original timeout is restored.
 
     Args:
-        driver: Driver object or downloaded driver artifact required by this operation.
-        args: Validated command-line options for the selected browser workflow.
-        url: URL used for the request or browser navigation.
+        driver: Configured browser facade reused for both acquisitions.
+        args: Parsed browser arguments used for offline session acquisition.
+        url: Base URL of the loopback fixture server.
 
     Returns:
-        A mapping containing the concurrency data.
+        Confirmation of session, timeout, cookie, and optional profile isolation.
+
+    Raises:
+        DemoSkipped: Safari is selected because its automation service is single-session.
+        DemoFailure: Session IDs, option snapshots, cookies, or profiles are not isolated.
     """
     if args.browser == "safari":
         raise DemoSkipped(
@@ -885,15 +1038,18 @@ async def concurrency(
     both_written = asyncio.Event()
     writes = 0
 
-    async def worker(context: SessionContext, expected: int) -> tuple[str, str | None]:
-        """Run one owned worker operation for the enclosing workflow.
+    async def worker(context: SessionContext, expected: int) -> tuple[str, Path | None]:
+        """Exercise one isolated context and return its session/profile identity.
 
         Args:
-            context: Context used by this operation.
-            expected: Expected result or configuration value used by the assertion.
+            context: Single-use context whose option snapshot is under test.
+            expected: Expected session timeout and private cookie value.
 
         Returns:
-            Run one owned worker operation for the enclosing workflow. None indicates that no value is available.
+            The session ID and temporary profile directory, if a profile exists.
+
+        Raises:
+            DemoFailure: The option snapshot or cookie store is not isolated.
         """
         nonlocal writes
         async with context as session:
@@ -957,21 +1113,29 @@ async def concurrency(
 async def cancellation(
     driver: WebDriver, args: argparse.Namespace, url: str
 ) -> dict[str, Any]:
-    """Cancellation.
+    """Cancel an owned session task, drain cleanup, and reuse the facade.
+
+    A deliberately idle worker is cancelled only after its first page is ready.
+    The closed context is not reused; a fresh acquisition verifies that the
+    browser facade remains usable after cancellation.
 
     Args:
-        driver: Driver object or downloaded driver artifact required by this operation.
-        args: Validated command-line options for the selected browser workflow.
-        url: URL used for the request or browser navigation.
+        driver: Configured browser facade used for both acquisitions.
+        args: Parsed browser arguments used for offline session acquisition.
+        url: Base URL of the loopback fixture server.
 
     Returns:
-        A mapping containing the cancellation data.
+        Confirmation that cancellation was awaited and a fresh acquisition succeeded.
+
+    Raises:
+        DemoFailure: The worker does not start, propagate cancellation, or permit
+            a successful fresh acquisition.
     """
     context = acquire_offline(driver, args)
     ready = asyncio.Event()
 
     async def worker() -> None:
-        """Run one owned worker operation for the enclosing workflow."""
+        """Load the fixture, signal readiness, and wait indefinitely for cancellation."""
         async with context as session:
             await session.load(url)
             ready.set()
@@ -1014,12 +1178,16 @@ async def record(report: dict[str, Any], name: str, operation: Awaitable[Any]) -
     """Record the outcome and duration of one awaited demo section.
 
     Args:
-        report: Mutable run report updated with outcomes and diagnostic artifacts.
-        name: Name identifying the requested item.
-        operation: Operation performed by this helper; its result or failure is propagated.
+        report: Mutable run report whose ``sections`` list receives one entry.
+        name: Stable section name displayed and stored in the report.
+        operation: Awaitable implementing the section.
+
+    Raises:
+        BaseException: Any section failure other than :class:`DemoSkipped` is
+            recorded with duration and then propagated unchanged.
     """
     started = perf_counter()
-    entry = {"section": name}
+    entry: dict[str, Any] = {"section": name}
     report["sections"].append(entry)
     print("Running " + name + "...", flush=True)
     try:
@@ -1045,23 +1213,29 @@ async def run_tour(
     profile_source: Path | None,
     report: dict[str, Any],
 ) -> None:
-    """Provision the browser and run the selected local HTML demo sections.
+    """Provision the browser and run the selected local HTML tour sections.
+
+    Driver management and option configuration always run first. Ordinary
+    sections share one session and reload the fixture before each chapter;
+    concurrency and cancellation own separate acquisitions. Browser options are
+    closed regardless of success, failure, or cancellation.
 
     Args:
-        args: Validated command-line options for the selected browser workflow.
-        url: URL used for the request or browser navigation.
-        output: Directory for this run's report and captures.
-        profile_source: Empty demonstration profile to clone, or None for a fresh profile.
-        report: Mutable run report updated with outcomes and diagnostic artifacts.
+        args: Parsed browser, provisioning, section, and session options.
+        url: Base URL of the loopback fixture server.
+        output: Run-specific directory for screenshots and PDFs.
+        profile_source: Empty demonstration profile to clone, or ``None`` when
+            profile cloning is unavailable.
+        report: Mutable run report receiving section and session results.
     """
     driver = make_driver(args)
     try:
 
         async def manager_demo() -> dict[str, Any]:
-            """Manager demo.
+            """Provision the selected driver and convert its result to a report mapping.
 
             Returns:
-                A mapping containing the manager demo data.
+                Dataclass fields from the completed installation result.
             """
             result = await provision(driver, args)
             return asdict(result)
@@ -1069,10 +1243,10 @@ async def run_tour(
         await record(report, "driver-management", manager_demo())
 
         async def options_demo() -> dict[str, Any]:
-            """Options demo.
+            """Configure the facade and return its options report details.
 
             Returns:
-                A mapping containing the options demo data.
+                The summary produced by :func:`configure`.
             """
             return configure(driver, args, profile_source)
 
@@ -1093,15 +1267,18 @@ async def run_tour(
                         if name in ordinary:
 
                             async def chapter(name: str = name) -> dict[str, Any]:
-                                # Each chapter can be selected independently and starts fresh.
-                                """Chapter.
+                                """Reload the fixture and run one selected ordinary section.
 
                                 Args:
-                                    name: Name identifying the requested item.
+                                    name: Section name used to resolve its coroutine.
 
                                 Returns:
-                                    A mapping containing the chapter data.
+                                    Browser observations reported by the section.
+
+                                Raises:
+                                    KeyError: ``name`` does not identify a registered section.
                                 """
+                                # Each chapter can be selected independently and starts fresh.
                                 await session.load(url)
                                 return await globals()[name](tour)
 
@@ -1118,13 +1295,22 @@ async def run_tour(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Parse command-line arguments and run the requested program workflow.
+    """Run the requested local-demo command and emit its report or listing.
+
+    ``list`` prints section names, ``install`` prints one installation result,
+    and ``run`` creates a unique artifact directory with ``report.json``. A run
+    report includes not-run entries for sections skipped after an earlier failure.
 
     Args:
         argv: Command-line arguments; None reads the current process arguments.
 
     Returns:
-        Process exit code; zero indicates the requested workflow completed successfully.
+        ``0`` after help, listing, installation, or a successful tour; ``130``
+        after keyboard interruption; otherwise ``1`` for a handled failure.
+
+    Raises:
+        SystemExit: Command-line parsing or validation fails.
+        OSError: A fixture, output directory, or final report cannot be created.
     """
     args = parse_args(argv)
     if args.command is None:
@@ -1137,10 +1323,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     if args.command == "install":
 
         async def install_only() -> InstallationResult:
-            """Install only.
+            """Provision one driver while guaranteeing options cleanup.
 
             Returns:
-                The InstallationResult value produced by this operation.
+                The completed immutable installation result.
             """
             driver = make_driver(args)
             try:
@@ -1155,7 +1341,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         except Exception as exc:
             print(f"Installation failed: {type(exc).__name__}: {exc}", file=sys.stderr)
             return 1
-        print(json.dumps(asdict(result), indent=2))
+        print(json.dumps(asdict(result), indent=2, default=json_default))
         return 0
 
     args.output_dir = args.output_dir.expanduser().resolve()
@@ -1221,8 +1407,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             for status in ("passed", "skipped", "failed", "cancelled", "not-run")
         }
         path = output / "report.json"
-        path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-        print(json.dumps(report, indent=2))
+        path.write_text(
+            json.dumps(report, indent=2, default=json_default) + "\n",
+            encoding="utf-8",
+        )
+        print(json.dumps(report, indent=2, default=json_default))
         print("Report: " + str(path))
     return code
 

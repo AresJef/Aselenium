@@ -19,6 +19,37 @@ V = TypeVar("V")
 DEADLINE: ContextVar[float | None] = ContextVar("aselenium_wait_deadline", default=None)
 
 
+def validate_delay(duration: int | float | None) -> int | float | None:
+    """Validate an optional delay before any associated browser operation.
+
+    Args:
+        duration: Nonnegative, finite seconds, or ``None`` to omit the delay.
+
+    Returns:
+        The original validated value without coercion.
+
+    Raises:
+        errors.InvalidArgumentError: The value is a boolean, is negative or
+            nonnumeric, or cannot be represented as a finite floating-point delay.
+    """
+    if duration is None:
+        return None
+    try:
+        valid = (
+            not isinstance(duration, bool)
+            and isinstance(duration, (int, float))
+            and isfinite(duration)
+            and duration >= 0
+        )
+    except OverflowError:
+        valid = False
+    if not valid:
+        raise errors.InvalidArgumentError(
+            "Pause duration must be a finite nonnegative number or None"
+        )
+    return duration
+
+
 async def poll(
     check: Callable[[], Awaitable[T]], timeout: float | None = 5, interval: float = 0.2
 ) -> T | None:
@@ -31,10 +62,13 @@ async def poll(
         interval: Positive delay in seconds between unsuccessful observations.
 
     Returns:
-        The first truthy predicate result, the last falsey result, or None when the deadline expires.
+        The first truthy predicate result, the last falsey result, or ``None``
+        when the deadline expires before an observation completes.
 
     Raises:
-        errors.InvalidArgumentError: The timeout or polling interval is invalid.
+        errors.InvalidArgumentError: ``timeout`` is not finite and nonnegative,
+            or ``interval`` is not finite and positive. Boolean values are
+            rejected even though Python treats them as integers.
         asyncio.CancelledError: The caller cancels the wait. Predicate failures
             also propagate unless they represent this wait's expired deadline.
 
@@ -98,7 +132,7 @@ async def poll(
 async def first_match(
     values: Sequence[V], find: Callable[[V], Awaitable[T | None]], timeout: float | None
 ) -> T | None:
-    """Return the first available match while sharing one deadline across candidates.
+    """Return the first non-``None`` match under one shared deadline.
 
     Args:
         values: Input values evaluated in order by this operation.
@@ -107,16 +141,22 @@ async def first_match(
             candidates once without sleeping between observations.
 
     Returns:
-        The first non-None lookup result, or None if nothing matches before the deadline.
+        The first non-``None`` lookup result, including falsey values, or
+        ``None`` if nothing matches before the deadline.
+
+    Raises:
+        errors.InvalidArgumentError: ``timeout`` is invalid.
+        asyncio.CancelledError: The caller cancels the lookup.
     """
     if not values:
         return None
 
     async def check() -> tuple[T] | None:
-        """Observe the enclosing wait predicate once.
+        """Scan all candidates once and box the first non-``None`` result.
 
         Returns:
-            A truthy one-item tuple holding the first non-None match, or None.
+            A truthy one-item tuple preserving a falsey match, or ``None`` when
+            every candidate misses.
         """
         for value in values:
             result = await find(value)

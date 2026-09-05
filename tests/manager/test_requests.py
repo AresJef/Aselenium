@@ -320,6 +320,53 @@ async def test_vendor_timeout_is_reported(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("kind", "error_type"),
+    [
+        pytest.param("text", errors.DriverRequestTimeoutError, id="metadata"),
+        pytest.param("file", errors.FileDownloadTimeoutError, id="download"),
+    ],
+)
+async def test_outer_deadline_preserves_classified_timeout_identity(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    kind: _http.ResponseKind,
+    error_type: type[errors.AseleniumError],
+) -> None:
+    """Do not rewrap a timeout already classified by the inner request layer.
+
+    Args:
+        tmp_path: Isolated cache parent for the manager instance.
+        monkeypatch: Pytest fixture used to replace the admitted request.
+        kind: Response kind selecting the metadata or download deadline.
+        error_type: Expected package-defined timeout class.
+    """
+    manager = ChromeDriverManager(directory=tmp_path)
+    original = error_type("classified inner timeout")
+
+    async def raise_classified_timeout(*args: Any, **kwargs: Any) -> None:
+        """Raise the exact package exception supplied by the regression."""
+        raise original
+
+    def unused_session_factory() -> aiohttp.ClientSession:
+        """Fail if the patched request unexpectedly creates an HTTP client."""
+        raise AssertionError("classified timeout path must not create a client")
+
+    monkeypatch.setattr(_http, "_admitted_request", raise_classified_timeout)
+
+    with pytest.raises(error_type) as caught:
+        await _http.request(
+            manager,
+            "https://vendor.invalid/resource",
+            kind,
+            unused_session_factory,
+        )
+
+    assert caught.value is original
+    assert caught.value.__cause__ is None
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("status", [429, 500, 502, 503, 504])
 async def test_vendor_retry_budget_and_retry_after(
     tmp_path: Path, fake_vendor: Any, monkeypatch: pytest.MonkeyPatch, status: Any

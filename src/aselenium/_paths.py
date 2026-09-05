@@ -1,16 +1,18 @@
 """Central filesystem-path parsing and validation for package internals.
 
-Public entry points may accept text or string-valued path-like objects.  This
-module converts that input exactly once and keeps :class:`pathlib.Path` values
-through the rest of each filesystem workflow.  It deliberately does not call
-``resolve()`` so symbolic-link names and ``..`` components retain the host
-operating system's native traversal semantics.
+Public entry points accept text and string-valued path-like objects. This module
+normalizes those values at filesystem-workflow boundaries; downstream code
+keeps :class:`pathlib.Path` objects. It deliberately does not call ``resolve()``
+so symbolic-link names and ``..`` components retain the host operating system's
+native traversal semantics.
 """
 
 from __future__ import annotations
 
-from os import PathLike, fspath
+from collections.abc import Collection
+from os import PathLike, fspath, scandir, stat_result
 from pathlib import Path
+from stat import S_ISDIR, S_ISLNK, S_ISREG
 from typing import TypeAlias
 
 from aselenium import errors
@@ -18,8 +20,89 @@ from aselenium import errors
 PathInput: TypeAlias = str | PathLike[str]
 
 
+def _stat_is_link(info: stat_result) -> bool:
+    """Classify a non-following status result as a link or reparse point.
+
+    Args:
+        info: Status returned by ``lstat()`` or by ``DirEntry.stat()`` with
+            ``follow_symlinks=False``.
+
+    Returns:
+        ``True`` for a symbolic link, junction, or another Windows reparse
+        point; otherwise ``False``.
+    """
+    return S_ISLNK(info.st_mode) or bool(getattr(info, "st_file_attributes", 0) & 0x400)
+
+
+def is_link(path: Path) -> bool:
+    """Return whether a retained path is a link or Windows reparse point.
+
+    Args:
+        path: Host-native path to inspect without following its final component.
+
+    Returns:
+        ``True`` for symbolic links, junctions, and other Windows reparse
+        points; ``False`` for missing or ordinary entries.
+    """
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return False
+    return _stat_is_link(info)
+
+
+def _regular_tree_files(
+    root: Path, *, ignored_names: Collection[str] = ()
+) -> list[Path]:
+    """Collect regular files without following links or filesystem special entries.
+
+    Args:
+        root: Existing absolute directory retained by the calling workflow.
+        ignored_names: Entry basenames to omit at every directory level.
+
+    Returns:
+        Regular files below ``root`` as retained host-native paths.
+
+    Raises:
+        ValueError: ``root`` is relative, is a link/reparse point, or contains
+            a link/reparse point or non-regular filesystem entry.
+        OSError: A directory entry cannot be inspected.
+    """
+    if not isinstance(root, Path) or not root.is_absolute():
+        raise ValueError("Filesystem tree root must be an absolute pathlib.Path")
+    if is_link(root):
+        raise ValueError("Filesystem tree root is a link/reparse point: %s" % root)
+    pending = [root]
+    files: list[Path] = []
+    while pending:
+        directory = pending.pop()
+        if is_link(directory):
+            raise ValueError(
+                "Filesystem tree contains a link/reparse point: %s" % directory
+            )
+        with scandir(directory) as entries:
+            for entry in entries:
+                if entry.name in ignored_names:
+                    continue
+                path = directory / entry.name
+                info = entry.stat(follow_symlinks=False)
+                if _stat_is_link(info):
+                    raise ValueError(
+                        "Filesystem tree contains a link/reparse point: %s" % path
+                    )
+                if S_ISDIR(info.st_mode):
+                    pending.append(path)
+                elif S_ISREG(info.st_mode):
+                    files.append(path)
+                else:
+                    raise ValueError(
+                        "Filesystem tree contains a non-regular entry: %s" % path
+                    )
+    return files
+
+
 def parse_path(path: PathInput) -> Path:
-    """Convert one nonempty text path to an absolute, un-resolved ``Path``.
+    """Convert one nonempty text path to an absolute, unresolved ``Path``.
 
     Args:
         path: Text path or string-valued path-like object. A leading user-home
@@ -27,8 +110,9 @@ def parse_path(path: PathInput) -> Path:
             working directory.
 
     Returns:
-        An absolute ``Path``. Symbolic links and parent components are not
-        resolved or lexically collapsed.
+        An absolute host-native ``Path``. Symbolic links and parent components
+        are not resolved or lexically collapsed. An already absolute ``Path``
+        is returned unchanged.
 
     Raises:
         errors.AseleniumInvalidPathError: The value is empty, byte-valued,
@@ -73,12 +157,18 @@ def directory_path(path: PathInput) -> Path:
         path: Directory supplied as text or a string-valued path-like object.
 
     Returns:
-        Absolute path to the existing directory.
+        Absolute host-native path to the existing directory, without resolving
+        symbolic links or collapsing parent components.
 
     Raises:
         errors.AseleniumInvalidPathError: The input cannot be parsed safely.
         errors.AseleniumDirectoryNotFoundError: The path is not an existing
             directory on the host filesystem.
+
+    Example:
+        >>> from pathlib import Path
+        >>> directory_path(Path.cwd()) == Path.cwd()
+        True
     """
     parsed = parse_path(path)
     if not parsed.is_dir():
@@ -95,7 +185,8 @@ def file_path(path: PathInput) -> Path:
         path: File supplied as text or a string-valued path-like object.
 
     Returns:
-        Absolute path to the existing regular file.
+        Absolute host-native path to the existing regular file, without
+        resolving symbolic links or collapsing parent components.
 
     Raises:
         errors.AseleniumInvalidPathError: The input cannot be parsed safely.
@@ -118,11 +209,13 @@ def save_file_path(path: PathInput, file_ext: str) -> Path:
         file_ext: Required case-sensitive filename suffix, such as ``.png``.
 
     Returns:
-        Absolute output path with ``file_ext`` appended when it was absent.
+        Absolute host-native output path with ``file_ext`` appended when it was
+        absent. Existing suffix case is preserved.
 
     Raises:
         errors.AseleniumInvalidPathError: The input cannot be parsed or the
-            supplied or suffixed destination is an existing directory.
+            suffix is invalid, or the supplied or suffixed destination is an
+            existing directory.
         errors.AseleniumDirectoryNotFoundError: The destination parent is not an
             existing directory.
 
@@ -131,6 +224,10 @@ def save_file_path(path: PathInput, file_ext: str) -> Path:
         >>> destination.is_absolute() and destination.name == "capture.png"
         True
     """
+    if not isinstance(file_ext, str) or not file_ext.startswith(".") or file_ext == ".":
+        raise errors.AseleniumInvalidPathError(
+            "Output filename suffix must start with '.' and contain a suffix"
+        )
     parsed = parse_path(path)
     if parsed.is_dir():
         raise errors.AseleniumInvalidPathError(
@@ -138,7 +235,7 @@ def save_file_path(path: PathInput, file_ext: str) -> Path:
         )
     if not parsed.parent.is_dir():
         raise errors.AseleniumDirectoryNotFoundError(
-            "File directory '{}' does not exist.".format(parsed)
+            "File directory '{}' does not exist.".format(parsed.parent)
         )
     if not parsed.name.endswith(file_ext):
         parsed = parsed.with_name(parsed.name + file_ext)

@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium alert implementation and supporting types."""
+"""JavaScript alert, confirm, and prompt commands for active sessions."""
 
 from __future__ import annotations
 
@@ -27,6 +26,8 @@ from typing import (
 )
 
 from aselenium import errors
+from aselenium._response import response_value
+from aselenium._wait import validate_delay
 from aselenium.command import Command
 
 if TYPE_CHECKING:
@@ -40,7 +41,7 @@ class Alert:
     """Represent a JavaScript alert."""
 
     def __init__(self, session: Session) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Bind alert commands to an active browser session.
 
         Args:
             session: The session the alert raises.
@@ -59,24 +60,20 @@ class Alert:
             res = await self._session.execute_command(Command.W3C_GET_ALERT_TEXT)
         except errors.InvalidMethodError:
             return None
-        try:
-            return res["value"]
-        except KeyError as err:
-            raise errors.InvalidResponseError(
-                "<{}>\nFailed to get the text message from alert: {}".format(
-                    self.__class__.__name__, res
-                )
-            ) from err
+        return response_value(res, str, "Alert text")
 
     # Control ------------------------------------------------------------------------------
     async def dismiss(self, pause: int | float | None = None) -> None:
         """Dismiss the alert.
 
         Args:
-            pause: The pause in seconds after execution. Defaults to `None`.
-                This can be useful to wait for the command to take effect,
-                before executing the next command. Defaults to `None` - no pause.
+            pause: Finite, nonnegative delay after the command, in seconds.
+                ``None`` means no delay. Validated before dismissing the alert.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` is invalid, including a boolean.
         """
+        validate_delay(pause)
         await self._session.execute_command(Command.W3C_DISMISS_ALERT)
         await self.pause(pause)
 
@@ -84,16 +81,19 @@ class Alert:
         """Accept the alert.
 
         Args:
-            pause: The pause in seconds after execution. Defaults to `None`.
-                This can be useful to wait for the command to take effect,
-                before executing the next command. Defaults to `None` - no pause.
+            pause: Finite, nonnegative delay after the command, in seconds.
+                ``None`` means no delay. Validated before accepting the alert.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` is invalid, including a boolean.
         """
+        validate_delay(pause)
         await self._session.execute_command(Command.W3C_ACCEPT_ALERT)
         await self.pause(pause)
 
     async def send(
         self,
-        *values: str,
+        *values: object,
         sep: str = " ",
         pause: int | float | None = None,
     ) -> None:
@@ -105,16 +105,23 @@ class Alert:
         Args:
             *values: Values converted to strings and joined into the prompt text.
             sep: Separator between values; defaults to one space.
-            pause: Optional delay in seconds after the command completes.
+            pause: Finite, nonnegative delay after the command, in seconds.
+                ``None`` means no delay. Validated before prompt text is sent.
+
+        Raises:
+            errors.InvalidArgumentError: ``pause`` or ``sep`` is invalid, or an
+                input value cannot be converted to text.
 
         Example:
             >>> await alert.send("Hello", "world!")
             >>> await alert.accept()
         """
-        # Validate
+        validate_delay(pause)
+        if not isinstance(sep, str):
+            raise errors.InvalidArgumentError("Alert separator must be text")
         try:
             text_values = [str(value) for value in values]
-        except ValueError as err:
+        except Exception as err:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid 'values' to send to alert: {}".format(
                     self.__class__.__name__,
@@ -131,50 +138,49 @@ class Alert:
 
     # Utils -------------------------------------------------------------------------------
     async def pause(self, duration: int | float | None) -> None:
-        """Pause the for a given duration.
+        """Pause alert-command sequencing without blocking the event loop.
 
         Args:
-            duration: The duration to pause in seconds.
+            duration: Finite, nonnegative delay in seconds, or ``None`` for no
+                delay.
+
+        Raises:
+            errors.InvalidArgumentError: ``duration`` is not a finite,
+                nonnegative number or ``None``.
         """
-        if duration is None:
-            return None  # exit
-        try:
+        validate_delay(duration)
+        if duration is not None:
             await sleep(duration)
-        except Exception as err:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'duration' to pause: {}.".format(
-                    self.__class__.__name__, repr(duration)
-                )
-            ) from err
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
-        """Return a diagnostic representation of this instance.
+        """Describe the alert handle without allocating a service endpoint.
 
         Returns:
-            A diagnostic representation of this instance.
+            The parent session ID and already allocated service URL, if any.
         """
+        service = self._session._service
         return "<%s (session='%s', service='%s')>" % (
             self.__class__.__name__,
             self._session._id,
-            self._session._service.url,
+            getattr(service, "_url", None),
         )
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Hash the owning session shared by equivalent alert handles.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            The owning session's identity hash.
         """
-        return hash((self.__class__.__name__, hash(self._session)))
+        return hash(self._session)
 
     def __eq__(self, __o: Any) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Return whether another alert handle belongs to the same session.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` for another alert handle bound to the identical session.
         """
-        return hash(self) == hash(__o) if isinstance(__o, Alert) else False
+        return isinstance(__o, Alert) and self._session is __o._session

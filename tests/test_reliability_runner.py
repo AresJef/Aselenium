@@ -60,6 +60,7 @@ def valid_report(
                 "scenario": scenario,
                 "status": "passed",
                 "command_acknowledged_before_fault": True,
+                "fault_signal_sent": True,
                 "command_failure_type": "SessionTimeoutError"
                 if scenario.endswith("hang")
                 else "SessionClientError",
@@ -220,6 +221,7 @@ def test_incomplete_json_never_counts_as_success(
         ("recovery", ("scenarios", 0, "scenario"), "driver-crash"),
         ("recovery", ("scenarios", 0, "status"), "failed"),
         ("recovery", ("scenarios", 0, "command_acknowledged_before_fault"), 1),
+        ("recovery", ("scenarios", 0, "fault_signal_sent"), False),
         ("recovery", ("scenarios", 0, "command_failure_type"), "AssertionError"),
         (
             "recovery",
@@ -308,6 +310,20 @@ def test_invalid_or_inconsistent_success_claim_is_rejected(
     current[path[-1]] = value
     with pytest.raises(ValueError):
         controller["validate_report"](gate, report, "chrome", 1)
+
+
+def test_recovery_signal_proof_cannot_be_omitted(
+    controller: dict[str, Any],
+) -> None:
+    """Reject recovery evidence that never proves the target received a signal.
+
+    Args:
+        controller: Loaded real reliability report validator.
+    """
+    report = valid_report("recovery")
+    report["scenarios"][0].pop("fault_signal_sent")
+    with pytest.raises(ValueError, match="requested signal"):
+        controller["validate_report"]("recovery", report, "chrome", 1)
 
 
 @pytest.mark.parametrize("gate", GATES)
@@ -417,6 +433,8 @@ def test_reliability_runner_keeps_later_gates_and_failure_diagnostics(
         gate = GATES[len(calls)]
         calls.append(command)
         assert kwargs["timeout"] > 0
+        if gate == "recovery":
+            assert kwargs["timeout"] == 540
         assert "PYTHONPATH" not in kwargs["env"]
         path = Path(command[command.index("--output") + 1])
         assert kwargs["cwd"] == path.parent
@@ -494,3 +512,108 @@ def test_reliability_runner_keeps_later_gates_and_failure_diagnostics(
         log = (summaries[0].parent / "chrome-recovery.log").read_text()
         assert "partial stdout" in log
         assert "cleanup diagnostic" in log
+
+
+def test_recovery_annotation_retains_failed_scenario_after_verbose_output(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    controller: dict[str, Any],
+) -> None:
+    """Keep the failed scenario and cause at the tail of a bounded CI annotation.
+
+    Args:
+        tmp_path: Disposable executable and report directories.
+        monkeypatch: Replace child execution and enable GitHub annotations.
+        capsys: Capture controller progress and workflow commands.
+        controller: Actual script entry point and summary builder.
+    """
+    binary = tmp_path / "browser"
+    binary.touch()
+    calls = 0
+
+    def invoke(command: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        """Write one failed recovery report followed by valid gate reports.
+
+        Args:
+            command: Harness command containing the report destination.
+            **kwargs: Owned-process runner options, intentionally unused.
+
+        Returns:
+            Controlled child result with deliberately verbose recovery output.
+        """
+        nonlocal calls
+        gate = GATES[calls]
+        calls += 1
+        report = valid_report(gate, browser="edge")
+        return_code = 0
+        if gate == "recovery":
+            report["status"] = "failed"
+            scenario = report["scenarios"][0]
+            scenario["status"] = "failed"
+            scenario["failure_type"] = "ValueError"
+            scenario["failure"] = "distinct recovery root cause"
+            return_code = 1
+        path = Path(command[command.index("--output") + 1])
+        path.write_text(json.dumps(report), encoding="utf-8")
+        return subprocess.CompletedProcess(
+            command,
+            return_code,
+            "verbose fixture output " + "x" * 8_000 if gate == "recovery" else "",
+            "",
+        )
+
+    monkeypatch.setitem(controller["main"].__globals__, "run_owned", invoke)
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    arguments = [
+        "--python",
+        str(binary),
+        "--browser",
+        "edge",
+        "--binary",
+        str(binary),
+        "--cache-dir",
+        str(tmp_path / "cache"),
+        "--output-dir",
+        str(tmp_path / "reports"),
+        "--duration",
+        "1",
+    ]
+
+    assert controller["main"](arguments) == 1
+
+    annotations = [
+        line
+        for line in capsys.readouterr().out.splitlines()
+        if line.startswith("::error::")
+    ]
+    assert len(annotations) == 1
+    annotation = annotations[0]
+    assert "earlier diagnostic text truncated" in annotation
+    assert 'Failure summary: {"gate":"recovery"' in annotation
+    assert '"scenario":"browser-crash"' in annotation
+    assert '"failure_type":"ValueError"' in annotation
+    assert '"failure":"distinct recovery root cause"' in annotation
+    assert annotation.endswith("}")
+
+
+def test_recovery_failure_summary_is_bounded_for_malformed_verbose_reports(
+    controller: dict[str, Any],
+) -> None:
+    """Bound summary size while preserving each expected failed scenario identity.
+
+    Args:
+        controller: Actual script namespace containing the summary builder.
+    """
+    report = valid_report("recovery")
+    report["status"] = "failed"
+    for index, scenario in enumerate(report["scenarios"]):
+        scenario["status"] = "failed"
+        scenario["failure_type"] = "SyntheticError"
+        scenario["failure"] = f"failure-{index}-" + "x" * 8_000
+
+    summary = controller["failure_summary"]("recovery", report)
+
+    assert len(summary) <= controller["FAILURE_SUMMARY_LIMIT"]
+    for scenario in ("browser-crash", "driver-crash", "browser-hang", "driver-hang"):
+        assert f'"scenario":"{scenario}"' in summary

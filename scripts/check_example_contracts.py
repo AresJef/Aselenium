@@ -113,12 +113,14 @@ class Contracts:
                     arguments.vararg.arg, inspect.Parameter.VAR_POSITIONAL
                 )
             )
-        for argument, default in zip(arguments.kwonlyargs, arguments.kw_defaults):
+        for argument, default_node in zip(arguments.kwonlyargs, arguments.kw_defaults):
             parameters.append(
                 inspect.Parameter(
                     argument.arg,
                     inspect.Parameter.KEYWORD_ONLY,
-                    default=None if default is not None else inspect.Parameter.empty,
+                    default=(
+                        None if default_node is not None else inspect.Parameter.empty
+                    ),
                 )
             )
         if arguments.kwarg:
@@ -246,7 +248,11 @@ class ExampleVisitor(ast.NodeVisitor):
             try:
                 self.index.signature(function).bind(
                     *[None for _ in node.args],
-                    **{keyword.arg: None for keyword in node.keywords},
+                    **{
+                        keyword.arg: None
+                        for keyword in node.keywords
+                        if keyword.arg is not None
+                    },
                 )
             except TypeError as cause:
                 self.issues.append(

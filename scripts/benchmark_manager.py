@@ -99,8 +99,8 @@ def cache_samples(
     base.mkdir()
     manager = ChromeFileManager(base)
     for patch in range(size):
-        version = "120.0.6099.%d" % patch
-        key = manager._key("driver", version)
+        seeded_version = "120.0.6099.%d" % patch
+        key = manager._key("driver", seeded_version)
         folder = manager._directory / key
         folder.mkdir()
         location = folder / "chromedriver.fixture"
@@ -111,7 +111,7 @@ def cache_samples(
                 product=manager.product,
                 platform=manager._platform,
                 kind="driver",
-                version=version,
+                version=seeded_version,
                 executable=location.name,
                 sha256=digest(location),
                 created=patch,
@@ -119,18 +119,25 @@ def cache_samples(
         )
     hit = ChromiumVersion("120.0.6099.%d" % (size - 1))
     miss = ChromiumVersion("999.0.0.1")
-    assert manager.match_driver(hit)["version"] == hit
-    assert manager.match_driver(miss) is None
+    matched = manager.match_driver(hit)
+    if matched is None:
+        raise RuntimeError("Synthetic cache exact-hit lookup returned no entry")
+    if matched["version"] != hit:
+        raise RuntimeError(
+            "Synthetic cache exact-hit lookup returned the wrong version"
+        )
+    if manager.match_driver(miss) is not None:
+        raise RuntimeError("Synthetic cache exact-miss lookup returned an entry")
 
-    results = {}
-    for label, version in [("exact_hit_us", hit), ("exact_miss_us", miss)]:
+    results: dict[str, Any] = {}
+    for label, query_version in [("exact_hit_us", hit), ("exact_miss_us", miss)]:
         # Warm the query machinery once; setup/seed costs are not measured.
-        manager.match_driver(version)
+        manager.match_driver(query_version)
         timings = []
         for _ in range(samples):
             start = time.perf_counter()
             for _ in range(iterations):
-                manager.match_driver(version)
+                manager.match_driver(query_version)
             timings.append((time.perf_counter() - start) * 1_000_000 / iterations)
         results[label] = summarize(timings)
 

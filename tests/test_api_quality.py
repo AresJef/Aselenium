@@ -13,11 +13,35 @@ from typing import Any, get_type_hints
 
 import pytest
 
+import aselenium
 from aselenium import Proxy, Timeouts
+from aselenium import firefox as firefox_package
+from aselenium import manager as manager_package
 from aselenium._wait import T, poll
 from aselenium.manager.version import Version
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_root_exports_are_unique_resolved_and_cover_facade_packages() -> None:
+    """Keep the formatted root facade complete and free of stale export names."""
+    exports = aselenium.__all__
+    assert len(exports) == len(set(exports))
+    assert all(
+        not name.startswith("_") and hasattr(aselenium, name) for name in exports
+    )
+    for package in (firefox_package, manager_package):
+        for name in package.__all__:
+            assert getattr(aselenium, name) is getattr(package, name)
+    assert {
+        "AseleniumDirectoryNotFoundError",
+        "AseleniumInvalidPathError",
+        "FirefoxAddon",
+        "InstallationRequest",
+        "InstallationResult",
+        "WindowNotFoundError",
+    } <= set(exports)
+    assert "WindowNotFountError" not in exports
 
 
 def test_all_sources_meet_structural_api_quality_contract(
@@ -138,6 +162,168 @@ def test_prompted_example_style_guard(
     result = module.Audit()
     module.check_examples(doc, "fixture", result)
     assert (not result.issues) is valid
+
+
+def path_architecture_issues(module: Any, code: str) -> list[str]:
+    """Run only the package Path-semantics checks against synthetic source.
+
+    Args:
+        module: Loaded API-quality checker module.
+        code: Python module source to inspect.
+
+    Returns:
+        Path-architecture diagnostics produced for the synthetic module.
+    """
+    tree = ast.parse(code)
+    parents = {
+        child: parent
+        for parent in ast.walk(tree)
+        for child in ast.iter_child_nodes(parent)
+    }
+    result = module.Audit()
+    module.check_path_architecture(
+        tree, Path("src/aselenium/fixture.py"), parents, result
+    )
+    return result.issues
+
+
+@pytest.mark.parametrize(
+    "code,expected",
+    [
+        (
+            "def save(path: str) -> bool:\n    return True\n",
+            "public path boundary must accept PathInput",
+        ),
+        (
+            "def save(path: Any) -> bool:\n    return True\n",
+            "path annotation must not use Any",
+        ),
+        (
+            "def save(path) -> bool:\n    return True\n",
+            "missing path annotation",
+        ),
+        (
+            "class Session:\n"
+            "    @property\n"
+            "    def driver_location(self) -> str:\n"
+            "        return '/tmp/driver'\n",
+            "filesystem result must retain Path semantics",
+        ),
+        (
+            "class Session:\n"
+            "    @property\n"
+            "    def driver_location(self):\n"
+            "        return Path('/tmp/driver')\n",
+            "filesystem result must retain Path semantics",
+        ),
+        (
+            "class Session:\n"
+            "    @property\n"
+            "    def driver_location(self) -> PathInput:\n"
+            "        return '/tmp/driver'\n",
+            "filesystem result must retain Path semantics",
+        ),
+        (
+            "class Snapshot:\n    driver_location: str\n",
+            "retained path must use Path",
+        ),
+        (
+            "class Snapshot:\n    driver_location: PathInput\n",
+            "retained path must use Path",
+        ),
+        (
+            "class Snapshot:\n"
+            "    def __init__(self) -> None:\n"
+            "        self.driver_location: str = '/tmp/driver'\n",
+            "retained path must use Path",
+        ),
+        (
+            "class Options:\n"
+            "    @property\n"
+            "    def browser_location(self) -> Path | None:\n"
+            "        return None\n"
+            "\n"
+            "    @browser_location.setter\n"
+            "    def browser_location(self, value: str | None) -> None:\n"
+            "        pass\n",
+            "public path boundary must accept PathInput",
+        ),
+        (
+            "async def install(binary: PathInput | None = None) -> str:\n"
+            "    return '/tmp/driver'\n",
+            "filesystem result must retain Path semantics",
+        ),
+        (
+            "def _core(path: Path) -> Path:\n    return parse_path(str(path))\n",
+            "stringify/reparse path workflow",
+        ),
+        (
+            "def _core(path: Path) -> Path:\n"
+            "    encoded = str(path)\n"
+            "    return parse_path(encoded)\n",
+            "stringify/reparse path workflow",
+        ),
+    ],
+)
+def test_path_architecture_guard_rejects_semantic_regressions(
+    code: str,
+    expected: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reject API narrowing, type erasure, and duplicate path parsing.
+
+    Args:
+        code: Synthetic package source containing one deliberate regression.
+        expected: Diagnostic fragment proving the intended guard fired.
+        monkeypatch: Fixture restoring the checker module registration.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "path_architecture_check", ROOT / "scripts/check_api_quality.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, module)
+    spec.loader.exec_module(module)
+    assert any(expected in issue for issue in path_architecture_issues(module, code))
+
+
+def test_path_architecture_guard_accepts_boundary_and_core_types(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Accept PathInput at public boundaries and Path throughout parsed cores.
+
+    Args:
+        monkeypatch: Fixture restoring the checker module registration.
+    """
+    spec = importlib.util.spec_from_file_location(
+        "valid_path_architecture_check", ROOT / "scripts/check_api_quality.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    monkeypatch.setitem(sys.modules, spec.name, module)
+    spec.loader.exec_module(module)
+    code = (
+        "class Snapshot:\n"
+        "    driver_location: Path\n"
+        "\n"
+        "class Client:\n"
+        "    def __init__(self, directory: PathInput) -> None:\n"
+        "        self.directory = parse_path(directory)\n"
+        "\n"
+        "    @property\n"
+        "    def driver_location(self) -> Path:\n"
+        "        return self.directory\n"
+        "\n"
+        "    def save(self, path: PathInput) -> Path:\n"
+        "        return parse_path(path)\n"
+        "\n"
+        "    def quoted(self, path: 'PathInput') -> 'Path':\n"
+        "        return parse_path(path)\n"
+        "\n"
+        "def _core(path: Path) -> Path:\n"
+        "    return path\n"
+    )
+    assert path_architecture_issues(module, code) == []
 
 
 @pytest.mark.parametrize(

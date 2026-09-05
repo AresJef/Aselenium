@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium options implementation and supporting types."""
+"""Open-source Chromium capability identifiers and option behavior."""
 
 from typing import Any
 
@@ -27,7 +26,7 @@ __all__ = ["ChromiumOptions"]
 
 # Chromium Options --------------------------------------------------------------------------------
 class ChromiumOptions(ChromiumBaseOptions):
-    """Chromium options."""
+    """Build Chromium capabilities using Google's WebDriver vendor namespace."""
 
     DEFAULT_CAPABILITIES: dict[str, Any] = {"browserName": "chrome"}
     VENDOR_PREFIX: str = "goog"

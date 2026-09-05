@@ -1,24 +1,64 @@
 # Final production review
 
+This is the preceding review snapshot. The later
+[pre-deployment review](pre-deployment-review.md) records additional fixes and
+current-candidate results; the counts and artifact identities below remain
+historical evidence.
+
 Review date: **2026-09-05**. This is a bounded release-candidate review, following
-the [release-acceptance expansion](release-acceptance.md). Its results supersede
-the earlier 2,652-test snapshot for the code reviewed here; older records remain
-historical evidence rather than continuously updated badges.
+the [release-acceptance expansion](release-acceptance.md). The current 2.0.0
+follow-up results below supersede the earlier 2,823- and 2,652-test snapshots;
+older records remain historical evidence rather than continuously updated badges.
 
-> **Version note:** the tested artifacts in this dated record were labeled
-> 1.0.5. The same reviewed runtime was subsequently assigned the 2.0.0 candidate
-> version; this record and its hashes intentionally retain the tested identity.
-
-**Outcome: the reviewed code passed the local release-candidate gates**, including
-three complete regression environments, four installed-browser tours and the
-Chrome/Edge recovery, proxy and sustained-session checks described below.
+**Outcome: the 2.0.0 candidate passes every currently executable local release
+gate.** The earlier multi-environment and native-browser evidence remains useful,
+but hosted Windows/Linux and final-tag publication behavior must still be proven
+by the configured CI/release workflow.
 
 The review covered driver management first, then process/session ownership,
 connection scheduling, options and browser adapters, DOM/input/value handling,
 documentation, typing, distribution contents, and the acceptance harnesses.
-The package was still version 1.0.5 at the time of this review. No release was
-published and no commit or push was performed during the review. Existing
-unrelated working-tree changes were preserved.
+The package and rebuilt distributions are version 2.0.0. No release was published
+and no commit, push, or tag was performed during this review. Existing unrelated
+working-tree changes were preserved.
+
+## Preceding 2.0.0 follow-up verification
+
+- The unrestricted Python 3.13.12 suite passed **3,227 tests** with asyncio
+  debugging; the sole platform-inapplicable case was the Windows drive-relative
+  syntax check, skipped on macOS. This run included real disposable loopback
+  HTTP/TCP/TLS servers and owned-process inspection.
+- Coverage measured **92.41% statement coverage** (7,174/7,763) and **83.45%
+  branch coverage** (1,836/2,200), or **90.43% combined**. Every configured
+  component floor passed.
+- Ruff lint and formatting pass across **136 files**. The structural API audit
+  covers **135 files, 2,407 functions/methods, 294 classes, and 196 prompted
+  examples** with no findings. The example-contract checker also reports none.
+- The configured mypy gate now checks all maintained Python under `src/` and
+  `scripts/`: **78 source files** pass. This includes the local/Google demos,
+  quick start, browser smoke/soak programs, benchmarks, and release tooling—not
+  only the importable package. Installed-wheel consumer typing remains a separate
+  distribution gate.
+- The 2.0.0 wheel and source distribution pass strict metadata and archive
+  integrity checks. Both carry matching `LICENSE`, `NOTICE`, README metadata,
+  `py.typed`, and GeckoDriver compatibility data; runtime sources in the wheel
+  match the reviewed checkout.
+- A clean, non-editable installation of that wheel passed the complete local
+  fixture tour on current macOS Chrome (**15/15 stages**) and Firefox (**15/15
+  stages**). Safari passed all **12 applicable stages**; frames, W3C action chains,
+  and concurrent sessions are the same three explicit facade exclusions described
+  below. The installed package reports version 2.0.0 and its public typing consumer
+  plus all three negative controls pass.
+- The refreshed dependency audit reports no known vulnerabilities in the resolved
+  environment. The editable Aselenium entry is intentionally skipped, so that
+  result is not a security proof for Aselenium itself.
+
+This follow-up was run in the current macOS/Python environment. Chrome, Firefox,
+and Safari therefore have fresh final-wheel evidence. The earlier Python 3.11,
+minimum-dependency, Edge, and reliability runs below predate the last
+path/response/demo cleanup and remain baseline evidence. The release workflow
+must rerun its Python 3.10-3.14, Windows/Linux/macOS, minimum-dependency, Edge,
+and native reliability matrix on the tagged commit.
 
 ## Corrections made
 
@@ -105,10 +145,12 @@ existing mechanism was documented, not redesigned in this review.
 Regression file: [lifecycle final-review tests](../tests/test_final_lifecycle_review.py)
 — **5 cases**.
 
-## Final verification
+## Earlier multi-environment verification baseline
 
-The four new regression files add **171 cases**, bringing the full suite to
-**2,823 tests**. Parameterized cases are not a count of distinct defects.
+At this earlier checkpoint, four regression files added **171 cases**, bringing
+that snapshot to **2,823 tests**. Parameterized cases are not a count of distinct
+defects. These numbers are retained for traceability and are not the current
+test count.
 
 | Environment | Passed | Failures / errors / skips |
 | --- | ---: | --- |
@@ -185,8 +227,9 @@ This review establishes local release-candidate evidence, not universal producti
 certification. Before publication, run the configured remote CI and release gates
 on the exact candidate. Windows/Linux native behavior, standalone Chromium/CfT
 bundles, WebView2, casting hardware and untested browser channels still require
-their own acceptance. Whole-package strict typing remains outside the configured
-19-module gate. A bounded soak does not prove unlimited uptime or absence of leaks.
+their own acceptance. Mypy now covers all maintained Python in `src/` and
+`scripts/`; it is not a strict, `Any`-free typing guarantee. A bounded soak does
+not prove unlimited uptime or absence of leaks.
 
 Profile cleanup is not a transactional filesystem rollback after partial deletion.
 Options mutation is not claimed to be arbitrary-thread-safe. An authoritative

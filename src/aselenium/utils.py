@@ -15,13 +15,13 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium utils implementation and supporting types."""
+"""Geometry, key constants, value containers, and property-list decoding."""
 
 from __future__ import annotations
 
 from collections.abc import ItemsView, Iterator, KeysView, ValuesView
-from math import ceil, floor
+from math import ceil, floor, isfinite
+from pathlib import Path
 from platform import system
 from plistlib import load
 from typing import (
@@ -30,16 +30,8 @@ from typing import (
     cast,
 )
 
-from orjson import loads
-
 from aselenium import errors
-from aselenium._paths import (
-    PathInput,
-    directory_path,
-    file_path,
-    parse_path,
-    save_file_path,
-)
+from aselenium._paths import PathInput, parse_path
 
 __all__ = ["KeyboardKeys", "MouseButtons"]
 R = TypeVar("R", bound="Rectangle")
@@ -47,17 +39,40 @@ R = TypeVar("R", bound="Rectangle")
 
 # Class: rectangle --------------------------------------------------------------------------------
 class Rectangle:
-    """Represent the size and relative position of a rectangle object."""
+    """Represent integral browser geometry derived from finite real numbers."""
 
-    def __init__(self, width: int, height: int, x: int, y: int) -> None:
-        """Initialize the instance with the supplied configuration.
+    def __init__(
+        self,
+        width: int | float,
+        height: int | float,
+        x: int | float,
+        y: int | float,
+    ) -> None:
+        """Round dimensions upward and coordinates downward to browser integers.
 
         Args:
-            width: The width of the rectangle object.
-            height: The height of the rectangle object.
-            x: The x-coordinate of the rectangle object.
-            y: The y-coordinate of the rectangle object.
+            width: Finite rectangle width, rounded toward positive infinity.
+            height: Finite rectangle height, rounded toward positive infinity.
+            x: Finite horizontal coordinate, rounded toward negative infinity.
+            y: Finite vertical coordinate, rounded toward negative infinity.
+
+        Raises:
+            errors.InvalidRectValueError: A value is boolean, nonnumeric, or not
+                finite.
         """
+        values = (width, height, x, y)
+        if any(
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not isfinite(value)
+            for value in values
+        ):
+            raise errors.InvalidRectValueError(
+                "<{}>\nInvalid rectangle values: "
+                "{{'width': {}, 'height': {}, 'x': {}, 'y': {}}}.".format(
+                    self.__class__.__name__, repr(width), repr(height), repr(x), repr(y)
+                )
+            )
         try:
             self._width: int = ceil(width)
             self._height: int = ceil(height)
@@ -74,12 +89,14 @@ class Rectangle:
     # Properties ---------------------------------------------------------------
     @property
     def dict(self) -> dict[str, int]:
-        """Return as dictionary.
-
-        e.g. `{'width': 100, 'height': 100, 'x': 0, 'y': 0}`
+        """Return the rectangle as a WebDriver-compatible mapping.
 
         Returns:
-            As dictionary.
+            Integer ``width``, ``height``, ``x``, and ``y`` values.
+
+        Example:
+            >>> Rectangle(100, 80, 10, 20).dict
+            {'width': 100, 'height': 80, 'x': 10, 'y': 20}
         """
         return {
             "width": self._width,
@@ -98,16 +115,24 @@ class Rectangle:
         return self._width
 
     @width.setter
-    def width(self, value: int | None) -> None:
+    def width(self, value: int | float | None) -> None:
         # Ignore None
         """Set the width.
 
         Args:
-            value: New width value. None is handled according to the property's reset/ignore semantics.
+            value: Finite width rounded upward. ``None`` leaves the value unchanged.
         """
         if value is None:
             return None  # exit
         # Set value
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not isfinite(value)
+        ):
+            raise errors.InvalidRectValueError(
+                f"<{self.__class__.__name__}>\nInvalid rectangle width: {value!r}."
+            )
         try:
             self._width = ceil(value)
         except Exception as err:
@@ -127,16 +152,24 @@ class Rectangle:
         return self._height
 
     @height.setter
-    def height(self, value: int | None) -> None:
+    def height(self, value: int | float | None) -> None:
         # Ignore None
         """Set the height.
 
         Args:
-            value: New height value. None is handled according to the property's reset/ignore semantics.
+            value: Finite height rounded upward. ``None`` leaves the value unchanged.
         """
         if value is None:
             return None  # exit
         # Set value
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not isfinite(value)
+        ):
+            raise errors.InvalidRectValueError(
+                f"<{self.__class__.__name__}>\nInvalid rectangle height: {value!r}."
+            )
         try:
             self._height = ceil(value)
         except Exception as err:
@@ -156,16 +189,24 @@ class Rectangle:
         return self._x
 
     @x.setter
-    def x(self, value: int | None) -> None:
+    def x(self, value: int | float | None) -> None:
         # Ignore None
         """Set the x.
 
         Args:
-            value: New x value. None is handled according to the property's reset/ignore semantics.
+            value: Finite coordinate rounded downward. ``None`` leaves it unchanged.
         """
         if value is None:
             return None  # exit
         # Set value
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not isfinite(value)
+        ):
+            raise errors.InvalidRectValueError(
+                f"<{self.__class__.__name__}>\nInvalid rectangle x-coordinate: {value!r}."
+            )
         try:
             self._x = floor(value)
         except Exception as err:
@@ -185,16 +226,24 @@ class Rectangle:
         return self._y
 
     @y.setter
-    def y(self, value: int | None) -> None:
+    def y(self, value: int | float | None) -> None:
         # Ignore None
         """Set the y.
 
         Args:
-            value: New y value. None is handled according to the property's reset/ignore semantics.
+            value: Finite coordinate rounded downward. ``None`` leaves it unchanged.
         """
         if value is None:
             return None  # exit
         # Set value
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (int, float))
+            or not isfinite(value)
+        ):
+            raise errors.InvalidRectValueError(
+                f"<{self.__class__.__name__}>\nInvalid rectangle y-coordinate: {value!r}."
+            )
         try:
             self._y = floor(value)
         except Exception as err:
@@ -290,7 +339,7 @@ class Rectangle:
         Returns:
             True if this instance compares equal to another object; otherwise False.
         """
-        return hash(self) == hash(__o) if isinstance(__o, self.__class__) else False
+        return self is __o
 
     def __bool__(self) -> bool:
         """Return the truth value of this instance.
@@ -311,10 +360,10 @@ class Rectangle:
 
 # Utils: custom dictionary ------------------------------------------------------------------------
 class CustomDict:
-    """A custom dictionary."""
+    """Provide an identity-based mutable mapping with defensive snapshots."""
 
     def __init__(self, **kwargs: Any) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Store the supplied keyword entries in insertion order.
 
         Args:
             **kwargs: The dictionary to be initialized.
@@ -361,7 +410,7 @@ class CustomDict:
 
         Args:
             key: Lookup key used by the current operation.
-            default: Default used by this operation.
+            default: Value returned when ``key`` is absent.
 
         Returns:
             A stored value or the supplied default when the key is absent.
@@ -394,7 +443,7 @@ class CustomDict:
         Returns:
             True if this instance compares equal to another object; otherwise False.
         """
-        return hash(self) == hash(__o) if isinstance(__o, self.__class__) else False
+        return self is __o
 
     def __len__(self) -> int:
         """Return the number of stored items.
@@ -416,8 +465,8 @@ class CustomDict:
         """Assign the value associated with the supplied key.
 
         Args:
-            key: Lookup key used by the current operation.
-            value: Value to inspect, normalize, or assign as described above.
+            key: Mapping key to create or replace.
+            value: Value stored under ``key`` without transformation.
         """
         self._dict[key] = value
 
@@ -425,7 +474,7 @@ class CustomDict:
         """Return the item associated with the supplied index or key.
 
         Args:
-            key: Lookup key used by the current operation.
+            key: Mapping key to retrieve.
 
         Returns:
             The item associated with the supplied index or key.
@@ -556,211 +605,49 @@ def process_keys(*keys: object) -> list[str]:
     return lst
 
 
-# Utils: file -------------------------------------------------------------------------------------
-def is_path_dir(path: object) -> bool:
-    """Check if a path exists and is a directory.
-
-    Args:
-        path: Filesystem path to inspect or operate on.
-
-    Returns:
-        True if a path exists and is a directory; otherwise False.
-    """
-    try:
-        return parse_path(cast(PathInput, path)).is_dir()
-    except (errors.AseleniumInvalidPathError, OSError):
-        return False
-
-
-def is_path_file(path: object) -> bool:
-    """Check if a path exists and is a file.
-
-    Args:
-        path: Filesystem path to inspect or operate on.
-
-    Returns:
-        True if a path exists and is a file; otherwise False.
-    """
-    try:
-        return parse_path(cast(PathInput, path)).is_file()
-    except (errors.AseleniumInvalidPathError, OSError):
-        return False
-
-
-def is_file_dir_exists(file: object) -> bool:
-    """Check if the file's directory exists.
-
-    Args:
-        file: File used by this operation.
-
-    Returns:
-        True if the file's directory exists; otherwise False.
-    """
-    try:
-        return parse_path(cast(PathInput, file)).parent.is_dir()
-    except (errors.AseleniumInvalidPathError, OSError):
-        return False
-
-
-def _absolute_path(path: PathInput) -> str:
-    """Expand a nonempty text path without resolving filesystem aliases.
-
-    Args:
-        path: Nonempty path string or string-valued filesystem-path object.
-
-    Returns:
-        An absolute string with user-home expansion applied. Symbolic-link names
-        and parent components remain in the returned text. When the path is later
-        accessed, its target is selected according to the host operating system's
-        native symlink and parent-traversal semantics.
-
-    Raises:
-        errors.AseleniumInvalidPathError: The path is empty, contains a null
-            character, is not string-valued, or cannot be made absolute.
-    """
-    return str(parse_path(path))
-
-
-def validate_dir(path: PathInput) -> str:
-    """Validate an existing directory and return its absolute path.
-
-    Args:
-        path: Nonempty directory path string or string-valued pathlike object.
-            Relative paths are anchored to the current working directory and
-            leading user-home markers are expanded.
-
-    Returns:
-        Absolute directory path whose text preserves symbolic-link names and
-        parent components rather than explicitly resolving them. Filesystem access
-        still follows the host operating system's native traversal semantics.
-
-    Raises:
-        errors.AseleniumInvalidPathError: The input is not a nonempty text path.
-        errors.AseleniumDirectoryNotFoundError: The path does not identify an
-            existing directory. Symbolic links to existing directories are valid.
-
-    Example:
-        >>> from pathlib import Path
-        >>> Path(validate_dir(".")).is_absolute()
-        True
-    """
-    return str(directory_path(path))
-
-
-def validate_file(path: PathInput) -> str:
-    """Validate an existing regular file and return its absolute path.
-
-    Args:
-        path: Nonempty file path string or string-valued pathlike object.
-            Relative paths are anchored to the current working directory and
-            leading user-home markers are expanded.
-
-    Returns:
-        Absolute file path whose text preserves symbolic-link names and parent
-        components rather than explicitly resolving them. Filesystem access still
-        follows the host operating system's native traversal semantics.
-
-    Raises:
-        errors.AseleniumInvalidPathError: The input is not a nonempty text path.
-        errors.AseleniumFileNotFoundError: The path does not identify an existing
-            regular file. Symbolic links to existing regular files are valid.
-    """
-    return str(file_path(path))
-
-
-def validate_save_file_path(path: PathInput, file_ext: str) -> str:
-    """Validate a file destination and append its required suffix when absent.
-
-    Args:
-        path: Nonempty file path string or string-valued pathlike object. Relative
-            paths are made absolute and leading user-home markers are expanded.
-            Whitespace is not stripped. A supplied path that the host filesystem
-            identifies as a directory is rejected before a suffix is appended.
-        file_ext: Required case-sensitive suffix, such as ".png" or ".pdf".
-
-    Returns:
-        Absolute destination with the suffix appended if necessary. The parent
-        directory must already exist; this function creates no files or folders.
-        Symbolic-link names and parent components remain in the returned text;
-        filesystem access follows the host operating system's native traversal
-        semantics.
-
-    Raises:
-        errors.AseleniumInvalidPathError: The input is not a nonempty text path,
-            or the supplied or suffixed destination names an existing directory.
-        errors.AseleniumDirectoryNotFoundError: The destination's parent directory
-            does not exist.
-
-    Example:
-        >>> from pathlib import Path
-        >>> destination = validate_save_file_path("capture", ".png")
-        >>> Path(destination).is_absolute() and destination.endswith("capture.png")
-        True
-    """
-    return str(save_file_path(path, file_ext))
-
-
-# Utils: dict -------------------------------------------------------------------------------------
-def prettify_dict(dic: dict[str, Any], lead: str = "  ") -> str:
-    """Stringify a dictionary in a pretty format.
-
-    Args:
-        dic: The dictionary to be stringified.
-        lead: The leading spaces for each line. Defaults to `'  '` (double space).
-
-    Returns:
-        The prettified dictionary as a string.
-    """
-
-    def prettify(dic: dict[str, Any], indent: int) -> list[Any]:
-        """Format the supplied diagnostic text for display.
-
-        Args:
-            dic: Dic used by this operation.
-            indent: Indent used by this operation.
-
-        Returns:
-            The diagnostic value formatted as indented JSON where possible.
-        """
-        reps = []
-        for key, val in dic.items():
-            if isinstance(val, dict):
-                if val:
-                    reps.append(lead * indent + "%s: {" % repr(key))
-                    reps += prettify(val, indent + 1)
-                    reps.append(lead * indent + "}")
-                else:
-                    reps.append(lead * indent + "%s: {}" % repr(key))
-            else:
-                reps.append(lead * indent + "%s: %s" % (repr(key), repr(val)))
-        return reps
-
-    return "{\n%s\n}" % "\n".join(prettify(dic, 1))
-
-
 # Utils: plist ------------------------------------------------------------------------------------
 def load_plist_file(plist_file: PathInput) -> dict[str, Any]:
-    """Load a local plist file.
+    """Decode a property-list file from an accepted filesystem path.
 
     Args:
-        plist_file: Plist file used by this operation.
+        plist_file: Existing plist path supplied as text, ``Path``, or another
+            string-valued ``os.PathLike`` object.
 
     Returns:
-        A local plist file.
+        The decoded top-level property-list mapping.
+
+    Raises:
+        errors.AseleniumInvalidPathError: The path value is empty, invalid, or
+            not string-valued.
+        OSError: The path cannot be opened or read.
+        plistlib.InvalidFileException: The file is not a valid property list.
+        ValueError: The plist root is not a dictionary, or a top-level key is
+            not a string.
     """
-    with parse_path(plist_file).open("rb") as file:
-        return load(file)
+    return _load_plist_file(parse_path(plist_file))
 
 
-# Utils: json -------------------------------------------------------------------------------------
-def load_json_file(json_file: PathInput) -> dict[str, Any]:
-    """Load a local json file.
+def _load_plist_file(plist_file: Path) -> dict[str, Any]:
+    """Decode a plist from an already parsed host-native path.
 
     Args:
-        json_file: Json file used by this operation.
+        plist_file: Absolute path retained by the calling filesystem workflow.
 
     Returns:
-        A local json file.
+        The decoded top-level property-list mapping.
+
+    Raises:
+        OSError: The path cannot be opened or read.
+        plistlib.InvalidFileException: The file is not a valid property list.
+        ValueError: The path is not an absolute ``Path``, the plist root is not
+            a dictionary, or a top-level key is not a string.
     """
-    with parse_path(json_file).open("r", encoding="utf-8") as file:
-        return loads(file.read())
+    if not isinstance(plist_file, Path) or not plist_file.is_absolute():
+        raise ValueError("Property-list path must be an absolute pathlib.Path")
+    with plist_file.open("rb") as file:
+        value = load(file)
+    if not isinstance(value, dict):
+        raise ValueError("Property-list root must be a dictionary")
+    if not all(isinstance(key, str) for key in value):
+        raise ValueError("Property-list root keys must all be strings")
+    return cast(dict[str, Any], value)

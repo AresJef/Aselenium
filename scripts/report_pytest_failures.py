@@ -7,7 +7,15 @@ import sys
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, Sequence
+from typing import TYPE_CHECKING, Literal, Sequence
+
+if TYPE_CHECKING:
+    from scripts._workflow_commands import _bounded_command_data
+else:
+    try:
+        from scripts._workflow_commands import _bounded_command_data
+    except ModuleNotFoundError:  # Direct execution outside the checkout root.
+        from _workflow_commands import _bounded_command_data
 
 ANNOTATION_LIMIT = 3_500
 SUMMARY_DETAIL_LIMIT = 8_000
@@ -56,8 +64,12 @@ def read_issues(report: Path) -> list[JUnitIssue]:
         test_name = case.get("name", "unknown test").strip()
         node_id = f"{class_name}::{test_name}" if class_name else test_name
         for result in case:
-            kind = result.tag.rpartition("}")[-1]
-            if kind not in {"failure", "error"}:
+            raw_kind = result.tag.rpartition("}")[-1]
+            if raw_kind == "failure":
+                kind: Literal["failure", "error"] = "failure"
+            elif raw_kind == "error":
+                kind = "error"
+            else:
                 continue
             issues.append(
                 JUnitIssue(
@@ -101,18 +113,6 @@ def _bounded_node_id(value: str) -> str:
     return value[: NODE_ID_LIMIT - len(suffix)] + suffix
 
 
-def _escape_command_data(value: str) -> str:
-    """Escape untrusted text for the GitHub workflow-command data field.
-
-    Args:
-        value: Arbitrary test diagnostic text.
-
-    Returns:
-        Text with workflow-command control characters percent-encoded.
-    """
-    return value.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-
-
 def format_annotation(issue: JUnitIssue) -> str:
     """Format one issue as a bounded GitHub error annotation.
 
@@ -126,8 +126,8 @@ def format_annotation(issue: JUnitIssue) -> str:
     if issue.message and issue.details and issue.message not in issue.details:
         diagnostic = f"{issue.message}\n{issue.details}"
     node_id = _bounded_node_id(issue.node_id)
-    content = _bounded(f"{node_id} [{issue.kind}]\n{diagnostic}", ANNOTATION_LIMIT)
-    return f"::error::{_escape_command_data(content)}"
+    content = f"{node_id} [{issue.kind}]\n{diagnostic}"
+    return f"::error::{_bounded_command_data(content, ANNOTATION_LIMIT)}"
 
 
 def format_summary(issues: Sequence[JUnitIssue]) -> str:
@@ -164,8 +164,9 @@ def report_issues(report: Path, summary_path: Path | None = None) -> int:
     try:
         issues = read_issues(report)
     except (OSError, ET.ParseError) as exc:
-        message = _escape_command_data(
-            f"Could not read pytest diagnostics from {report.name}: {exc}"
+        message = _bounded_command_data(
+            f"Could not read pytest diagnostics from {report.name}: {exc}",
+            ANNOTATION_LIMIT,
         )
         print(f"::warning::{message}")
         return 0
@@ -182,8 +183,9 @@ def report_issues(report: Path, summary_path: Path | None = None) -> int:
                 summary.write(format_summary(issues))
                 summary.write("\n")
         except OSError as exc:
-            message = _escape_command_data(
-                f"Could not append the pytest job summary: {exc}"
+            message = _bounded_command_data(
+                f"Could not append the pytest job summary: {exc}",
+                ANNOTATION_LIMIT,
             )
             print(f"::warning::{message}")
     return 0

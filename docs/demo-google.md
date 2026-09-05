@@ -73,6 +73,7 @@ language differences may prevent that particular example from completing.
 | `--timeout` | Total work budget in seconds; default 180. Owned cleanup may finish after the deadline. |
 | `--allow-download` | Permit driver vendor requests/downloads during provisioning. Does not toggle Google connectivity. |
 | `--cache-dir` | Cache parent, shared with the local tour; defaults to `.demo-cache`. |
+| `--profile-root` | Existing shared writable Firefox profile parent; Firefox-only workaround for Snap/Flatpak temporary-filesystem isolation. Requires GeckoDriver 0.32.0 or newer. |
 | `--output-dir` | Parent for a unique `google-<browser>-...` output directory; defaults to `.demo-output`. |
 
 For example, select an installed Edge explicitly:
@@ -81,6 +82,15 @@ For example, select an installed Edge explicitly:
 .venv/bin/python src/demo_google.py run --browser edge \
   --binary "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge" \
   --allow-download
+```
+
+For a container-packaged Firefox that cannot access GeckoDriver's host temporary
+directory, use a non-hidden caller-owned directory under your home:
+
+```bash
+mkdir -p "$HOME/aselenium-firefox-profiles"
+.venv/bin/python src/demo_google.py run --browser firefox --allow-download \
+  --profile-root "$HOME/aselenium-firefox-profiles"
 ```
 
 On Windows use `.venv\Scripts\python.exe`. If a dependency exists in `.venv` but

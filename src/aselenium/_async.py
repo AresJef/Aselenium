@@ -18,13 +18,23 @@ P = ParamSpec("P")
 
 
 async def finish_owned(awaitable: Awaitable[T]) -> T:
-    """Do not abandon cleanup/worker work when its waiter is cancelled.
+    """Drain owned asynchronous work before propagating cancellation.
+
+    This helper shields cleanup and bounded worker tasks so their resources are
+    not abandoned when the waiting task is cancelled. If cancellation arrives,
+    it is re-raised only after the owned task reaches a terminal state.
 
     Args:
-        awaitable: Owned asynchronous work that must be drained before cancellation propagates.
+        awaitable: Asynchronous cleanup or worker operation owned by the caller.
 
     Returns:
-        The value produced by the owned awaitable.
+        The awaitable's result when the caller is not cancelled.
+
+    Raises:
+        asyncio.CancelledError: The caller or owned work is cancelled. Caller
+            cancellation is re-raised only after the owned work terminates.
+        BaseException: Any non-cancellation failure raised by the owned work
+            while the caller remains active.
     """
     task = asyncio.ensure_future(awaitable)
     try:
@@ -45,7 +55,11 @@ async def finish_owned(awaitable: Awaitable[T]) -> T:
 async def run_blocking(
     function: Callable[P, T], *args: P.args, **kwargs: P.kwargs
 ) -> T:
-    """Run blocking work in a bounded worker pool without abandoning it on cancellation.
+    """Run blocking work with per-event-loop concurrency and cancellation ownership.
+
+    At most four calls execute concurrently for each event loop. Cancellation
+    waits for an admitted worker call to finish before it propagates, preventing
+    filesystem and subprocess-adjacent work from continuing without an owner.
 
     Args:
         function: Blocking callable to run in a bounded worker thread.
@@ -53,10 +67,12 @@ async def run_blocking(
         **kwargs: Keyword arguments forwarded to the wrapped operation.
 
     Returns:
-        The value returned by the blocking callable.
+        The value returned by ``function``.
 
-    Example:
-        >>> payload = await run_blocking(Path("page.html").read_bytes)
+    Raises:
+        asyncio.CancelledError: The caller is cancelled; raised after an
+            admitted worker call finishes.
+        BaseException: Any exception raised by ``function``.
     """
     loop = asyncio.get_running_loop()
     reference = _GATES.get(loop)

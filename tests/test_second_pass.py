@@ -13,6 +13,7 @@ import pytest
 from psutil import NoSuchProcess
 
 from aselenium import _output, errors
+from aselenium._paths import save_file_path
 from aselenium._wait import DEADLINE, poll
 from aselenium.actions import Actions
 from aselenium.chrome.options import ChromeOptions
@@ -23,7 +24,7 @@ from aselenium.options import Proxy
 from aselenium.safari.options import SafariOptions
 from aselenium.service import ChromiumBaseService
 from aselenium.session import Session
-from aselenium.utils import Rectangle, validate_save_file_path
+from aselenium.utils import Rectangle
 from aselenium.webdriver import SessionContext
 
 
@@ -106,7 +107,7 @@ async def test_step05_failed_start_cannot_overwrite_resources_before_quit() -> N
         quit=AsyncMock(side_effect=errors.ServiceProcessError("still owned"))
     )
     manager = SimpleNamespace(install_result=AsyncMock())
-    context = SessionContext(manager, (), {}, object, 1, (), {}, SimpleNamespace())
+    context = SessionContext(manager, (), {}, object, 1, (), {}, ChromeOptions())
     context._session = original
     context._state = "starting"
     with pytest.raises(errors.InvalidSessionError, match="quit"):
@@ -195,7 +196,7 @@ def test_step02_relative_output_filename(
         expected: Fixture or parametrized expected input for this regression.
     """
     monkeypatch.chdir(tmp_path)
-    assert validate_save_file_path(name, ".png") == str(tmp_path / expected)
+    assert save_file_path(name, ".png") == tmp_path / expected
 
 
 @pytest.mark.asyncio

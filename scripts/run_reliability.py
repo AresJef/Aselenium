@@ -28,7 +28,7 @@ RECOVERY_FAILURES = {
     "ConnectionClosedError",
     "InvalidSessionError",
     "UnknownError",
-    "WindowNotFountError",
+    "WindowNotFoundError",
 }
 RECOVERY_COMMAND_TIMEOUT = 5
 MANAGER_PROXY_CASES = {
@@ -45,6 +45,20 @@ GROWTH_LIMITS = {
     "handles": 32,
     "processes": 8,
 }
+FAILURE_SUMMARY_LIMIT = 1_800
+RECOVERY_SUMMARY_FIELDS = (
+    "failure_type",
+    "failure",
+    "command_failure_type",
+    "failure_after_injection_seconds",
+    "library_cleanup_survivors",
+    "library_profile_removed",
+    "harness_emergency_cleanup",
+    "template_profile_removed",
+    "remaining_owned_tasks",
+    "remaining_observed_processes",
+    "cleanup_retry_error",
+)
 
 
 def require(condition: bool, message: str) -> None:
@@ -182,6 +196,10 @@ def validate_recovery(data: dict[str, Any]) -> None:
         require(
             scenario.get("command_acknowledged_before_fault") is True,
             "Fault was not proven to occur during an acknowledged command",
+        )
+        require(
+            scenario.get("fault_signal_sent") is True,
+            "Fault target was not proven to receive the requested signal",
         )
         require(
             text_field(scenario, "command_failure_type") in RECOVERY_FAILURES,
@@ -392,6 +410,78 @@ def validate_report(name: str, value: object, browser: str, duration: int) -> No
         raise ValueError(f"Unknown reliability gate: {name}")
 
 
+def _compact_summary_value(value: Any) -> Any:
+    """Bound variable-size report values before placing them in an annotation.
+
+    Args:
+        value: Report value selected for concise failure diagnostics.
+
+    Returns:
+        A JSON-compatible scalar or bounded list suitable for an annotation.
+    """
+    if isinstance(value, str):
+        return value if len(value) <= 160 else value[:157] + "..."
+    if isinstance(value, list):
+        values = [_compact_summary_value(item) for item in value[:8]]
+        if len(value) > 8:
+            values.append(f"... {len(value) - 8} more")
+        return values
+    if value is None or type(value) in (bool, int, float):
+        return value
+    return _compact_summary_value(str(value))
+
+
+def failure_summary(name: str, value: object) -> str:
+    """Create a bounded report synopsis whose critical fields survive truncation.
+
+    Args:
+        name: Reliability gate that produced the report.
+        value: Decoded child report, which may be malformed or incomplete.
+
+    Returns:
+        Compact JSON identifying the gate and its failed recovery scenarios.
+    """
+    if not isinstance(value, dict):
+        return json.dumps(
+            {"gate": name, "report_type": type(value).__name__},
+            separators=(",", ":"),
+        )
+
+    summary: dict[str, Any] = {
+        "gate": name,
+        "status": _compact_summary_value(value.get("status")),
+    }
+    if name != "recovery" or not isinstance(value.get("scenarios"), list):
+        for key in ("error", "message", "failure_type", "failure"):
+            if key in value:
+                summary[key] = _compact_summary_value(value[key])
+        return json.dumps(summary, separators=(",", ":"))
+
+    failed_reports = [
+        scenario
+        for scenario in value["scenarios"]
+        if isinstance(scenario, dict) and scenario.get("status") != "passed"
+    ]
+    failed = failed_reports[: len(RECOVERY_SCENARIOS)]
+    scenarios: list[dict[str, Any]] = [
+        {
+            "scenario": _compact_summary_value(scenario.get("scenario")),
+            "status": _compact_summary_value(scenario.get("status")),
+        }
+        for scenario in failed
+    ]
+    summary["failed_scenario_count"] = len(failed_reports)
+    summary["failed_scenarios"] = scenarios
+    for field in RECOVERY_SUMMARY_FIELDS:
+        for index, scenario in enumerate(failed):
+            if field not in scenario:
+                continue
+            scenarios[index][field] = _compact_summary_value(scenario[field])
+            if len(json.dumps(summary, separators=(",", ":"))) > FAILURE_SUMMARY_LIMIT:
+                scenarios[index].pop(field)
+    return json.dumps(summary, separators=(",", ":"))
+
+
 def commands(args: argparse.Namespace, binary: str) -> list[tuple[str, list[str], int]]:
     """Build explicit argument vectors for the existing independently testable harnesses.
 
@@ -423,7 +513,8 @@ def commands(args: argparse.Namespace, binary: str) -> list[tuple[str, list[str]
                 "--command-timeout",
                 str(RECOVERY_COMMAND_TIMEOUT),
             ],
-            240,
+            # Four bounded 120-second scenarios plus process/report cleanup.
+            540,
         ),
         (
             "browser-proxy",
@@ -501,6 +592,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     results: dict[str, Any] = {}
     for name, command, timeout in commands(args, binary):
         report = output / f"{args.browser}-{name}.json"
+        data: object = {}
         try:
             result = run_owned(
                 [*command, "--output", str(report)],
@@ -549,7 +641,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 details = ""
             emit_workflow_error(
                 f"{args.browser} {name} reliability gate failed",
-                f"{details}\n{type(cause).__name__}: {cause}".strip(),
+                (
+                    f"{details}\n{type(cause).__name__}: {cause}\n"
+                    f"Failure summary: {failure_summary(name, data)}"
+                ).strip(),
             )
         print(json.dumps({name: results[name]}), flush=True)
     passed = all(result["status"] == "passed" for result in results.values())

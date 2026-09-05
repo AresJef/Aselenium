@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 from types import ModuleType
@@ -53,6 +54,24 @@ def process_double(pid: int = 654321, created: float = 123.0) -> Mock:
     process.ppid.return_value = os.getpid()
     process.children.return_value = []
     return process
+
+
+@pytest.mark.parametrize("named", [False, True])
+def test_capture_reads_native_files_and_temporary_wrappers(
+    owned_runner: ModuleType, tmp_path: Path, named: bool
+) -> None:
+    """Accept both platform-specific temporary capture implementations.
+
+    Args:
+        owned_runner: Imported process helper providing the capture reader.
+        tmp_path: Disposable parent for the binary capture file.
+        named: Whether to use the wrapper also returned by TemporaryFile on Windows.
+    """
+    factory = tempfile.NamedTemporaryFile if named else tempfile.TemporaryFile
+    with factory(dir=tmp_path) as stream:
+        stream.write(b"captured\xffoutput")
+        stream.seek(4)
+        assert owned_runner.read_output(stream) == "captured\ufffdoutput"
 
 
 @pytest.mark.parametrize("force", [False, True])

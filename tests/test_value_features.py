@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import plistlib
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
 
 import pytest
 
@@ -37,19 +35,7 @@ from aselenium.session import (
     Session,
     Window,
 )
-from aselenium.utils import (
-    CustomDict,
-    Rectangle,
-    is_file_dir_exists,
-    is_path_dir,
-    is_path_file,
-    load_json_file,
-    load_plist_file,
-    prettify_dict,
-    validate_dir,
-    validate_file,
-    validate_save_file_path,
-)
+from aselenium.utils import CustomDict, Rectangle, load_plist_file
 
 
 def test_rectangle_coordinates_copy_and_mutation() -> None:
@@ -95,6 +81,22 @@ def test_rectangle_invalid_assignment_does_not_mutate(name: str) -> None:
     assert rectangle.dict == before
 
 
+@pytest.mark.parametrize("value", [True, float("inf"), float("-inf"), float("nan")])
+def test_rectangle_rejects_boolean_and_nonfinite_geometry(value: float) -> None:
+    """Reject ambiguous or non-serializable numeric geometry.
+
+    Args:
+        value: Boolean or nonfinite value that WebDriver cannot represent safely.
+    """
+    with pytest.raises(errors.InvalidRectValueError):
+        Rectangle(value, 20, 3, 4)
+
+    rectangle = Rectangle(10, 20, 3, 4)
+    with pytest.raises(errors.InvalidRectValueError):
+        rectangle.width = value
+    assert rectangle.width == 10
+
+
 def test_custom_mapping_public_accessors_and_top_level_copy() -> None:
     """Keep mapping operations ordered and independent at the documented top level."""
     value = CustomDict(first=1, second=2)
@@ -115,6 +117,24 @@ def test_custom_mapping_public_accessors_and_top_level_copy() -> None:
     assert value == value and value != object()
     assert hash(value) == id(value)
     assert "CustomDict" in repr(value)
+
+
+def test_identity_value_objects_do_not_use_hashes_as_equality_proofs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Keep identity semantics even when distinct instances have colliding hashes.
+
+    Args:
+        monkeypatch: Fixture restoring the patched built-in hash lookup.
+    """
+    first_rectangle = Rectangle(1, 2, 3, 4)
+    second_rectangle = Rectangle(1, 2, 3, 4)
+    first_mapping = CustomDict(value=1)
+    second_mapping = CustomDict(value=1)
+    monkeypatch.setattr("builtins.hash", lambda value: 7)
+
+    assert first_rectangle != second_rectangle
+    assert first_mapping != second_mapping
 
 
 @pytest.mark.parametrize(
@@ -157,90 +177,46 @@ def test_version_public_views_and_numeric_ordering(
     assert short.build_num == short.patch_num == 0
 
 
-def test_path_predicates_and_validation(tmp_path: Path) -> None:
-    """Distinguish existing files/directories and normalize output extensions.
+def test_plist_loading_accepts_pathlike_input(tmp_path: Path) -> None:
+    """Decode a local property list through the retained Path workflow.
 
     Args:
-        tmp_path: Private directory holding a synthetic input and output paths.
-    """
-    file = tmp_path / "input.txt"
-    file.write_text("fixture", encoding="utf-8")
-    assert is_path_file(file) and not is_path_dir(file)
-    assert is_path_dir(tmp_path) and not is_path_file(tmp_path)
-    assert is_file_dir_exists(file)
-    assert validate_dir(str(tmp_path)) == str(tmp_path)
-    assert validate_file(str(file)) == str(file)
-    assert validate_save_file_path(str(tmp_path / "capture"), ".png") == str(
-        tmp_path / "capture.png"
-    )
-    assert validate_save_file_path(str(tmp_path / "capture.png"), ".png") == str(
-        tmp_path / "capture.png"
-    )
-    with pytest.raises(errors.AseleniumDirectoryNotFoundError):
-        validate_dir(str(file))
-    with pytest.raises(errors.AseleniumFileNotFoundError):
-        validate_file(str(tmp_path))
-    with pytest.raises(errors.AseleniumDirectoryNotFoundError):
-        validate_save_file_path(str(tmp_path / "missing" / "out"), ".png")
-
-
-@pytest.mark.parametrize("invalid", [None, object(), {"path": "invalid"}])
-def test_path_helpers_reject_non_path_inputs(invalid: Any) -> None:
-    """Return false from predicates and raise package errors from validators.
-
-    Args:
-        invalid: Value that is neither a path string nor a filesystem-path object.
-    """
-    assert not is_path_file(invalid)
-    assert not is_path_dir(invalid)
-    assert not is_file_dir_exists(invalid)
-    for validator in (validate_file, validate_dir):
-        with pytest.raises(errors.AseleniumInvalidPathError):
-            validator(invalid)
-    with pytest.raises(errors.AseleniumInvalidPathError):
-        validate_save_file_path(invalid, ".png")
-
-
-@pytest.mark.parametrize("kind", ["file", "directory"])
-def test_validated_relative_paths_match_documented_absolute_contract(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str
-) -> None:
-    """Expose the documented absolute-path contract for relative valid inputs.
-
-    Args:
-        tmp_path: Isolated working directory.
-        monkeypatch: Fixture restoring the original working directory.
-        kind: Whether the relative input names a file or a directory.
-    """
-    monkeypatch.chdir(tmp_path)
-    target = tmp_path / "fixture"
-    if kind == "file":
-        target.write_bytes(b"fixture")
-        result = validate_file("fixture")
-    else:
-        target.mkdir()
-        result = validate_dir("fixture")
-    assert result == str(target)
-
-
-def test_json_plist_loading_and_nested_diagnostic_format(tmp_path: Path) -> None:
-    """Read local structured files and retain nested values in diagnostic formatting.
-
-    Args:
-        tmp_path: Directory for generated JSON and plist fixtures.
+        tmp_path: Directory for the generated property-list fixture.
     """
     data = {"name": "中文", "nested": {"enabled": True}, "empty": {}}
-    json_path, plist_path = tmp_path / "fixture.json", tmp_path / "fixture.plist"
-    json_path.write_text(json.dumps(data), encoding="utf-8")
+    plist_path = tmp_path / "fixture.plist"
     plist_path.write_bytes(plistlib.dumps(data))
-    assert load_json_file(str(json_path)) == data
-    assert load_plist_file(str(plist_path)) == data
-    formatted = prettify_dict(data, lead="--")
-    assert "--'name': '中文'" in formatted
-    assert "----'enabled': True" in formatted
-    assert "--'empty': {}" in formatted
-    with pytest.raises(FileNotFoundError):
-        load_json_file(str(tmp_path / "missing"))
+    assert load_plist_file(plist_path) == data
+
+
+def test_plist_loading_rejects_non_mapping_root(tmp_path: Path) -> None:
+    """Reject syntactically valid plist data that lacks Safari metadata keys.
+
+    Args:
+        tmp_path: Directory for the generated property-list fixture.
+    """
+    plist_path = tmp_path / "array.plist"
+    plist_path.write_bytes(plistlib.dumps(["Safari", "metadata"]))
+
+    with pytest.raises(ValueError, match="root must be a dictionary"):
+        load_plist_file(plist_path)
+
+
+def test_plist_loading_rejects_non_string_top_level_keys(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reject decoder results outside the declared string-key mapping contract.
+
+    Args:
+        tmp_path: Directory for an existing file accepted by the path boundary.
+        monkeypatch: Fixture restoring the plist decoder after the test.
+    """
+    plist_path = tmp_path / "fixture.plist"
+    plist_path.touch()
+    monkeypatch.setattr("aselenium.utils.load", lambda stream: {1: "invalid"})
+
+    with pytest.raises(ValueError, match="keys must all be strings"):
+        load_plist_file(plist_path)
 
 
 def test_cached_value_copies_and_network_accessors() -> None:
@@ -278,8 +254,7 @@ def test_option_public_views_and_abstract_construction() -> None:
     assert proxy.auto_detect is True and proxy.pac_url is None
     proxy.pac_url = "http://config.invalid/proxy.pac"
     assert (
-        proxy.auto_detect is False
-        and proxy.pac_url == "http://config.invalid/proxy.pac"
+        proxy.auto_detect is True and proxy.pac_url == "http://config.invalid/proxy.pac"
     )
     timeouts = Timeouts(implicit=0, pageLoad=2.5, script=1.5, unit="s")
     assert timeouts.pageLoad == 2.5 and timeouts.pageLoad_ms == 2500
@@ -342,17 +317,19 @@ def test_session_metadata_accessors_preserve_configuration_snapshot(
         options.browser_location = str(binary)
         options.browser_version = version_class("123.4.5")
         driver_version = Version("1.2.3")
+        driver_path = Path("/fixture/driver")
         service = SimpleNamespace(
-            _driver_location="/fixture/driver", _driver_version=driver_version
+            driver_location=driver_path,
+            driver_version=driver_version,
         )
         session = session_class(options, service)
         assert session.options is options and session.service is service
-        assert session.browser_location == str(binary)
+        assert session.browser_location == binary
         assert session.browser_version == "123.4.5"
         options.browser_version = version_class("124.0.0")
         assert session.browser_version == "123.4.5"
         assert (
-            session.driver_location == "/fixture/driver"
+            session.driver_location == driver_path
             and session.driver_version is driver_version
         )
         assert session.connection is None

@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium shadow implementation and supporting types."""
+"""W3C shadow-root handles and descendant-element operations."""
 
 from __future__ import annotations
 
@@ -30,6 +29,7 @@ from typing import (
 from urllib.parse import quote
 
 from aselenium import errors, javascript
+from aselenium._response import typed_value
 from aselenium._wait import first_match, poll
 from aselenium.command import Command
 
@@ -50,7 +50,7 @@ class Shadow:
     """Represent a shadow root inside an element."""
 
     def __init__(self, shadow_id: str, element: Element) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Bind a validated remote shadow-root ID to its host element.
 
         Args:
             shadow_id: The shadow root ID.
@@ -69,12 +69,13 @@ class Shadow:
         self._session: Session = element._session
         self._service: BaseService = self._session.service
         # Connection
-        self._conn: Connection = self._session._conn
+        connection, base_url = self._session._conn, self._session._base_url
+        if connection is None or base_url is None:
+            raise errors.InvalidSessionError("Shadow root requires a started session")
+        self._conn: Connection = connection
         # Shadow
         self._id: str = shadow_id
-        self._base_url: str = (
-            self._session._base_url + "/shadow/" + quote(self._id, safe="")
-        )
+        self._base_url: str = base_url + "/shadow/" + quote(self._id, safe="")
 
     # Basic -------------------------------------------------------------------------------
     @property
@@ -88,19 +89,19 @@ class Shadow:
 
     @property
     def element_id(self) -> str:
-        """Return the element ID of the shadow root. e.g. '61A5CAC057B025F22A116E47F7950D24_element_1'.
+        """Return the remote ID of the host element.
 
         Returns:
-            The element id of the shadow root. e.g. '61a5cac057b025f22a116e47f7950d24_element_1'.
+            The host element's WebDriver ID.
         """
         return self._element._id
 
     @property
     def id(self) -> str:
-        """The the ID of the shadow root. e.g. '61A5CAC057B025F22A116E47F7950D24_element_1'.
+        """Return the remote shadow-root ID.
 
         Returns:
-            The stored id.
+            The shadow root's WebDriver ID.
         """
         return self._id
 
@@ -109,7 +110,7 @@ class Shadow:
         """Return the base URL of the shadow root.
 
         Returns:
-            The base url of the shadow root.
+            The percent-encoded command URL for this shadow root.
         """
         return self._base_url
 
@@ -149,7 +150,7 @@ class Shadow:
         """Check if an element exists (inside the shadow). This method ignores the implicit wait timeout, and returns element existence immediately.
 
         Args:
-            value: The selector for the element (css only) *OR* an  instance.
+            value: An `Element` or a CSS selector inside this shadow root.
 
         Returns:
             True if the element exists, False otherwise.
@@ -160,7 +161,9 @@ class Shadow:
         if self._session._is_element(value):
             return await value.exists
         else:
-            return await self._element_exists_no_wait(value)
+            return await self._element_exists_no_wait(
+                self._validate_element_selector(value)
+            )
 
     async def elements_exist(self, *values: str | Element, all_: bool = True) -> bool:
         """Check if multiple elements exist (inside the shadow). This method ignores the implicit wait timeout, and returns elements existence immediately.
@@ -169,7 +172,7 @@ class Shadow:
             all_: Determines what satisfies the existence of the elements. Defaults to `True (all elements)`.
                 - `True`: All elements must exist to return True.
                 - `False`: Any one of the elements exists returns True.
-            *values: The locators for multiple elements (css only) *OR*  instances.
+            *values: Elements or CSS selectors inside this shadow root.
 
         Returns:
             True if the elements exist, False otherwise.
@@ -180,11 +183,11 @@ class Shadow:
             ... )  # True / False
         """
 
-        async def check_existance(value: str | Element) -> bool:
+        async def check_existence(value: str | Element) -> bool:
             """Perform one element-existence observation for the enclosing wait.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector to check once.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -192,17 +195,19 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.exists
             else:
-                return await self._element_exists_no_wait(value)
+                return await self._element_exists_no_wait(
+                    self._validate_element_selector(value)
+                )
 
-        # Check existance
+        # Check existence
         if all_:
             for value in values:
-                if not await check_existance(value):
+                if not await check_existence(value):
                     return False
             return True
         else:
             for value in values:
-                if await check_existance(value):
+                if await check_existence(value):
                     return True
             return False
 
@@ -310,7 +315,7 @@ class Shadow:
                 - `'in_viewport'`: Wait for a nonempty rectangle intersecting the viewport.
                 - `'enabled'`: Wait until an element is enabled.
                 - `'selected'`: Wait until an element is selected.
-            value: The selector for the element (css only) *OR* an  instance.
+            value: An `Element` or a CSS selector inside this shadow root.
             timeout: Total seconds to wait until timeout. Defaults to `5`.
 
         Returns:
@@ -326,7 +331,7 @@ class Shadow:
             """Check whether the previously identified element is absent from the DOM.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -334,13 +339,15 @@ class Shadow:
             if self._session._is_element(value):
                 return not await value.exists
             else:
-                return not await self._element_exists_no_wait(value)
+                return not await self._element_exists_no_wait(
+                    self._validate_element_selector(value)
+                )
 
         async def is_exist(value: str | Element) -> bool:
             """Check whether a matching element currently exists.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -348,13 +355,15 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.exists
             else:
-                return await self._element_exists_no_wait(value)
+                return await self._element_exists_no_wait(
+                    self._validate_element_selector(value)
+                )
 
         async def is_unobscured(value: str | Element) -> bool:
             """Check the matched element using a center-point hit test.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -362,14 +371,16 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.unobscured
             else:
-                element = await self._find_element_no_wait(value)
+                element = await self._find_element_no_wait(
+                    self._validate_element_selector(value)
+                )
                 return False if element is None else await element.unobscured
 
         async def is_in_viewport(value: str | Element) -> bool:
             """Check whether the matched element intersects the viewport.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -377,14 +388,16 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.in_viewport
             else:
-                element = await self._find_element_no_wait(value)
+                element = await self._find_element_no_wait(
+                    self._validate_element_selector(value)
+                )
                 return False if element is None else await element.in_viewport
 
         async def is_enabled(value: str | Element) -> bool:
             """Check whether the matched element is enabled.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -392,14 +405,16 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.enabled
             else:
-                element = await self._find_element_no_wait(value)
+                element = await self._find_element_no_wait(
+                    self._validate_element_selector(value)
+                )
                 return False if element is None else await element.enabled
 
         async def is_selected(value: str | Element) -> bool:
             """Check whether the matched element is selected.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -407,7 +422,9 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.selected
             else:
-                element = await self._find_element_no_wait(value)
+                element = await self._find_element_no_wait(
+                    self._validate_element_selector(value)
+                )
                 return False if element is None else await element.selected
 
         # Determine condition
@@ -451,7 +468,7 @@ class Shadow:
                 - `True`: All elements must satisfy the condition to return True.
                 - `False`: Any one of the elements satisfies the condition returns True.
             timeout: Total seconds to wait until timeout. Defaults to `5`.
-            *values: The locators for multiple elements (css only) *OR*  instances.
+            *values: Elements or CSS selectors inside this shadow root.
 
         Returns:
             True if the elements satisfy the condition, False otherwise.
@@ -467,7 +484,7 @@ class Shadow:
             """Check whether the previously identified element is absent from the DOM.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -475,13 +492,15 @@ class Shadow:
             if self._session._is_element(value):
                 return not await value.exists
             else:
-                return not await self._element_exists_no_wait(value)
+                return not await self._element_exists_no_wait(
+                    self._validate_element_selector(value)
+                )
 
         async def is_exist(value: str | Element) -> bool:
             """Check whether a matching element currently exists.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -489,13 +508,15 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.exists
             else:
-                return await self._element_exists_no_wait(value)
+                return await self._element_exists_no_wait(
+                    self._validate_element_selector(value)
+                )
 
         async def is_unobscured(value: str | Element) -> bool:
             """Check the matched element using a center-point hit test.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -503,14 +524,16 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.unobscured
             else:
-                element = await self._find_element_no_wait(value)
+                element = await self._find_element_no_wait(
+                    self._validate_element_selector(value)
+                )
                 return False if element is None else await element.unobscured
 
         async def is_in_viewport(value: str | Element) -> bool:
             """Check whether the matched element intersects the viewport.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -518,14 +541,16 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.in_viewport
             else:
-                element = await self._find_element_no_wait(value)
+                element = await self._find_element_no_wait(
+                    self._validate_element_selector(value)
+                )
                 return False if element is None else await element.in_viewport
 
         async def is_enabled(value: str | Element) -> bool:
             """Check whether the matched element is enabled.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -533,14 +558,16 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.enabled
             else:
-                element = await self._find_element_no_wait(value)
+                element = await self._find_element_no_wait(
+                    self._validate_element_selector(value)
+                )
                 return False if element is None else await element.enabled
 
         async def is_selected(value: str | Element) -> bool:
             """Check whether the matched element is selected.
 
             Args:
-                value: Value to inspect, normalize, or assign as described above.
+                value: Element or CSS selector evaluated during this poll.
 
             Returns:
                 True when the checked condition is satisfied; otherwise False.
@@ -548,7 +575,9 @@ class Shadow:
             if self._session._is_element(value):
                 return await value.selected
             else:
-                element = await self._find_element_no_wait(value)
+                element = await self._find_element_no_wait(
+                    self._validate_element_selector(value)
+                )
                 return False if element is None else await element.selected
 
         async def check_condition(
@@ -559,7 +588,7 @@ class Shadow:
 
             Args:
                 values: Input values evaluated in order by this operation.
-                condition_checker: Condition checker used by this operation.
+                condition_checker: Async predicate applied to each candidate.
 
             Returns:
                 True when the requested condition holds for all candidates if all_ is True, or for any candidate otherwise; False if the requirement is not met.
@@ -596,18 +625,19 @@ class Shadow:
         )
 
     async def _element_exists_no_wait(self, value: str) -> bool:
-        """Check if an element exists (inside the element) without implicit wait. Returns `False` immediately if element not exists.
+        """Check for a matching descendant once, without applying implicit wait.
 
         Args:
-            value: Value to inspect, normalize, or assign as described above.
+            value: CSS selector scoped to this shadow root.
 
         Returns:
             True if an element exists (inside the element) without implicit wait; otherwise False.
         """
         try:
-            return await self._session._execute_script(
+            result = await self._session._execute_script(
                 javascript.ELEMENT_EXISTS_IN_NODE["css selector"], value, self
             )
+            return typed_value(result, bool, "Shadow descendant existence state")
         except errors.ElementNotFoundError:
             return False
         except errors.InvalidElementStateError as err:
@@ -618,13 +648,13 @@ class Shadow:
             ) from err
 
     async def _find_element_no_wait(self, value: str) -> Element | None:
-        """Find element (inside the element) without implicit wait. Returns `None` immediately if element not exists.
+        """Find one descendant without applying implicit wait.
 
         Args:
-            value: Value to inspect, normalize, or assign as described above.
+            value: CSS selector scoped to this shadow root.
 
         Returns:
-            The Element value produced by this operation. None indicates that no value is available.
+            The matching descendant element, or `None` when no match exists.
         """
         try:
             res = await self._session._execute_script(
@@ -648,32 +678,29 @@ class Shadow:
             ) from err
 
     # Utils -------------------------------------------------------------------------------
-    def _validate_timeout(self, value: Any) -> int | float:
-        """Validate if timeout value `> 0`.
+    def _validate_element_selector(self, value: str | Element) -> str:
+        """Return a nonempty CSS selector or reject the unexpected value.
 
         Args:
-            value: If timeout value `> 0` supplied for validation.
+            value: Selector candidate from an element-or-selector public API.
 
         Returns:
-            If timeout value `> 0`.
+            The validated CSS selector.
+
+        Raises:
+            errors.InvalidArgumentError: If `value` is not a nonempty string.
         """
-        if not isinstance(value, (int, float)):
+        if not isinstance(value, str) or not value:
             raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'timeout'. Must be an integer or float, "
-                "instead got: {}.".format(self.__class__.__name__, type(value))
-            )
-        if value <= 0:
-            raise errors.InvalidArgumentError(
-                "<{}>\nInvalid 'timeout'. Must be greater than 0, "
-                "instead got: {}.".format(self.__class__.__name__, value)
+                "Shadow-root selector must be a nonempty string"
             )
         return value
 
     def _raise_invalid_wait_condition(self, condition: Any) -> NoReturn:
-        """Raise invalid wait until 'condition' error.
+        """Reject an unsupported shadow-descendant wait condition.
 
         Args:
-            condition: Asynchronous no-argument predicate whose truthy result completes the wait.
+            condition: Unsupported condition value.
 
         Raises:
             errors.InvalidArgumentError: Always raised with the supplied diagnostic context.
@@ -686,38 +713,39 @@ class Shadow:
 
     # Special methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
-        """Return a diagnostic representation of this instance.
+        """Describe the shadow handle without allocating a service endpoint.
 
         Returns:
-            A diagnostic representation of this instance.
+            Shadow/host/session IDs and the already allocated service URL, if any.
         """
         return "<%s (id='%s', element='%s', session='%s', service='%s')>" % (
             self.__class__.__name__,
             self._id,
             self._element._id,
             self._session._id,
-            self._service.url,
+            getattr(self._service, "_url", None),
         )
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Hash the remote shadow-root identity within its owning session.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            A hash derived from the owning session and remote shadow-root ID.
         """
         return hash((self._session, self._id))
 
     def __eq__(self, __o: Any) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Return whether another handle identifies the same remote shadow root.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` when both handles have the same remote ID and owning
+            session; otherwise ``False``.
         """
         return (
-            self._session == __o._session and self._id == __o._id
+            self._session is __o._session and self._id == __o._id
             if isinstance(__o, Shadow)
             else False
         )

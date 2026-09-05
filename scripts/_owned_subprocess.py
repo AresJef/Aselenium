@@ -16,7 +16,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO
+from typing import Protocol
 
 import psutil
 
@@ -236,11 +236,35 @@ class OwnedTree:
         return survivors
 
 
-def read_output(stream: BinaryIO) -> str:
+class BinaryCapture(Protocol):
+    """Describe the operations required from native files and temporary wrappers."""
+
+    def seek(self, offset: int, /) -> int:
+        """Reposition the binary capture stream.
+
+        Args:
+            offset: Absolute byte offset from the beginning of the file.
+
+        Returns:
+            The resulting byte position.
+        """
+        ...
+
+    def read(self) -> bytes:
+        """Read the remaining captured bytes.
+
+        Returns:
+            All bytes from the current position through the end of the file.
+        """
+        ...
+
+
+def read_output(stream: BinaryCapture) -> str:
     """Read seekable child output without waiting on inherited pipe handles.
 
     Args:
-        stream: Disposable binary capture file positioned anywhere.
+        stream: Seekable binary capture positioned anywhere. Both a native file
+            and the temporary-file wrapper used by Windows are supported.
 
     Returns:
         Captured bytes decoded as UTF-8, replacing invalid sequences.

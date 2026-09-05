@@ -15,41 +15,45 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium webdriver implementation and supporting types."""
+"""Reusable browser facades and cancellation-safe session ownership."""
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from copy import deepcopy
+from math import isfinite
 from typing import (
     TYPE_CHECKING,
     Any,
-    cast,
+    Generic,
+    TypeVar,
 )
 
 from aselenium import errors
 from aselenium._async import finish_owned, run_blocking
 from aselenium._paths import PathInput
 from aselenium._profiles import claim_profile, release_profile
-from aselenium.options import BaseOptions, ChromiumBaseOptions
+from aselenium.options import BaseOptions
 
 if TYPE_CHECKING:
     from types import TracebackType
 
     from aselenium.manager._cache import FileManager
     from aselenium.manager._installation import InstallationResult
-    from aselenium.manager.driver import ChromiumDriverManager, DriverManager
+    from aselenium.manager.driver import DriverManager
     from aselenium.service import BaseService
     from aselenium.session import Session
 
+S = TypeVar("S", bound="Session")
+M = TypeVar("M", bound="DriverManager")
+O = TypeVar("O", bound=BaseOptions)
+
 
 # Base Webdriver ----------------------------------------------------------------------------------
-class SessionContext:
-    """The base context manager for a session."""
+class SessionContext(Generic[S]):
+    """Own one session's provisioning, startup, and deterministic cleanup."""
 
-    _SESSION_CLS: type[Session] | None = None
+    _SESSION_CLS: type[S] | None = None
 
     def __init__(
         self,
@@ -62,20 +66,20 @@ class SessionContext:
         service_kwargs: dict[str, Any],
         options: BaseOptions,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Capture the dependencies and immutable options snapshot for one session.
 
         Args:
-            manager: The driver manager.
-            manager_install_args: The arguments for installing the webdriver.
-            manager_install_kwargs: The keyword arguments for installing the webdriver.
-            service_cls: The webdriver service class.
-            service_timeout: Timeout in seconds for starting/stopping the service.
-            service_args: Additional arguments for service `subprocess.Popen` constructor.
-            service_kwargs: Additional keyword arguments for service `subprocess.Popen` constructor.
-            options: The browser options.
+            manager: Manager used to locate or provision the required executables.
+            manager_install_args: Positional arguments for ``manager.install_result``.
+            manager_install_kwargs: Keyword arguments for ``manager.install_result``.
+            service_cls: Service implementation that owns the driver subprocess.
+            service_timeout: Positive startup and shutdown timeout in seconds.
+            service_args: Additional positional arguments for the service.
+            service_kwargs: Additional keyword arguments for the service.
+            options: Browser options to snapshot for this acquisition.
         """
         # Session
-        self._session: Session | None = None
+        self._session: S | None = None
         # Driver Manager
         self._manager = manager
         self._manager_install_args = manager_install_args
@@ -86,11 +90,7 @@ class SessionContext:
         self._service_args = service_args
         self._service_kwargs = dict(service_kwargs)
         # Browser options
-        self._options = (
-            options.snapshot()
-            if isinstance(options, BaseOptions)
-            else deepcopy(options)
-        )
+        self._options = options.snapshot()
         self._installation: InstallationResult | None = None
         self._service: BaseService | None = None
         self._state = "new"
@@ -101,11 +101,11 @@ class SessionContext:
         """Extra updates to the browser options."""
         pass
 
-    async def start(self) -> Session:
+    async def start(self) -> S:
         """Start once; concurrent starts share the same owned session.
 
         Returns:
-            The initialized session or default window described by the return annotation.
+            The initialized browser session.
         """
         async with self._lifecycle_lock:
             if self._state == "running":
@@ -129,17 +129,21 @@ class SessionContext:
                     **self._manager_install_kwargs,
                 )
                 self._installation = installation
+                # InstallationResult already carries validated Path objects. Retain
+                # their identity through leasing, options setup, and construction.
+                driver_location = installation.driver_location
+                browser_location = installation.browser_location
                 cache = getattr(self._manager, "_file_manager", None)
-                if cache is not None and hasattr(cache, "lease"):
+                if cache is not None:
                     for location in (
-                        installation.driver_location,
-                        installation.browser_location,
+                        driver_location,
+                        browser_location,
                     ):
                         if location:
 
                             def claim() -> None:
                                 """Record a cache lease before the session starts using the executable."""
-                                token = cache.lease(location)
+                                token = cache._lease_path(location)
                                 if token:
                                     self._leases.append((cache, token))
 
@@ -147,11 +151,11 @@ class SessionContext:
                 self._options.browser_version = self._manager._parse_browser_version(
                     installation.browser_version
                 )
-                self._options.browser_location = installation.browser_location
+                self._options._set_browser_location_path(browser_location)
                 self._extra_options_updates()
                 self._service = self._service_cls(
                     self._manager._parse_driver_version(installation.driver_version),
-                    installation.driver_location,
+                    driver_location,
                     self._service_timeout,
                     *self._service_args,
                     **self._service_kwargs,
@@ -197,11 +201,11 @@ class SessionContext:
 
         await finish_owned(close())
 
-    async def __aenter__(self) -> Session:
-        """Start the owned asynchronous context and return its managed value.
+    async def __aenter__(self) -> S:
+        """Start and return the browser session owned by this context.
 
         Returns:
-            The Session value produced by this operation.
+            The running browser-specific session.
         """
         return await self.start()
 
@@ -225,75 +229,101 @@ class SessionContext:
                 raise
 
 
-class WebDriver:
-    """The base class of the webdriver for the browser."""
+C = TypeVar("C", bound="SessionContext[Any]")
+
+
+class WebDriver(Generic[M, O, C]):
+    """Build reusable browser facades from validated manager and service components."""
 
     def __init__(
         self,
-        manager_cls: Callable[..., DriverManager],
+        manager_cls: Callable[..., M] | M,
         service_cls: type[BaseService],
-        options_cls: type[BaseOptions],
-        session_context_cls: type[SessionContext],
+        options_cls: type[O],
+        session_context_cls: type[C],
         directory: PathInput | None = None,
         max_cache_size: int | None = None,
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
         proxy: str | None = None,
-        service_timeout: int = 10,
+        service_timeout: int | float = 10,
         *service_args: Any,
         **service_kwargs: Any,
     ) -> None:
-        r"""Initialize the instance with the supplied configuration.
-
-        Driver Manager Arguments:
-
-        Driver Service Arguments:
+        """Initialize a reusable browser facade and its driver manager.
 
         Args:
-            manager_cls: Browser-specific driver-manager class instantiated by the facade.
+            manager_cls: Browser-specific driver-manager factory, or a fully
+                configured manager instance. A factory receives the cache and
+                provisioning arguments documented below.
             service_cls: Browser-specific service class used for each acquisition.
             options_cls: Browser-specific options class instantiated by the facade.
             session_context_cls: Browser-specific session-context class created by acquire().
-            directory: The directory to cache the webdrivers. Defaults to `None`.
-                - If `None`, the webdrivers will be automatically cache in the following default directory:
-                1. MacOS default: `'/Users/<user>/.aselenium'`.
-                2. Windows default: `'C:\Users\<user>\.aselenium'`.
-                3. Linux default: `'/home/<user>/.aselenium'`.
-                - If specified, a folder named `'.aselenium'` will be created in the given directory.
-            max_cache_size: The maximum cache size of the webdrivers. Defaults to `None`.
-                - If `None`, all webdrivers will be cached to local storage without limit.
-                - For value > 1, if the cached webdrivers exceed this limit, the oldest
-                webdrivers will be deleted.
-            request_timeout: The timeout in seconds for api requests. Defaults to `10`.
-            download_timeout: The timeout in seconds for file download. Defaults to `300`.
-            proxy: The proxy for http requests. Defaults to `None`.
-                This might be needed for some users that cannot access the webdriver api directly
-                due to internet restrictions. Only accepts proxy startswith `'http://'`.
-            service_timeout: Timeout in seconds for starting/stopping the webdriver service. Defaults to `10`.
+            directory: Cache parent directory. ``None`` uses the platform-specific
+                user cache directory. Strings, ``Path`` objects, and compatible
+                ``os.PathLike[str]`` values are accepted.
+            max_cache_size: Maximum number of cached artifacts, or ``None`` for no
+                count-based limit.
+            request_timeout: Positive timeout in seconds for metadata requests.
+            download_timeout: Positive total timeout in seconds for downloads.
+            proxy: HTTP proxy URL used only for driver provisioning, or ``None``.
+            service_timeout: Positive timeout in seconds for starting and stopping
+                the webdriver service.
             *service_args: Additional arguments for the webdriver service.
             **service_kwargs: Additional keyword arguments for the webdriver service.
+
+        Raises:
+            TypeError: A supplied constructor argument has an unsupported type.
+            ValueError: A timeout, proxy, or cache-size value is invalid.
+            aselenium.errors.AseleniumInvalidPathError: A supplied cache path is
+                malformed or cannot be represented by the local filesystem.
         """
+        # Validate all facade-owned configuration before constructing components
+        # whose initializers may create cache directories.
+        if (
+            isinstance(service_timeout, bool)
+            or not isinstance(service_timeout, (int, float))
+            or not isfinite(service_timeout)
+            or service_timeout <= 0
+        ):
+            raise errors.InvalidArgumentError(
+                "service_timeout must be a finite positive number"
+            )
+
         # Driver Manager
-        self._manager = manager_cls(
-            directory=directory,
-            max_cache_size=max_cache_size,
-            request_timeout=request_timeout,
-            download_timeout=download_timeout,
-            proxy=proxy,
-        )
+        if callable(manager_cls):
+            self._manager = manager_cls(
+                directory=directory,
+                max_cache_size=max_cache_size,
+                request_timeout=request_timeout,
+                download_timeout=download_timeout,
+                proxy=proxy,
+            )
+        else:
+            if (
+                directory is not None
+                or max_cache_size is not None
+                or request_timeout != 10
+                or download_timeout != 300
+                or proxy is not None
+            ):
+                raise TypeError(
+                    "cache and provisioning arguments require a driver-manager factory"
+                )
+            self._manager = manager_cls
         # Driver Service
         self._service_cls: type[BaseService] = service_cls
-        self._service_timeout: int = service_timeout
+        self._service_timeout: int | float = service_timeout
         self._service_args: tuple[Any, ...] = service_args
         self._service_kwargs: dict[str, Any] = service_kwargs
         # Browser Options
-        self._options: BaseOptions = options_cls()
+        self._options: O = options_cls()
         # Session
-        self._session_context_cls: type[SessionContext] = session_context_cls
+        self._session_context_cls: type[C] = session_context_cls
 
     # Properties ------------------------------------------------------------------
     @property
-    def manager(self) -> DriverManager:
+    def manager(self) -> M:
         """Return the driver manager.
 
         Returns:
@@ -302,7 +332,7 @@ class WebDriver:
         return self._manager
 
     @property
-    def options(self) -> BaseOptions:
+    def options(self) -> O:
         """Return the webdriver options for the browser.
 
         Returns:
@@ -311,12 +341,16 @@ class WebDriver:
         return self._options
 
     # Acquire ---------------------------------------------------------------------
-    def acquire(self, *args: Any, **kwargs: Any) -> SessionContext:
-        """Acquire a new browser session.
+    def acquire(self, *args: Any, **kwargs: Any) -> C:
+        """Create a single-use context for a new browser session.
+
+        Browser-specific facades provide typed acquisition parameters. The current
+        options are snapshotted immediately; provisioning starts when the context is
+        entered.
 
         Args:
-            *args: Positional arguments forwarded to the wrapped operation.
-            **kwargs: Keyword arguments forwarded to the wrapped operation.
+            *args: Positional arguments forwarded to the manager installation call.
+            **kwargs: Keyword arguments forwarded to the manager installation call.
 
         Returns:
             A new single-use session context with an acquisition-time options snapshot.
@@ -358,28 +392,9 @@ class WebDriver:
         Returns:
             True if this instance compares equal to another object; otherwise False.
         """
-        return hash(self) == hash(__o) if isinstance(__o, self.__class__) else False
+        return self is __o
 
 
 # Chromium Base Webdriver -------------------------------------------------------------------------
-class ChromiumBaseWebDriver(WebDriver):
-    """The base class of the webdriver for the Chromium based browser."""
-
-    # Properties ------------------------------------------------------------------
-    @property
-    def manager(self) -> ChromiumDriverManager:
-        """Return the driver manager.
-
-        Returns:
-            The facade's browser-specific driver manager.
-        """
-        return cast("ChromiumDriverManager", self._manager)
-
-    @property
-    def options(self) -> ChromiumBaseOptions:
-        """Return the webdriver options for the browser.
-
-        Returns:
-            The browser options owned by this facade or session.
-        """
-        return cast("ChromiumBaseOptions", self._options)
+class ChromiumBaseWebDriver(WebDriver[M, O, C], Generic[M, O, C]):
+    """Base facade shared by Chromium-family browsers."""

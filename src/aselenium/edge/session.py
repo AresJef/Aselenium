@@ -15,12 +15,11 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium session implementation and supporting types."""
+"""Microsoft Edge-specific typed accessors for Chromium session behavior."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from aselenium.session import ChromiumBaseSession
 
@@ -43,7 +42,7 @@ class EdgeSession(ChromiumBaseSession):
         Returns:
             The browser options owned by this facade or session.
         """
-        return self._options
+        return cast("EdgeOptions", super().options)
 
     @property
     def service(self) -> EdgeService:
@@ -52,4 +51,4 @@ class EdgeSession(ChromiumBaseSession):
         Returns:
             The driver service owned by the session.
         """
-        return self._service
+        return cast("EdgeService", super().service)

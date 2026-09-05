@@ -280,8 +280,7 @@ def test_firefox_compatibility_selection_checks_the_entire_range(
     """
     manager, _ = make_manager(tmp_path, monkeypatch, FirefoxDriverManager, browser)
     assert (
-        str(manager._find_max_compatible_driver_version(FirefoxVersion(browser)))
-        == expected
+        str(manager._compatible_gecko_versions(FirefoxVersion(browser))[0]) == expected
     )
 
 
