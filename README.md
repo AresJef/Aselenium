@@ -94,17 +94,18 @@ The usual browser must be installed separately, except when provisioning a
 Chrome for Testing browser/driver pair. Safari requires macOS and an existing
 Remote Automation setup.
 
-After the GitHub 2.0.0 release has been published, install its attached wheel:
-
-```bash
-python -m pip install --upgrade https://github.com/AresJef/Aselenium/releases/download/v2.0.0/aselenium-2.0.0-py3-none-any.whl
-```
-
-When the optional PyPI promotion has also completed, the equivalent index
-installation is:
+Install version 2.0.0 from PyPI:
 
 ```bash
 python -m pip install --upgrade aselenium==2.0.0
+```
+
+The [GitHub Release](https://github.com/AresJef/Aselenium/releases/tag/v2.0.0)
+also provides the same wheel and source distribution with SHA-256 checksums.
+To install its wheel directly:
+
+```bash
+python -m pip install --upgrade https://github.com/AresJef/Aselenium/releases/download/v2.0.0/aselenium-2.0.0-py3-none-any.whl
 ```
 
 To develop from a source checkout, run the following from the repository root.

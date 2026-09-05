@@ -173,12 +173,35 @@ Release only after those gates succeed. The Release attaches the exact native-
 tested wheel and source distribution plus SHA-256 checksums and the curated
 version notes.
 
-`ASELENIUM_PUBLISH_ENABLED=true` opts into a PyPI promotion of those same files
-using Trusted Publishing. If the variable is absent or false, the PyPI job is
-skipped and the validated GitHub Release is still published. If PyPI promotion
-is enabled but fails, the GitHub Release is blocked so the two public channels
-cannot silently diverge. Configure the PyPI project, `pypi` environment and OIDC
-publisher before enabling the variable.
+PyPI publication is automatic after those tests succeed. The publishing job uses
+the existing GitHub Actions secret `PYPI_API_TOKEN`, with username `__token__`.
+Keep that token valid and authorized for the `aselenium` PyPI project. It can be
+a repository secret or a secret in the `pypi` environment; an environment secret
+with the same name takes precedence. There is no opt-in repository variable and
+no PyPI login or Trusted Publisher setup is required for this token-based flow.
+The secret is available only in the isolated publishing job, never in build or
+test jobs. Missing credentials, an upload error or a failed test blocks the
+release; ordinary branch pushes and pull requests do not publish packages.
+TestPyPI is a separate index and is not a prerequisite for production publication.
+
+For each new version, update `pyproject.toml`, version-specific README links and
+`docs/releases/<version>.md`; merge the reviewed changes into `main`; then push
+the matching `v<version>` tag. The tag must identify a commit in main's history.
+The workflow runs the complete release acceptance suite, publishes its exact
+wheel and sdist to PyPI, then creates the GitHub Release with the same files.
+Do not move an already published tag or try to overwrite a version on PyPI.
+
+An existing GitHub Release that passed validation but was not uploaded to PyPI
+can be recovered with **Promote an existing tested release to PyPI** in Actions.
+Run it from `main`, providing its release tag and successful `release.yml` run
+ID. It checks the tag's version and main ancestry, the run's repository and
+commit, every required package/browser job, and byte-for-byte agreement between
+the retained `candidate-distributions` artifact and public release files and
+checksums. It publishes without rebuilding or modifying the GitHub Release.
+Missing or expired validation artifacts stop recovery; they are retained for
+14 days. Duplicate PyPI files also fail rather than being silently skipped.
+API-token publishing does not generate Trusted Publishing's OIDC-backed
+attestations.
 
 Editing or locally validating these definitions does **not** establish a remote
 CI pass, publish a release, or activate the schedule before the workflow reaches

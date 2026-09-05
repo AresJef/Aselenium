@@ -100,20 +100,30 @@ def test_release_workflow_gates_publication_on_the_tested_tag_artifacts() -> Non
     assert "readme-renderer[md]>=46,<47" in verify_commands
     assert "markdown.render" in verify_commands
     assert jobs["pypi"]["needs"] == "verify-release"
-    assert "vars.ASELENIUM_PUBLISH_ENABLED == 'true'" in jobs["pypi"]["if"]
+    assert "if" not in jobs["pypi"]
     assert jobs["pypi"]["environment"]["name"] == "pypi"
-    assert jobs["pypi"]["permissions"] == {"id-token": "write"}
+    assert jobs["pypi"]["permissions"] == {"contents": "read"}
     assert all("checkout" not in step.get("uses", "") for step in jobs["pypi"]["steps"])
     publish_step = next(
         step
         for step in jobs["pypi"]["steps"]
         if step.get("uses", "").startswith("pypa/gh-action-pypi-publish@")
     )
-    assert "with" not in publish_step
+    assert publish_step["with"] == {
+        "user": "__token__",
+        "password": "${{ secrets.PYPI_API_TOKEN }}",
+        "attestations": "false",
+    }
+    secret_check = next(step for step in jobs["pypi"]["steps"] if "env" in step)
+    assert secret_check["env"] == {"PYPI_API_TOKEN": "${{ secrets.PYPI_API_TOKEN }}"}
+    assert 'if [ -z "$PYPI_API_TOKEN" ]; then' in secret_check["run"]
+    assert "exit 1" in secret_check["run"]
 
     github_release = jobs["github-release"]
     assert set(github_release["needs"]) == {"verify-release", "pypi"}
     assert github_release["permissions"] == {"contents": "write"}
+    assert "needs.pypi.result == 'success'" in github_release["if"]
+    assert "skipped" not in github_release["if"]
     release_commands = "\n".join(
         step.get("run", "") for step in github_release["steps"]
     )
@@ -318,7 +328,7 @@ def test_runtime_requirements_match_declared_dependencies_exactly() -> None:
     assert requirements == declared
 
 
-@pytest.mark.parametrize("name", ["tests.yml", "release.yml"])
+@pytest.mark.parametrize("name", ["tests.yml", "release.yml", "promote-pypi.yml"])
 def test_external_workflow_actions_are_pinned_to_full_commits(name: Any) -> None:
     """Verify external workflow actions are pinned to full commits.
 
