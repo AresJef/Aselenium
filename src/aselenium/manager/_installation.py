@@ -9,17 +9,21 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass, field, replace
 from functools import wraps
 from inspect import signature
-from os import fspath
+from pathlib import Path
 from threading import RLock
 from typing import (
     TYPE_CHECKING,
     Any,
     Concatenate,
+    Generic,
     ParamSpec,
     TypeVar,
+    cast,
+    overload,
 )
 from weakref import WeakKeyDictionary, WeakValueDictionary
 
+from aselenium import errors
 from aselenium._async import finish_owned, run_blocking
 from aselenium.manager._cache import FileManager, artifact_lock
 
@@ -28,9 +32,10 @@ if TYPE_CHECKING:
 
     from aselenium.manager.driver import DriverManager
     from aselenium.manager.version import Version
-M = TypeVar("M", bound="DriverManager")
+M = TypeVar("M", bound="DriverManager[Any, Any]")
 V = TypeVar("V", bound="Version")
 T = TypeVar("T")
+R = TypeVar("R")
 P = ParamSpec("P")
 
 
@@ -42,8 +47,8 @@ class InstallationRequest:
         product: Browser product name, such as Chrome or Firefox.
         version: Frozen requested version selector, or None when omitted.
         channel: Requested release channel.
-        binary: Explicit browser executable override, or None for discovery.
-        driver: Explicit driver executable override, or None for managed resolution.
+        binary: Parsed browser executable override, or None for discovery.
+        driver: Parsed driver executable override, or None for managed resolution.
         os_name: Operating-system identifier used by the driver vendor.
         architecture: Architecture width used to scope the cache view.
         arm: Whether the target architecture belongs to the ARM family.
@@ -54,8 +59,8 @@ class InstallationRequest:
     product: str
     version: str | None
     channel: str
-    binary: str | None
-    driver: str | None
+    binary: Path | None
+    driver: Path | None
     os_name: str
     architecture: str
     arm: bool
@@ -77,9 +82,9 @@ class InstallationResult:
     """
 
     request: InstallationRequest
-    driver_location: str
+    driver_location: Path
     driver_version: str | None
-    browser_location: str | None
+    browser_location: Path | None
     browser_version: str | None
     channel: str
 
@@ -105,21 +110,39 @@ class Invocation:
     client_lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
 
-class RequestField:
-    """Route provisioning fields to the current invocation, not shared mutable state."""
+class RequestField(Generic[R]):
+    """Route a typed provisioning field to request-local or published state."""
 
     def __set_name__(self, owner: type[Any], name: str) -> None:
         """Record the attribute name assigned to this descriptor.
 
         Args:
             owner: Class on which Python installed the descriptor.
-            name: Name identifying the requested item.
+            name: Attribute name assigned to the descriptor.
         """
         self.name = name
 
+    @overload
+    def __get__(  # noqa: D418 - structural audit requires every definition documented.
+        self, instance: None, owner: type[Any] | None = None
+    ) -> RequestField[R]:
+        """Return the descriptor itself when accessed through its owner class."""
+        ...
+
+    @overload
+    def __get__(  # noqa: D418 - structural audit requires every definition documented.
+        self,
+        instance: DriverManager[Any, Any],
+        owner: type[Any] | None = None,
+    ) -> R:
+        """Return request-local or published state for a manager instance."""
+        ...
+
     def __get__(
-        self, instance: DriverManager | None, owner: type[Any] | None = None
-    ) -> Any:
+        self,
+        instance: DriverManager[Any, Any] | None,
+        owner: type[Any] | None = None,
+    ) -> RequestField[R] | R:
         """Read the request-local value, or the last published value outside an invocation.
 
         Args:
@@ -133,10 +156,10 @@ class RequestField:
             return self
         active = instance._invocation.get()
         if active is not None:
-            return active.values.get(self.name)
-        return instance.__dict__.get(self.name)
+            return cast(R, active.values.get(self.name))
+        return cast(R, instance.__dict__.get(self.name))
 
-    def __set__(self, instance: DriverManager, value: Any) -> None:
+    def __set__(self, instance: DriverManager[Any, Any], value: R) -> None:
         """Store the value in the current invocation or the instance state.
 
         Args:
@@ -151,12 +174,12 @@ class RequestField:
 
 
 _LOCKS: WeakKeyDictionary[
-    asyncio.AbstractEventLoop, WeakValueDictionary[str, asyncio.Lock]
+    asyncio.AbstractEventLoop, WeakValueDictionary[Path | str, asyncio.Lock]
 ] = WeakKeyDictionary()
 _REGISTRY_LOCK = RLock()
 
 
-def installation_lock(manager: DriverManager) -> asyncio.Lock:
+def installation_lock(manager: DriverManager[Any, Any]) -> asyncio.Lock:
     """Locks are shared only within the current event loop and cache root.
 
     Args:
@@ -167,7 +190,10 @@ def installation_lock(manager: DriverManager) -> asyncio.Lock:
     """
     loop = asyncio.get_running_loop()
     cache = manager._file_manager
-    key = str(cache._directory) if cache is not None else manager._name
+    # Filesystem-backed managers share by their already-parsed cache root. A
+    # system-managed driver such as Safari has no filesystem cache and uses its
+    # product name as the non-path registry identity.
+    key: Path | str = cache._directory if cache is not None else manager._name
     with _REGISTRY_LOCK:
         locks = _LOCKS.setdefault(loop, WeakValueDictionary())
         lock = locks.get(key)
@@ -205,20 +231,20 @@ async def owned_gather(*coroutines: Coroutine[Any, Any, T]) -> list[T]:
 
 
 def isolated_install(
-    method: Callable[Concatenate[M, P], Coroutine[Any, Any, str]],
-) -> Callable[Concatenate[M, P], Coroutine[Any, Any, str]]:
-    """Keep install()'s signature/str return while publishing a stable snapshot.
+    method: Callable[Concatenate[M, P], Coroutine[Any, Any, Path]],
+) -> Callable[Concatenate[M, P], Coroutine[Any, Any, Path]]:
+    """Isolate ``install()`` while publishing a stable path snapshot.
 
     Args:
-        method: Method being wrapped or HTTP verb used for the request.
+        method: Asynchronous manager installation method to isolate.
 
     Returns:
-        An asynchronous method preserving the original arguments and str result.
+        An asynchronous method preserving the original arguments and ``Path`` result.
     """
     parameters = signature(method)
 
     @wraps(method)
-    async def wrapped(self: M, *args: P.args, **kwargs: P.kwargs) -> str:
+    async def wrapped(self: M, *args: P.args, **kwargs: P.kwargs) -> Path:
         """Execute one isolated installation and publish its completed result snapshot.
 
         Args:
@@ -237,19 +263,8 @@ def isolated_install(
         bound.apply_defaults()
         values = bound.arguments
 
-        def frozen_value(name: str) -> str | None:
-            """Freeze one non-path installation selector as immutable text.
-
-            Args:
-                name: Name identifying the requested item.
-
-            Returns:
-                Text form of the selector, or None when the argument is absent.
-            """
-            value = values.get(name)
-            return None if value is None else str(value)
-
-        selector = frozen_value("version")
+        requested_version = values.get("version")
+        selector = None if requested_version is None else str(requested_version)
         policy = self._policy_override.get()
         if policy is None:
             policy = {
@@ -286,36 +301,39 @@ def isolated_install(
         token = self._invocation.set(invocation)
         try:
             location = await method(self, *args, **kwargs)
+            if not isinstance(location, Path):
+                raise errors.DriverInstallationError(
+                    "install() implementations must return a pathlib.Path"
+                )
             if request.validate_compatibility:
                 self._validate_installed_pair()
 
-            def path_snapshot(argument: str, state: str) -> str | None:
-                """Freeze one explicit path from its already-validated state.
+            def path_snapshot(argument: str, state: str) -> Path | None:
+                """Read one explicit override from parsed request-local state.
 
                 Args:
                     argument: Bound public argument name.
                     state: Request-local manager field containing the parsed ``Path``.
 
                 Returns:
-                    Absolute text for a validated override, the original path-like
-                    text for an intentionally ignored override, or None when absent.
+                    The parsed absolute path, or None when the public argument was absent.
+
+                Raises:
+                    errors.DriverInstallationError: The implementation failed to parse
+                        a supplied filesystem override at its core entry boundary.
                 """
                 raw = values.get(argument)
                 if raw is None:
                     return None
                 parsed = invocation.values.get(state)
-                if parsed is not None:
-                    return str(parsed)
-                try:
-                    text = fspath(raw)
-                except Exception:
-                    return str(raw)
-                return text if isinstance(text, str) else str(raw)
+                if not isinstance(parsed, Path):
+                    raise errors.DriverInstallationError(
+                        "install() did not validate the %s path override" % argument
+                    )
+                return parsed
 
-            # Explicit overrides normally live in the request-local Path fields.
-            # A channel such as Chrome for Testing intentionally ignores ``binary``;
-            # retain that original input rather than replacing it with a resolved
-            # download location that was not requested by the caller.
+            # Explicit overrides remain Path objects from the manager's core entry
+            # through the immutable request and result snapshots.
             request = replace(
                 request,
                 binary=path_snapshot("binary", "_target_binary"),
@@ -358,8 +376,8 @@ def isolated_install(
 def artifact_install(
     kind: str,
 ) -> Callable[
-    [Callable[[M, V], Coroutine[Any, Any, str]]],
-    Callable[[M, V], Coroutine[Any, Any, str]],
+    [Callable[[M, V], Coroutine[Any, Any, Path]]],
+    Callable[[M, V], Coroutine[Any, Any, Path]],
 ]:
     """Coordinate download work across processes; release before sibling joins.
 
@@ -371,24 +389,24 @@ def artifact_install(
     """
 
     def decorate(
-        method: Callable[[M, V], Coroutine[Any, Any, str]],
-    ) -> Callable[[M, V], Coroutine[Any, Any, str]]:
+        method: Callable[[M, V], Coroutine[Any, Any, Path]],
+    ) -> Callable[[M, V], Coroutine[Any, Any, Path]]:
         """Wrap the artifact installer with cross-process download coordination.
 
         Args:
-            method: Method being wrapped or HTTP verb used for the request.
+            method: Asynchronous artifact installer to coordinate.
 
         Returns:
             An installer with the original call contract and coordinated artifact acquisition.
         """
 
         @wraps(method)
-        async def wrapped(self: M, version: V) -> str:
+        async def wrapped(self: M, version: V) -> Path:
             """Reuse a matching artifact or install it while holding the download lock.
 
             Args:
                 self: Driver manager instance passed to the decorated method.
-                version: Version object or version selector for this operation.
+                version: Parsed artifact version passed to the wrapped installer.
 
             Returns:
                 The installed executable path after the wrapper has completed its ownership checks.

@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium service implementation and supporting types."""
+"""ChromeDriver service specialization."""
 
 from aselenium.service import ChromiumBaseService
 
@@ -25,4 +24,4 @@ __all__ = ["ChromeService"]
 
 # Chrome Service ----------------------------------------------------------------------------------
 class ChromeService(ChromiumBaseService):
-    """Chrome Service."""
+    """Launch and supervise a ChromeDriver process."""

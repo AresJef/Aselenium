@@ -16,7 +16,7 @@ from typing import Any
 import pytest
 
 import aselenium
-from aselenium import manager
+from aselenium import errors, manager
 from aselenium import options as options_module
 from aselenium import service as service_module
 
@@ -94,7 +94,10 @@ def assert_parameters(callable_object: Any, expected: Any) -> None:
 
 def test_manager_public_exports_are_available_at_both_import_paths() -> None:
     """Verify manager public exports are available at both import paths."""
-    expected = set(MANAGER_NAMES + VERSION_NAMES)
+    expected = set(MANAGER_NAMES + VERSION_NAMES) | {
+        "InstallationRequest",
+        "InstallationResult",
+    }
     assert set(manager.__all__) == expected
     assert len(manager.__all__) == len(expected)
     for name in expected:
@@ -111,11 +114,38 @@ def test_manager_constructor_and_install_signatures(name: Any) -> None:
         name: Fixture or parametrized name input for this regression.
     """
     manager_class = getattr(manager, name)
-    assert_parameters(manager_class.__init__, CONSTRUCTOR_PARAMETERS)
+    constructor = (
+        (("self", inspect.Parameter.empty),)
+        if name == "SafariDriverManager"
+        else CONSTRUCTOR_PARAMETERS
+    )
+    assert_parameters(manager_class.__init__, constructor)
     assert_parameters(manager_class.install, INSTALL_PARAMETERS[name])
     assert inspect.iscoroutinefunction(manager_class.install)
     assert_parameters(manager_class.reset, (("self", inspect.Parameter.empty),))
     assert not inspect.iscoroutinefunction(manager_class.reset)
+
+
+@pytest.mark.parametrize(
+    "argument",
+    [
+        {"directory": "/tmp"},
+        {"max_cache_size": 1},
+        {"request_timeout": 1},
+        {"download_timeout": 1},
+        {"proxy": "https://proxy.invalid"},
+    ],
+)
+def test_safari_manager_rejects_inapplicable_provisioning_configuration(
+    argument: dict[str, Any],
+) -> None:
+    """Keep Safari's constructor limited to its system-managed behavior.
+
+    Args:
+        argument: Unsupported cache, network, or proxy keyword argument.
+    """
+    with pytest.raises(TypeError, match="unexpected keyword argument"):
+        manager.SafariDriverManager(**argument)
 
 
 @pytest.mark.parametrize("name", MANAGER_NAMES)
@@ -128,12 +158,136 @@ def test_manager_can_be_constructed_without_browser_discovery(
         name: Fixture or parametrized name input for this regression.
         tmp_path: Isolated temporary directory supplied by pytest.
     """
-    instance = getattr(manager, name)(directory=str(tmp_path))
+    manager_class = getattr(manager, name)
+    instance = (
+        manager_class()
+        if name == "SafariDriverManager"
+        else manager_class(directory=str(tmp_path))
+    )
     assert instance.max_cache_size is None
     assert instance.requests_timeout == 10
     assert instance.download_timeout == 300
     assert instance.proxy is None
     instance.reset()
+
+
+@pytest.mark.parametrize(
+    "value",
+    [
+        pytest.param(True, id="bool"),
+        pytest.param(1.5, id="fractional-float"),
+        pytest.param("2", id="numeric-text"),
+        pytest.param(0, id="zero"),
+        pytest.param(-1, id="negative"),
+    ],
+)
+def test_manager_cache_limit_requires_a_positive_exact_integer(
+    tmp_path: Path, value: Any
+) -> None:
+    """Reject coercible and nonpositive cache limits without mutating configuration.
+
+    Args:
+        tmp_path: Isolated cache parent for a real manager instance.
+        value: Invalid cache limit that must not be coerced to an integer.
+    """
+    instance = manager.ChromeDriverManager(directory=tmp_path, max_cache_size=2)
+
+    with pytest.raises(errors.InvalidArgumentError, match="max cache size"):
+        instance.max_cache_size = value
+
+    assert instance.max_cache_size == 2
+
+
+@pytest.mark.parametrize(
+    ("argument", "message"),
+    [
+        pytest.param({"max_cache_size": True}, "max cache size", id="cache-limit"),
+        pytest.param({"request_timeout": 0}, "requests timeout", id="request-timeout"),
+        pytest.param(
+            {"download_timeout": float("inf")},
+            "download timeout",
+            id="download-timeout",
+        ),
+        pytest.param(
+            {"proxy": "https://proxy.invalid"},
+            "HTTP proxy",
+            id="proxy-scheme",
+        ),
+    ],
+)
+def test_invalid_manager_configuration_does_not_create_cache(
+    tmp_path: Path, argument: dict[str, Any], message: str
+) -> None:
+    """Validate scalar constructor inputs before creating cache directories.
+
+    Args:
+        tmp_path: Isolated parent whose contents expose filesystem side effects.
+        argument: Invalid manager constructor keyword and value.
+        message: Diagnostic fragment identifying the rejected setting.
+    """
+    with pytest.raises(errors.InvalidArgumentError, match=message):
+        manager.ChromeDriverManager(directory=tmp_path, **argument)
+
+    assert not (tmp_path / ".aselenium").exists()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "kwargs,message",
+    [
+        pytest.param({"policy": []}, "policy", id="non-text-policy"),
+        pytest.param(
+            {"validate_compatibility": 1},
+            "validate_compatibility",
+            id="non-boolean-validation",
+        ),
+    ],
+)
+async def test_install_result_control_values_require_exact_public_types(
+    tmp_path: Path, kwargs: dict[str, Any], message: str
+) -> None:
+    """Reject invalid policy and compatibility controls before installation starts.
+
+    Args:
+        tmp_path: Isolated cache parent for a real manager instance.
+        kwargs: Invalid install-result control passed by keyword.
+        message: Required diagnostic fragment identifying the rejected control.
+    """
+    instance = manager.ChromeDriverManager(directory=tmp_path)
+
+    with pytest.raises(errors.InvalidArgumentError, match=message):
+        await instance.install_result(**kwargs)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "args,kwargs,message",
+    [
+        pytest.param((120,), {}, "version", id="non-text-version"),
+        pytest.param(
+            ("120.0.1.1",), {"artifact": []}, "artifact", id="non-text-artifact"
+        ),
+        pytest.param(("120.0.1.1",), {"pinned": 1}, "pinned", id="non-boolean-pin"),
+    ],
+)
+async def test_pin_controls_require_exact_public_types(
+    tmp_path: Path,
+    args: tuple[Any, ...],
+    kwargs: dict[str, Any],
+    message: str,
+) -> None:
+    """Reject malformed pin inputs before parsing a version or touching the cache.
+
+    Args:
+        tmp_path: Isolated cache parent for a real manager instance.
+        args: Positional pin arguments containing the version candidate.
+        kwargs: Optional malformed artifact or pin-state control.
+        message: Required diagnostic fragment identifying the rejected input.
+    """
+    instance = manager.ChromeDriverManager(directory=tmp_path)
+
+    with pytest.raises(errors.InvalidArgumentError, match=message):
+        await instance.pin(*args, **kwargs)
 
 
 @pytest.mark.parametrize("name", FACADE_NAMES)

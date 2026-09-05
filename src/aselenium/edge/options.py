@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium options implementation and supporting types."""
+"""Microsoft Edge and WebView2 capability construction."""
 
 from __future__ import annotations
 
@@ -32,7 +31,7 @@ __all__ = ["EdgeOptions"]
 
 # Edge Options ------------------------------------------------------------------------------------
 class EdgeOptions(ChromiumBaseOptions):
-    """Edge options."""
+    """Build Microsoft Edge or WebView2 capabilities and launch options."""
 
     DEFAULT_CAPABILITIES: dict[str, Any] = {"browserName": "MicrosoftEdge"}
     VENDOR_PREFIX: str = "ms"
@@ -45,10 +44,10 @@ class EdgeOptions(ChromiumBaseOptions):
 
     # Caps: basic -------------------------------------------------------------------------
     def construct(self) -> dict[str, Any]:
-        """Construct the final capabilities for the browser.
+        """Construct an independent Edge or WebView2 capability mapping.
 
         Returns:
-            A mapping containing the construct data.
+            Chromium-family capabilities with the selected Edge browser name.
         """
         caps = super().construct()
         if self._use_webview:

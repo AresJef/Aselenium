@@ -14,6 +14,7 @@ from zipfile import ZipFile
 import pytest
 
 from aselenium import errors
+from aselenium._paths import is_link
 from aselenium.manager import _cache as cache_module
 from aselenium.manager import _filesystem as safety
 from aselenium.manager import file as files
@@ -775,7 +776,7 @@ def test_windows_reparse_attribute_is_treated_as_a_link(
         st_file_attributes = 0x400
 
     monkeypatch.setattr(Path, "lstat", lambda self: ReparseStat())
-    assert safety.is_link(tmp_path / "junction")
+    assert is_link(tmp_path / "junction")
 
 
 def test_checked_path_accepts_a_leaf_that_disappears_during_resolution(

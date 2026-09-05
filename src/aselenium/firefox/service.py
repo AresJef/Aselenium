@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium service implementation and supporting types."""
+"""GeckoDriver service ports, subprocess arguments, and profile-root support."""
 
 from __future__ import annotations
 
@@ -24,6 +23,7 @@ from os import fspath
 from typing import (
     TYPE_CHECKING,
     Any,
+    cast,
 )
 
 from aselenium import errors
@@ -119,7 +119,7 @@ class FirefoxService(BaseService):
         Returns:
             The version of the webdriver executable.
         """
-        return self._driver_version
+        return cast("GeckoVersion", self._driver_version)
 
     # Socket ------------------------------------------------------------------------------
     @property

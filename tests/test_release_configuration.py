@@ -4,13 +4,40 @@ from __future__ import annotations
 
 import re
 import runpy
+import subprocess
 from pathlib import Path
 from typing import Any
 
 import pytest
 import yaml
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib
+
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def run_git(repository: Path, *arguments: str) -> str:
+    """Run one local Git command for a disposable release-history fixture.
+
+    Args:
+        repository: Temporary repository in which to run the command.
+        *arguments: Git subcommand and arguments.
+
+    Returns:
+        Stripped standard output from the successful command.
+    """
+    result = subprocess.run(
+        ["git", *arguments],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    return result.stdout.strip()
 
 
 @pytest.mark.parametrize("tag", ["2.0.0", "v2.0.0"])
@@ -49,9 +76,27 @@ def test_release_workflow_gates_publication_on_the_tested_tag_artifacts() -> Non
     assert jobs["validate"]["uses"] == "./.github/workflows/tests.yml"
     assert jobs["validate"]["with"]["reliability_duration"] == "600"
     assert jobs["verify-release"]["needs"] == "validate"
-    verify_commands = "\n".join(
-        step.get("run", "") for step in jobs["verify-release"]["steps"]
+    verify_steps = jobs["verify-release"]["steps"]
+    checkout = next(
+        step
+        for step in verify_steps
+        if step.get("uses", "").startswith("actions/checkout@")
     )
+    assert checkout["with"] == {
+        "fetch-depth": "0",
+        "fetch-tags": "true",
+        "persist-credentials": "false",
+    }
+    tag_check = next(
+        step
+        for step in verify_steps
+        if step.get("run") == "python scripts/check_release.py"
+    )
+    assert tag_check["env"] == {
+        "RELEASE_COMMIT": "${{ github.sha }}",
+        "RELEASE_TAG": "${{ github.ref_name }}",
+    }
+    verify_commands = "\n".join(step.get("run", "") for step in verify_steps)
     assert "readme-renderer[md]>=46,<47" in verify_commands
     assert "markdown.render" in verify_commands
     assert jobs["pypi"]["needs"] == "verify-release"
@@ -76,6 +121,41 @@ def test_release_workflow_gates_publication_on_the_tested_tag_artifacts() -> Non
     assert "--notes-file" in release_commands
     assert "--verify-tag" in release_commands
     assert "dist/*.whl dist/*.tar.gz SHA256SUMS" in release_commands
+
+
+def test_release_tag_commit_must_belong_to_main_history(tmp_path: Path) -> None:
+    """Reject a correctly named tag created only on an unmerged feature branch.
+
+    Args:
+        tmp_path: Disposable Git repository used to model divergent history.
+    """
+    checks = runpy.run_path(str(ROOT / "scripts/check_release.py"))
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    run_git(repository, "init", "--initial-branch=main")
+    run_git(repository, "config", "user.name", "Release Test")
+    run_git(repository, "config", "user.email", "release@example.invalid")
+    tracked = repository / "tracked.txt"
+    tracked.write_text("main\n", encoding="utf-8")
+    run_git(repository, "add", "tracked.txt")
+    run_git(repository, "commit", "-m", "main release")
+    main_commit = run_git(repository, "rev-parse", "HEAD")
+    run_git(repository, "tag", "v2.0.0")
+    checks["check_tag_ancestry"](repository, "v2.0.0", main_commit, "refs/heads/main")
+
+    run_git(repository, "switch", "--create", "feature-release")
+    tracked.write_text("feature\n", encoding="utf-8")
+    run_git(repository, "commit", "--all", "-m", "unmerged release")
+    feature_commit = run_git(repository, "rev-parse", "HEAD")
+    run_git(repository, "tag", "v2.0.1")
+    with pytest.raises(ValueError, match="not contained in main"):
+        checks["check_tag_ancestry"](
+            repository, "v2.0.1", feature_commit, "refs/heads/main"
+        )
+    with pytest.raises(ValueError, match="does not match"):
+        checks["check_tag_ancestry"](
+            repository, "v2.0.0", feature_commit, "refs/heads/main"
+        )
 
 
 def test_ci_covers_current_package_without_removed_migration_job() -> None:
@@ -115,6 +195,13 @@ def test_ci_covers_current_package_without_removed_migration_job() -> None:
         if step.get("name") == "Report failing tests in annotations"
     )
     assert diagnostic_step["if"] == "failure()"
+
+
+def test_configured_mypy_gate_covers_runtime_demos_and_maintenance_scripts() -> None:
+    """Prevent the default typing gate from silently shrinking to package-only code."""
+    configuration = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    assert configuration["tool"]["mypy"]["files"] == ["src", "scripts"]
+    assert "ASYNC" in configuration["tool"]["ruff"]["lint"]["select"]
 
 
 def test_native_ci_requires_installed_wheel_and_all_browser_stages() -> None:
@@ -217,6 +304,18 @@ def test_minimum_constraints_match_declared_runtime_dependencies() -> None:
         )
     )
     assert constraints == minima
+
+
+def test_runtime_requirements_match_declared_dependencies_exactly() -> None:
+    """Prevent installer requirements from drifting from package metadata."""
+    with (ROOT / "pyproject.toml").open("rb") as stream:
+        declared = tuple(tomllib.load(stream)["project"]["dependencies"])
+    requirements = tuple(
+        line
+        for raw in (ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        if (line := raw.strip()) and not line.startswith("#")
+    )
+    assert requirements == declared
 
 
 @pytest.mark.parametrize("name", ["tests.yml", "release.yml"])

@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium actions implementation and supporting types."""
+"""Synchronized W3C pointer, keyboard, and wheel action-chain construction."""
 
 from __future__ import annotations
 
@@ -30,6 +29,7 @@ from typing import (
 )
 
 from aselenium import errors
+from aselenium._wait import validate_delay
 from aselenium.command import Command
 from aselenium.element import ELEMENT_KEY, Element
 from aselenium.settings import Constraint
@@ -106,7 +106,7 @@ class Actions:
         pointer: Literal["mouse", "pen", "touch"] = "mouse",
         duration: int | float = 0.2,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create an empty synchronized W3C action sequence for a session.
 
         Args:
             session: The session to perform the action chain.
@@ -134,7 +134,7 @@ class Actions:
         ):
             raise errors.InvalidArgumentError(
                 "<{}>\nArgument 'duration' must be an integer or "
-                "float with value `> 0`. Instead of: {} {}.".format(
+                "float with value `>= 0`. Instead of: {} {}.".format(
                     self.__class__.__name__, repr(duration), type(duration)
                 )
             )
@@ -299,7 +299,7 @@ class Actions:
         """Drag and drop an element (coordinates) to another element (coordinates).
 
         Notice:
-        The `drag_and_drop` method eqvivalent to the following actions:
+        The `drag_and_drop` method is equivalent to the following actions:
             - move_to(drag, drag_x, drag_y)
             - click(MouseButtons.LEFT, hold=True)
             - move_to(drop, drop_x, drop_y)
@@ -343,11 +343,11 @@ class Actions:
         """Move the pointer (mouse) to a location.
 
         Args:
-            x: X used by this operation.
-            y: Y used by this operation.
-            origin: Origin used by this operation.
-            duration: Duration used by this operation.
-            **kwargs: Keyword arguments forwarded to the wrapped operation.
+            x: Horizontal offset from ``origin`` in CSS pixels.
+            y: Vertical offset from ``origin`` in CSS pixels.
+            origin: Element or W3C origin name; ``None`` uses the viewport.
+            duration: Move duration in seconds, or ``None`` for the chain default.
+            **kwargs: Additional W3C pointer-move fields.
         """
         action = {
             "type": "pointerMove",
@@ -366,8 +366,8 @@ class Actions:
         """Press down a button of the pointer (mouse).
 
         Args:
-            button: Button used by this operation.
-            **kwargs: Keyword arguments forwarded to the wrapped operation.
+            button: WebDriver mouse-button number.
+            **kwargs: Additional W3C pointer-down fields.
         """
         self._add_pointer_action(
             {
@@ -382,19 +382,15 @@ class Actions:
         """Release a button of the pointer (mouse).
 
         Args:
-            button: Button used by this operation.
+            button: WebDriver mouse-button number.
         """
         self._add_pointer_action({"type": "pointerUp", "duration": 0, "button": button})
-
-    def _pointer_cancel(self) -> None:
-        """Cancel a pointer (mouse) action."""
-        self._add_pointer_action({"type": "pointerCancel"})
 
     def _add_pointer_action(self, action: dict[str, Any]) -> None:
         """Add a pointer (mouse) action to the chain.
 
         Args:
-            action: Action used by this operation.
+            action: Complete W3C pointer action appended to the pointer source.
         """
         if not self._pointer_actions:
             self._pointer_actions = {
@@ -412,7 +408,7 @@ class Actions:
         """Add a pause for the pointer (mouse) actions.
 
         Args:
-            duration: Duration used by this operation.
+            duration: Pause duration in protocol milliseconds.
         """
         if not self._pointer_actions:
             self._pointer_actions = {
@@ -564,21 +560,22 @@ class Actions:
         return self.pause(pause)
 
     def _key_down(self, key: str, **kwargs: Any) -> None:
-        """Press down a keyboard KEY.
+        """Append one W3C key-down action.
 
         Args:
-            key: Lookup key used by the current operation.
-            **kwargs: Keyword arguments forwarded to the wrapped operation.
+            key: WebDriver key value, including a Unicode character or
+                ``KeyboardKeys`` constant.
+            **kwargs: Optional W3C key-action fields.
         """
         self._add_key_action(
             {"type": "keyDown", "value": key, **self._adjust_kwargs(kwargs)}
         )
 
     def _key_up(self, key: str) -> None:
-        """Release a keyboard KEY.
+        """Append one W3C key-up action.
 
         Args:
-            key: Lookup key used by the current operation.
+            key: WebDriver key value previously pressed in this sequence.
         """
         self._add_key_action({"type": "keyUp", "value": key})
 
@@ -586,7 +583,7 @@ class Actions:
         """Add a keyboard action to the chain.
 
         Args:
-            action: Action used by this operation.
+            action: Complete W3C key action appended to the keyboard source.
         """
         if not self._key_actions:
             self._key_actions = {
@@ -603,7 +600,7 @@ class Actions:
         """Add a pause for the keyboard actions.
 
         Args:
-            duration: Duration used by this operation.
+            duration: Pause duration in protocol milliseconds.
         """
         if not self._key_actions:
             self._key_actions = {
@@ -674,12 +671,12 @@ class Actions:
         """Scroll the viewport to a location.
 
         Args:
-            x: X used by this operation.
-            y: Y used by this operation.
-            x_delta: X delta used by this operation.
-            y_delta: Y delta used by this operation.
-            origin: Origin used by this operation.
-            duration: Duration used by this operation.
+            x: Horizontal coordinate relative to ``origin`` in CSS pixels.
+            y: Vertical coordinate relative to ``origin`` in CSS pixels.
+            x_delta: Horizontal scroll delta in CSS pixels.
+            y_delta: Vertical scroll delta in CSS pixels.
+            origin: Element or W3C origin name; ``None`` uses the viewport.
+            duration: Scroll duration in seconds, or ``None`` for the chain default.
         """
         action = {
             "type": "scroll",
@@ -699,7 +696,7 @@ class Actions:
         """Add a wheel action to the chain.
 
         Args:
-            action: Action used by this operation.
+            action: Complete W3C scroll action appended to the wheel source.
         """
         if not self._wheel_actions:
             self._wheel_actions = {
@@ -716,7 +713,7 @@ class Actions:
         """Add a pause for the wheel actions.
 
         Args:
-            duration: Duration used by this operation.
+            duration: Pause duration in protocol milliseconds.
         """
         if not self._wheel_actions:
             self._wheel_actions = {
@@ -749,79 +746,61 @@ class Actions:
 
     # Perform -----------------------------------------------------------------------------
     async def perform(self, explicit_wait: int | float | None = None) -> None:
-        """Perform (execute) the actions chain.
+        """Dispatch the currently queued input once and optionally wait afterward.
 
-        The dispatched queue is cleared even if the request fails, so an ambiguous
-        failure cannot cause queued input to be replayed automatically. Await this
-        call before reusing the chain to build a new sequence. Cancellation
-        propagates to the caller.
+        The batch is detached before awaiting the browser, including on failure
+        or cancellation. Input queued while this request is pending belongs to
+        the next batch and cannot modify or replay the in-flight payload. Await
+        dependent sequences in order because input state belongs to the session.
 
         Args:
             explicit_wait: Optional finite, nonnegative delay in seconds after the driver
                 responds. None adds no delay. This does not wait for a specific DOM state;
                 use a condition-based wait when a page updates after the input sequence.
+
+        Raises:
+            errors.InvalidArgumentError: The delay is invalid; no input is dispatched.
+            errors.WebDriverError: The browser rejects the action sequence.
         """
-        if explicit_wait is not None and (
-            isinstance(explicit_wait, bool)
-            or not isinstance(explicit_wait, (int, float))
-            or not isfinite(explicit_wait)
-            or explicit_wait < 0
-        ):
-            raise errors.InvalidArgumentError(
-                "explicit_wait must be a finite nonnegative number"
+        validate_delay(explicit_wait)
+        batch = [
+            action
+            for action in (
+                self._pointer_actions,
+                self._key_actions,
+                self._wheel_actions,
             )
-        # Perform the actions
+            if action
+        ]
+        self._pointer_actions = {}
+        self._key_actions = {}
+        self._wheel_actions = {}
         try:
-            await self._session.execute_command(
-                Command.W3C_ACTIONS,
-                {
-                    "actions": [
-                        action
-                        for action in [
-                            self._pointer_actions,
-                            self._key_actions,
-                            self._wheel_actions,
-                        ]
-                        if action
-                    ]
-                },
-            )
+            await self._session.execute_command(Command.W3C_ACTIONS, {"actions": batch})
         except errors.MoveTargetOutOfBoundsError as err:
             raise errors.MoveTargetOutOfBoundsError(
                 f"<{self.__class__.__name__}> {err}\n"
                 "-> This might be caused by trying to perform an action to move "
-                "the pointer (mouse) or scoll the viewport out of the document."
-            )
-        finally:
-            # Clear dispatched input without losing the owning session. An
-            # ambiguous failure is not automatically replayed on another call.
-            self._pointer_actions = {}
-            self._key_actions = {}
-            self._wheel_actions = {}
-
-        # Explicit wait
-        if explicit_wait is None:
-            return None
-        try:
-            await sleep(explicit_wait)
-        except Exception as err:
-            raise errors.InvalidArgumentError(
-                "<{}>\nArgument 'explicit_wait' must "
-                "be a positive `<'int/float'>`, instead of: {} {}.".format(
-                    self.__class__.__name__, repr(explicit_wait), type(explicit_wait)
-                )
+                "the pointer (mouse) or scroll the viewport out of the document."
             ) from err
+        if explicit_wait is not None:
+            await sleep(explicit_wait)
 
     async def reset(self) -> Actions:
-        """Reset the action chain.
+        """Discard pending input and release the session's remote input state.
+
+        The pending batch is discarded before waiting for the browser. Input
+        added while release is pending remains queued for the next dispatch.
+        A failed release propagates; the remote held-key/button state may then
+        be unknown, but the discarded batch is not restored or replayed.
 
         Returns:
-            The Actions value produced by this operation.
+            This action builder, retaining only input added after reset began.
         """
-        await self._session.execute_command(Command.W3C_CLEAR_ACTIONS)
         self._pointer_actions = {}
         self._key_actions = {}
         self._wheel_actions = {}
+        await self._session.execute_command(Command.W3C_CLEAR_ACTIONS)
         return self
 
     # Utils -------------------------------------------------------------------------------
@@ -829,7 +808,7 @@ class Actions:
         """Adjust the duration to milliseconds.
 
         Args:
-            duration: Duration used by this operation.
+            duration: Seconds to convert, or ``None`` to use the chain default.
 
         Returns:
             Adjust the duration to milliseconds.
@@ -845,7 +824,7 @@ class Actions:
         ):
             raise errors.InvalidArgumentError(
                 "<{}>\nArgument 'duration' an integer or float "
-                "with value `> 0`. Instead of: {} {}.".format(
+                "with value `>= 0`. Instead of: {} {}.".format(
                     self.__class__.__name__, repr(duration), type(duration)
                 )
             )
@@ -858,17 +837,18 @@ class Actions:
             kwargs: Keyword arguments forwarded to the wrapped operation.
 
         Returns:
-            A mapping containing the adjust kwargs data.
+            Copy with snake_case keys converted to WebDriver camelCase and
+            ``None`` values removed.
         """
 
         def adjust_key(key: str) -> str:
             """Validate and normalize the key before adding it to the action sequence.
 
             Args:
-                key: Lookup key used by the current operation.
+                key: Python keyword name for a W3C action field.
 
             Returns:
-                And normalize the key before adding it to the action sequence.
+                CamelCase WebDriver field name.
             """
             if "_" in key:
                 key, *keys = key.split("_")

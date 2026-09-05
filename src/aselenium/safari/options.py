@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium options implementation and supporting types."""
+"""Safari and Safari Technology Preview capability construction."""
 
 from __future__ import annotations
 
@@ -26,31 +25,34 @@ from typing import (
 )
 
 from aselenium.logs import logger
-from aselenium.options import BaseOptions
+from aselenium.options import BaseOptions, Proxy
 
 __all__ = ["SafariOptions"]
 
 
 # Safari Options ----------------------------------------------------------------------------------
 class SafariOptions(BaseOptions):
-    """Safari options."""
+    """Build SafariDriver capabilities for standard or Technology Preview Safari.
+
+    Attributes:
+        DEFAULT_CAPABILITIES: Safari's baseline macOS session capabilities.
+    """
 
     DEFAULT_CAPABILITIES: dict[str, Any] = {
         "browserName": "safari",
         "platformName": "mac",
     }
-    "the default capabilities of the safari browser `dict[str, Any]`"
 
     def __init__(self) -> None:
-        """Initialize the instance."""
+        """Initialize Safari capabilities from their documented defaults."""
         super().__init__()
 
     # Caps: basic -------------------------------------------------------------------------
     def construct(self) -> dict[str, Any]:
-        """Construct the final capabilities for the browser.
+        """Construct an independent Safari W3C capability mapping.
 
         Returns:
-            A mapping containing the construct data.
+            A deep copy of the current Safari capabilities.
         """
         return deepcopy(self._capabilities)
 
@@ -142,11 +144,12 @@ class SafariOptions(BaseOptions):
         return None
 
     @proxy.setter
-    def proxy(self, value: str | None) -> None:
+    def proxy(self, value: Proxy | None) -> None:
         """Set the proxy.
 
         Args:
-            value: New proxy value. None is handled according to the property's reset/ignore semantics.
+            value: Ignored proxy configuration. SafariDriver does not accept the
+                cross-browser proxy capability exposed by this package.
         """
         logger.warning(
             "<{}>\nSafari does not support custom proxy configurations.".format(

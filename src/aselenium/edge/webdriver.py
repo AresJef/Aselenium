@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium webdriver implementation and supporting types."""
+"""High-level Microsoft Edge facade and its session context."""
 
 from __future__ import annotations
 
@@ -40,23 +39,23 @@ __all__ = ["Edge"]
 
 
 # Edge Session Context ----------------------------------------------------------------------------
-class EdgeSessionContext(SessionContext):
-    """The context manager for the Edge session."""
+class EdgeSessionContext(SessionContext[EdgeSession]):
+    """Provision, start, yield, and clean up one Microsoft Edge session."""
 
     _SESSION_CLS: type[EdgeSession] = EdgeSession
 
     async def __aenter__(self) -> EdgeSession:
-        """Start the owned asynchronous context and return its managed value.
+        """Start and return the Edge session owned by this context.
 
         Returns:
-            The EdgeSession value produced by this operation.
+            The running Microsoft Edge session.
         """
         return await self.start()
 
 
 # Edge Webdriver ----------------------------------------------------------------------------------
-class Edge(ChromiumBaseWebDriver):
-    """The webdriver for Edge."""
+class Edge(ChromiumBaseWebDriver[EdgeDriverManager, EdgeOptions, EdgeSessionContext]):
+    """Configure and acquire independent asynchronous Edge sessions."""
 
     def __init__(
         self,
@@ -65,18 +64,19 @@ class Edge(ChromiumBaseWebDriver):
         request_timeout: int | float = 10,
         download_timeout: int | float = 300,
         proxy: str | None = None,
-        service_timeout: int = 10,
+        service_timeout: int | float = 10,
         *service_args: Any,
         **service_kwargs: Any,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a reusable Edge facade without launching the browser.
 
         Args:
-            directory: Cache parent directory; None uses the default per-user cache location.
-            max_cache_size: Maximum retained artifact count; None leaves retention unbounded.
+            directory: Cache parent directory. ``None`` uses the per-user default.
+                Strings, ``Path`` objects, and ``os.PathLike[str]`` values are accepted.
+            max_cache_size: Maximum retained artifact count, or ``None`` for no limit.
             request_timeout: Positive timeout in seconds for vendor metadata requests.
             download_timeout: Positive total timeout in seconds for an artifact download.
-            proxy: Explicit provisioning proxy URL, or None for a direct connection.
+            proxy: Explicit HTTP provisioning proxy URL, or ``None`` for a direct connection.
             service_timeout: Positive timeout in seconds for service startup and shutdown.
             *service_args: Additional positional arguments forwarded to the service constructor.
             **service_kwargs: Additional keyword arguments forwarded to the service constructor.
@@ -122,31 +122,25 @@ class Edge(ChromiumBaseWebDriver):
         channel: Literal["stable", "beta", "dev"] = "stable",
         binary: PathInput | None = None,
     ) -> EdgeSessionContext:
-        """Acquire a new Edge session.
+        """Create a single-use context for a new Edge session.
+
+        Options are snapshotted when this method is called. Provisioning and browser
+        startup occur on entering the context, whose exit awaits owned cleanup.
 
         Args:
-            version: Defaults to `'build'`. Accepts the following values:
-                - `'major'`: Install webdriver that has the same major version as the browser.
-                - `'build'`: Install webdriver that has the same major & build version as the browser.
-                - `'patch'`: Install webdriver that has the same major, build & patch version as the browser.
-                - `'118.0.5982.0'`: Install the exact webdriver version regardless of the browser version.
-            channel: Defaults to `'stable'`. Accepts the following values:
-                - `'stable'`: Locate the `STABLE` (normal) browser binary in the system
-                and use it to determine the webdriver version.
-                - `'beta'`:   Locate the `BETA` browser binary in the system and use it to
-                determine the webdriver version.
-                - `'dev'`:    Locate the `DEV` browser binary in the system and use it to
-                determine the webdriver version.
-            binary: The path to a specific browser binary. Defaults to `None`.
-                If specified, will use this given browser binary to determine
-                the webdriver version and start the session.
+            version: A ``ChromiumVersion``, numeric version string, or resolution
+                selector. ``"build"`` matches the installed browser's build;
+                ``"major"`` allows its major version, ``"patch"`` requests its
+                exact version, and ``"offline"`` uses only local artifacts.
+            channel: Installed Edge channel: ``"stable"``, ``"beta"``, or ``"dev"``.
+            binary: Explicit installed-browser executable, or ``None`` for discovery.
+                Strings, ``Path`` objects, and ``os.PathLike[str]`` values are accepted.
 
         Returns:
-            A new single-use session context with an acquisition-time options snapshot.
+            A context yielding ``EdgeSession`` after successful startup.
 
         Example:
             >>> from aselenium import Edge
-
             >>> driver = Edge(max_cache_size=10)
             >>> try:
             ...     async with driver.acquire(version="build") as session:

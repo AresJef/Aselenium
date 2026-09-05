@@ -56,5 +56,6 @@ handling. Normal results are not guaranteed by an external website.
   and a single search stopped by Google's CAPTCHA. A normal live results page was
   not validated.
 
-The demo scripts and fixtures are included in the source distribution. They are
-not installed as public modules in the runtime wheel.
+The demo scripts and fixtures are maintained in the repository checkout. The
+production wheel and source distribution intentionally contain only the package
+and its required metadata/resources, so obtain the checkout to run the demos.

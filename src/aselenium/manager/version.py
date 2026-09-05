@@ -15,15 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium version implementation and supporting types."""
+"""Comparable browser and driver versions parsed from vendor output."""
 
 from __future__ import annotations
 
 from re import Pattern, compile
-from typing import (
-    Any,
-)
+from typing import ClassVar
 
 from aselenium import errors
 
@@ -32,23 +29,30 @@ __all__ = ["ChromiumVersion", "FirefoxVersion", "GeckoVersion", "SafariVersion"]
 
 # Version ------------------------------------------------------------------------------------------
 class Version:
-    """Represent a version (numeric only)."""
+    """Parse and compare the first supported numeric version in vendor text.
 
-    _VERSION_PATTERN: Pattern[str] = compile(r"\d+\.?\d*\.?\d*")
-    _VERSION_SEGMENTS: int = 3
+    Missing components compare as zero. Consequently, ``Version("120")`` and
+    ``Version("120.0.0")`` compare equal, while ``version`` and ``str()`` retain
+    the matched substring's original component count.
+    """
+
+    _VERSION_PATTERN: ClassVar[Pattern[str]] = compile(r"\d+(?:\.\d+){0,2}")
+    _VERSION_SEGMENTS: ClassVar[int] = 3
     _version: str
-    _versions_str: list[str]
+    _versions_str: tuple[str, ...]
     _versions_int: tuple[int, ...]
     _length: int
 
     def __init__(self, version: str | Version) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Parse vendor text or copy a compatible version instance.
 
         Args:
-            version: The version. e.g. '120.0.1'
+            version: Dotted numeric version or vendor output containing one,
+                such as ``"Firefox 120.0.1"``.
 
         Raises:
-            errors.InvalidVersionError: No supported numeric version can be parsed.
+            errors.InvalidVersionError: The value is neither text nor a
+                compatible version instance, or it contains no numeric version.
 
         Example:
             >>> from aselenium import ChromiumVersion
@@ -66,43 +70,35 @@ class Version:
 
     # Parsing -----------------------------------------------------------------------------
     def _parse_version(self, version: str | Version) -> None:
-        """Parse the version.
+        """Populate display and zero-padded comparison components.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Vendor output, dotted version text, or an instance accepted
+                by this parser class.
+
+        Raises:
+            errors.InvalidVersionError: No supported numeric version is present.
         """
-        # Parse version
-        try:
-            if not isinstance(version, str):
-                raise TypeError("Version input is not text")
-            matches = self._VERSION_PATTERN.search(version)
-        except AttributeError as err:
-            raise NotImplementedError(
-                "<Version> Class attribute '_VERSION_PATTERN' "
-                "must be implemented in subclass: <{}>.".format(self.__class__.__name__)
-            ) from err
-        except Exception as err:
-            # . already a version instance
-            if isinstance(version, self.__class__):
-                self._version = version._version
-                self._versions_str = version._versions_str
-                self._versions_int = version._versions_int
-                self._length = version._length
-                return None  # exit
-            # . failed to parse version
+        if isinstance(version, self.__class__):
+            self._version = version._version
+            self._versions_str = version._versions_str
+            self._versions_int = version._versions_int
+            self._length = version._length
+            return
+        if not isinstance(version, str):
             raise errors.InvalidVersionError(
                 "Invalid version: {} {}".format(repr(version), type(version))
-            ) from err
-        try:
-            if matches is None:
-                raise ValueError("No numeric version found")
-            self._version = matches.group(0).rstrip(".")
-            self._versions_str = self._version.split(".")
-            versions_int = [int(part) for part in self._versions_str]
-        except Exception as err:
+            )
+
+        match = self._VERSION_PATTERN.search(version)
+        if match is None:
             raise errors.InvalidVersionError(
                 "Invalid version: {} {}".format(repr(version), type(version))
-            ) from err
+            )
+
+        self._version = match.group(0)
+        self._versions_str = tuple(self._version.split("."))
+        versions_int = [int(part) for part in self._versions_str]
 
         # Check version segments
         self._length = len(self._versions_str)
@@ -116,19 +112,19 @@ class Version:
     # Version -----------------------------------------------------------------------------
     @property
     def version(self) -> str:
-        """Return the version.
+        """Return the matched numeric substring without zero-padding.
 
         Returns:
-            The version.
+            One-to-three-component version text extracted from the input.
         """
         return self._version
 
     @property
     def major(self) -> str:
-        """Return the major version. e.g. '120' for '120.0.1'.
+        """Return the first version component as text.
 
         Returns:
-            The major version. e.g. '120' for '120.0.1'.
+            Major component, such as ``"120"`` for ``"120.0.1"``.
         """
         if self._major is None:
             self._major = self._versions_str[0]
@@ -136,19 +132,20 @@ class Version:
 
     @property
     def major_num(self) -> int:
-        """Return the major version. e.g. 120 for '120.0.1'.
+        """Return the first version component as an integer.
 
         Returns:
-            The major version. e.g. 120 for '120.0.1'.
+            Major component, such as ``120`` for ``"120.0.1"``.
         """
         return self._versions_int[0]
 
     @property
     def build(self) -> str:
-        """Return the build version. e.g. '120.0' for '120.0.1'.
+        """Return text through the second component when one was present.
 
         Returns:
-            The build version. e.g. '120.0' for '120.0.1'.
+            Two-component prefix such as ``"120.0"``, or the major text for a
+            one-component input.
         """
         if self._build is None:
             if self._length < 2:
@@ -158,19 +155,19 @@ class Version:
 
     @property
     def build_num(self) -> int:
-        """Return the build version. e.g. 0 for '120.0.1'.
+        """Return the second comparison component as an integer.
 
         Returns:
-            The build version. e.g. 0 for '120.0.1'.
+            Second component, or zero when it was absent from the input.
         """
         return self._versions_int[1]
 
     @property
     def patch(self) -> str:
-        """Return the patch version. e.g. '120.0.1' for '120.0.1'.
+        """Return text through the third component when one was present.
 
         Returns:
-            The patch version. e.g. '120.0.1' for '120.0.1'.
+            Complete three-component text, or the longest shorter prefix parsed.
         """
         if self._patch is None:
             if self._length < 3:
@@ -180,145 +177,152 @@ class Version:
 
     @property
     def patch_num(self) -> int:
-        """Return the patch version. e.g. 1 for '120.0.1'.
+        """Return the third comparison component as an integer.
 
         Returns:
-            The patch version. e.g. 1 for '120.0.1'.
+            Third component, or zero when it was absent from the input.
         """
         return self._versions_int[2]
 
     # Special Methods ---------------------------------------------------------------------
     def __repr__(self) -> str:
-        """Return a diagnostic representation of this instance.
+        """Return the Python representation of the matched version text.
 
         Returns:
-            A diagnostic representation of this instance.
+            Quoted version text suitable for diagnostics.
         """
         return self._version.__repr__()
 
     def __str__(self) -> str:
-        """Return the human-readable string representation.
+        """Return the matched version text.
 
         Returns:
-            The human-readable string representation.
+            Version substring without comparison padding.
         """
         return self._version
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Hash the zero-padded numeric comparison components.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            Hash consistent with equality between abbreviated versions.
         """
         return hash(self._versions_int)
 
-    def __eq__(self, other: Any) -> bool:
-        """Return whether this instance compares equal to another object.
+    def __eq__(self, other: object) -> bool:
+        """Compare normalized components with a compatible version object.
 
         Args:
-            other: Object to compare with this instance.
+            other: Candidate version object.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` when numeric components match, ``False`` when they differ,
+            or ``NotImplemented`` for an incompatible type.
         """
         if isinstance(other, self.__class__):
             return self._versions_int == other._versions_int
         return NotImplemented
 
-    def __gt__(self, other: Any) -> bool:
-        """Return whether this instance sorts after another object.
+    def __gt__(self, other: object) -> bool:
+        """Compare whether this normalized version sorts after another.
 
         Args:
-            other: Object to compare with this instance.
+            other: Candidate version object.
 
         Returns:
-            True if this instance sorts after another object; otherwise False.
+            Comparison result, or ``NotImplemented`` for an incompatible type.
         """
         if isinstance(other, self.__class__):
             return self._versions_int > other._versions_int
         return NotImplemented
 
-    def __lt__(self, other: Any) -> bool:
-        """Return whether this instance sorts before another object.
+    def __lt__(self, other: object) -> bool:
+        """Compare whether this normalized version sorts before another.
 
         Args:
-            other: Object to compare with this instance.
+            other: Candidate version object.
 
         Returns:
-            True if this instance sorts before another object; otherwise False.
+            Comparison result, or ``NotImplemented`` for an incompatible type.
         """
         if isinstance(other, self.__class__):
             return self._versions_int < other._versions_int
         return NotImplemented
 
-    def __ge__(self, other: Any) -> bool:
-        """Return whether this instance sorts after or equal to another object.
+    def __ge__(self, other: object) -> bool:
+        """Compare whether this normalized version is at least another.
 
         Args:
-            other: Object to compare with this instance.
+            other: Candidate version object.
 
         Returns:
-            True if this instance sorts after or equal to another object; otherwise False.
+            Comparison result, or ``NotImplemented`` for an incompatible type.
         """
         if isinstance(other, self.__class__):
             return self._versions_int >= other._versions_int
         return NotImplemented
 
-    def __le__(self, other: Any) -> bool:
-        """Return whether this instance sorts before or equal to another object.
+    def __le__(self, other: object) -> bool:
+        """Compare whether this normalized version is at most another.
 
         Args:
-            other: Object to compare with this instance.
+            other: Candidate version object.
 
         Returns:
-            True if this instance sorts before or equal to another object; otherwise False.
+            Comparison result, or ``NotImplemented`` for an incompatible type.
         """
         if isinstance(other, self.__class__):
             return self._versions_int <= other._versions_int
         return NotImplemented
 
-    def __ne__(self, other: Any) -> bool:
-        """Return whether this instance differs from another object.
+    def __ne__(self, other: object) -> bool:
+        """Compare normalized components for inequality.
 
         Args:
-            other: Object to compare with this instance.
+            other: Candidate version object.
 
         Returns:
-            True if this instance differs from another object; otherwise False.
+            ``True`` when numeric components differ, ``False`` when they match,
+            or ``NotImplemented`` for an incompatible type.
         """
         if isinstance(other, self.__class__):
             return self._versions_int != other._versions_int
         return NotImplemented
 
     def __len__(self) -> int:
-        """Return the number of stored items.
+        """Return the number of components present in the parsed source text.
 
         Returns:
-            The number of stored items.
+            Component count before missing comparison components are zero-padded.
         """
         return self._length
 
     def __bool__(self) -> bool:
-        """Return the truth value of this instance.
+        """Keep every successfully parsed version truthy.
 
         Returns:
-            True; instances of this value type are always truthy.
+            Always ``True``.
         """
         return True
 
 
 # Chromium Version ---------------------------------------------------------------------------------
 class ChromiumVersion(Version):
-    """Represent a Chromium based browser/webdriver version."""
+    """Parse and compare up to four Chromium-family version components."""
 
-    _VERSION_PATTERN: Pattern[str] = compile(r"\d+\.?\d*\.?\d*\.?\d*")
-    _VERSION_SEGMENTS: int = 4
+    _VERSION_PATTERN: ClassVar[Pattern[str]] = compile(r"\d+(?:\.\d+){0,3}")
+    _VERSION_SEGMENTS: ClassVar[int] = 4
 
-    def __init__(self, version: Any) -> None:
-        """Initialize the instance with the supplied configuration.
+    def __init__(self, version: str | ChromiumVersion) -> None:
+        """Parse Chromium version text or copy another Chromium version.
 
         Args:
-            version: The version. e.g. '113.0.5672.123'
+            version: Dotted version or vendor output containing one, such as
+                ``"Google Chrome 113.0.5672.123"``.
+
+        Raises:
+            errors.InvalidVersionError: No Chromium-style numeric version can
+                be parsed.
         """
         super().__init__(version)
         # Version
@@ -330,10 +334,10 @@ class ChromiumVersion(Version):
     # Version -----------------------------------------------------------------------------
     @property
     def major(self) -> str:
-        """Return the major version. e.g. '113' for '113.0.5672.123'.
+        """Return the Chromium major component as text.
 
         Returns:
-            The major version. e.g. '113' for '113.0.5672.123'.
+            Major component, such as ``"113"`` for ``"113.0.5672.123"``.
         """
         if self._major is None:
             self._major = self._versions_str[0]
@@ -341,19 +345,20 @@ class ChromiumVersion(Version):
 
     @property
     def major_num(self) -> int:
-        """Return the major version. e.g. 113 for '113.0.5672.123'.
+        """Return the Chromium major component as an integer.
 
         Returns:
-            The major version. e.g. 113 for '113.0.5672.123'.
+            Major component, such as ``113`` for ``"113.0.5672.123"``.
         """
         return self._versions_int[0]
 
     @property
     def minor(self) -> str:
-        """Return the minor version. e.g. '113.0' for '113.0.5672.123'.
+        """Return text through the Chromium minor component when present.
 
         Returns:
-            The minor version. e.g. '113.0' for '113.0.5672.123'.
+            Two-component prefix such as ``"113.0"``, or the major text for a
+            one-component input.
         """
         if self._minor is None:
             if self._length < 2:
@@ -363,19 +368,20 @@ class ChromiumVersion(Version):
 
     @property
     def minor_num(self) -> int:
-        """Return the minor version. e.g. 0 for '113.0.5672.123'.
+        """Return the Chromium minor comparison component as an integer.
 
         Returns:
-            The minor version. e.g. 0 for '113.0.5672.123'.
+            Second component, or zero when it was absent from the input.
         """
         return self._versions_int[1]
 
     @property
     def build(self) -> str:
-        """Return the build version. e.g. '113.0.5672' for '113.0.5672.123'.
+        """Return text through the Chromium build component when present.
 
         Returns:
-            The build version. e.g. '113.0.5672' for '113.0.5672.123'.
+            Three-component prefix such as ``"113.0.5672"``. Inputs without a
+            build component fall back to the major text.
         """
         if self._build is None:
             if self._length < 3:
@@ -385,19 +391,19 @@ class ChromiumVersion(Version):
 
     @property
     def build_num(self) -> int:
-        """Return the build version. e.g. 5672 for '113.0.5672.123'.
+        """Return the Chromium build comparison component as an integer.
 
         Returns:
-            The build version. e.g. 5672 for '113.0.5672.123'.
+            Third component, or zero when it was absent from the input.
         """
         return self._versions_int[2]
 
     @property
     def patch(self) -> str:
-        """Return the patch version. e.g. '113.0.5672.123' for '113.0.5672.123'.
+        """Return text through the Chromium patch component when present.
 
         Returns:
-            The patch version. e.g. '113.0.5672.123' for '113.0.5672.123'.
+            Complete four-component text, or the longest supported shorter view.
         """
         if self._patch is None:
             if self._length < 4:
@@ -407,24 +413,24 @@ class ChromiumVersion(Version):
 
     @property
     def patch_num(self) -> int:
-        """Return the patch version. e.g. 123 for '113.0.5672.123'.
+        """Return the Chromium patch comparison component as an integer.
 
         Returns:
-            The patch version. e.g. 123 for '113.0.5672.123'.
+            Fourth component, or zero when it was absent from the input.
         """
         return self._versions_int[3]
 
 
 # Firefox Version ----------------------------------------------------------------------------------
 class FirefoxVersion(Version):
-    """Represent a Firefox browser version."""
+    """Parse and compare up to three Firefox browser version components."""
 
 
 # Gecko Version ------------------------------------------------------------------------------------
 class GeckoVersion(Version):
-    """Represent a Gecko driver version."""
+    """Parse and compare up to three geckodriver version components."""
 
 
 # Safari Version -----------------------------------------------------------------------------------
 class SafariVersion(Version):
-    """Represent a Safari browser version."""
+    """Parse and compare up to three Safari browser version components."""

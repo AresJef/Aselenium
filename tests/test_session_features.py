@@ -215,6 +215,35 @@ async def test_scalar_and_collection_properties(
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "attribute,value",
+    [
+        ("url", None),
+        ("title", 7),
+        ("page_source", {}),
+        ("cast_sinks", {}),
+        ("cast_sinks", [{"name": "valid"}, "invalid"]),
+        ("cast_issue", None),
+        ("log_types", "browser"),
+        ("log_types", ["browser", 7]),
+    ],
+)
+async def test_typed_properties_reject_malformed_response_values(
+    harness: SessionHarness, attribute: str, value: object
+) -> None:
+    """Reject response values that violate the public property's return type.
+
+    Args:
+        harness: Session with a recording transport.
+        attribute: Awaitable public property to inspect.
+        value: Malformed response value.
+    """
+    harness.execute.return_value = {"value": value}
+    with pytest.raises(errors.InvalidResponseError):
+        await getattr(harness.session, attribute)
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize("method", ["wait_until_url", "wait_until_title"])
 @pytest.mark.parametrize(
     "condition,value",
@@ -332,14 +361,19 @@ async def test_print_options_serialization(harness: SessionHarness) -> None:
     "options",
     [
         {"orientation": "diagonal"},
+        {"scale": float("nan")},
+        {"scale": float("inf")},
         {"scale": 0.09},
         {"scale": 2.1},
         {"background": "yes"},
+        {"page_width": True},
         {"page_width": -1},
         {"page_height": "wide"},
         {"margin_top": -1},
         {"shrink_to_fit": 1},
         {"page_ranges": "1-3"},
+        {"page_ranges": [""]},
+        {"page_ranges": [1]},
     ],
 )
 async def test_print_options_reject_invalid_values(
@@ -518,6 +552,23 @@ async def test_window_registry_refresh_and_rename(harness: SessionHarness) -> No
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("value", [None, "", 1, False, [], {}])
+async def test_active_window_rejects_malformed_handle(
+    harness: SessionHarness, value: Any
+) -> None:
+    """Reject missing, empty, or non-string focused-window handles.
+
+    Args:
+        harness: Session with a recording transport.
+        value: Malformed focused-window handle.
+    """
+    harness.execute.return_value = {"value": value}
+
+    with pytest.raises(errors.InvalidResponseError):
+        await harness.session.active_window
+
+
+@pytest.mark.asyncio
 async def test_new_switch_and_close_window(harness: SessionHarness) -> None:
     """Create a named tab, switch by its name, and close back to the prior window.
 
@@ -576,7 +627,7 @@ async def test_missing_window_is_a_typed_error(
     """
     harness.execute.return_value = {"value": []}
     arguments = ("missing", "renamed") if method == "rename_window" else ("missing",)
-    with pytest.raises(errors.WindowNotFountError):
+    with pytest.raises(errors.WindowNotFoundError):
         await getattr(harness.session, method)(*arguments)
 
 
@@ -806,6 +857,18 @@ async def test_cdp_cache_execution_and_lifecycle(harness: SessionHarness) -> Non
         await harness.session.execute_cdp_cmd("Runtime.evaluate")
 
 
+@pytest.mark.asyncio
+async def test_cdp_rejects_nonmapping_result(harness: SessionHarness) -> None:
+    """Require a mapping result from Chromium's DevTools command endpoint.
+
+    Args:
+        harness: Session with a recording transport.
+    """
+    harness.execute.return_value = {"value": []}
+    with pytest.raises(errors.InvalidResponseError):
+        await harness.session.execute_cdp_cmd("Browser.getVersion")
+
+
 @pytest.mark.parametrize("name", ["", None, 3])
 def test_cdp_cache_rejects_invalid_names(harness: SessionHarness, name: Any) -> None:
     """Reject non-string and empty CDP cache keys.
@@ -1010,6 +1073,9 @@ async def test_log_read_and_unsupported_type(harness: SessionHarness) -> None:
     harness.execute.return_value = {}
     with pytest.raises(errors.InvalidResponseError):
         await harness.session.get_logs("browser")
+    harness.execute.return_value = {"value": [{"level": "INFO"}, "invalid"]}
+    with pytest.raises(errors.InvalidResponseError):
+        await harness.session.get_logs("browser")
 
 
 @pytest.mark.asyncio
@@ -1068,6 +1134,42 @@ async def test_page_geometry_queries(
     harness.execute.side_effect = errors.InvalidJavaScriptError("geometry unavailable")
     with pytest.raises(errors.InvalidResponseError):
         await getattr(harness.session, attribute)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("attribute", ["page_width", "page_height"])
+@pytest.mark.parametrize("value", [True, False, None, 1.5, "1200", [], {}])
+async def test_page_dimensions_require_nonboolean_integers(
+    harness: SessionHarness, attribute: str, value: Any
+) -> None:
+    """Reject malformed script values for integer page dimensions.
+
+    Args:
+        harness: Session with a recording transport.
+        attribute: Page-dimension property under test.
+        value: Malformed script result.
+    """
+    harness.execute.return_value = {"value": value}
+
+    with pytest.raises(errors.InvalidResponseError):
+        await getattr(harness.session, attribute)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", [None, 1, "false", [], {}])
+async def test_page_element_existence_core_requires_boolean(
+    harness: SessionHarness, value: Any
+) -> None:
+    """Reject non-boolean values from the page-level existence script.
+
+    Args:
+        harness: Session with a recording transport.
+        value: Malformed script result.
+    """
+    harness.execute.return_value = {"value": value}
+
+    with pytest.raises(errors.InvalidResponseError):
+        await harness.session._element_exists_no_wait("#child", "css selector")
 
 
 @pytest.mark.asyncio
@@ -1600,6 +1702,7 @@ async def test_cdp_name_lookup_and_falsey_overrides(
         harness: Session with a recording transport.
         key_kind: Supported name-equivalent cache key representation.
     """
+    harness.execute.return_value = {"value": {}}
     command = harness.session.cache_cdp_cmd("network", "Network.enable", enabled=True)
     keys = {
         "name": "network",
@@ -1623,7 +1726,17 @@ async def test_cdp_name_lookup_and_falsey_overrides(
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     "value",
-    [None, 1, "secret", [], {}, {"value": "secret"}, {1: "secret", "name": "key"}],
+    [
+        None,
+        1,
+        "secret",
+        [],
+        {},
+        {"value": "secret"},
+        {"name": 1, "value": "secret"},
+        {"name": "", "value": "secret"},
+        {1: "secret", "name": "key"},
+    ],
 )
 async def test_cookie_collection_rejects_invalid_members(
     harness: SessionHarness, value: Any
@@ -1658,6 +1771,23 @@ async def test_cookie_collection_preserves_empty_order_and_metadata(
     parsed = await harness.session.cookies
     assert [cookie.name for cookie in parsed] == ["b", "a"]
     assert [cookie.dict for cookie in parsed] == values
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("name", ["", 1, False, None])
+async def test_get_cookie_rejects_malformed_remote_name(
+    harness: SessionHarness, name: Any
+) -> None:
+    """Reject a malformed name in an otherwise object-shaped cookie response.
+
+    Args:
+        harness: Session with a recording transport.
+        name: Invalid remote cookie name.
+    """
+    harness.execute.return_value = {"value": {"name": name, "value": "opaque"}}
+
+    with pytest.raises(errors.InvalidResponseError):
+        await harness.session.get_cookie("requested")
 
 
 @pytest.mark.asyncio
@@ -1696,6 +1826,9 @@ def test_cookie_copy_and_name_validation() -> None:
     assert copied.data == {"name": "copied", "value": "opaque", "path": "/"}
     with pytest.raises(errors.InvalidArgumentError):
         copied.name = ""
+    for value in ("", 1, False, None):
+        with pytest.raises(errors.InvalidArgumentError):
+            Cookie(name=value, value="opaque")
     with pytest.raises(errors.InvalidArgumentError):
         Cookie(value="missing name")
 

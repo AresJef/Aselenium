@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium service implementation and supporting types."""
+"""Lifecycle and process ownership for local WebDriver services."""
 
 from __future__ import annotations
 
@@ -24,7 +23,8 @@ import asyncio
 from asyncio import TimeoutError, sleep
 from errno import EACCES, ENOENT
 from math import isfinite
-from os import environ
+from os import PathLike, environ
+from pathlib import Path
 from platform import system
 from socket import AF_INET, SOCK_STREAM, create_connection, socket
 from subprocess import DEVNULL, Popen, TimeoutExpired
@@ -32,9 +32,10 @@ from time import monotonic as unix_time
 from typing import (
     TYPE_CHECKING,
     Any,
+    cast,
 )
 
-from aiohttp import ClientConnectorError, ClientSession
+from aiohttp import ClientError, ClientSession
 from psutil import NoSuchProcess, Process
 
 from aselenium import errors
@@ -47,7 +48,7 @@ if TYPE_CHECKING:
 
 # Base Service ------------------------------------------------------------------------------------
 class BaseService:
-    """The base class for the webdriver service.
+    """Manage a local WebDriver service process and status client.
 
     Service launch a subprocess as the interim process
     to communicate with the browser.
@@ -63,13 +64,13 @@ class BaseService:
         *args: Any,
         **kwargs: Any,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Validate an executable and configure one reusable driver service.
 
         Service launch a subprocess as the interim process to communicate with the browser.
 
         Args:
-            driver_version: The version of the webdriver executable.
-            driver_location: The path to the webdriver executable.
+            driver_version: Version of the WebDriver executable.
+            driver_location: Path to the WebDriver executable.
             timeout: Timeout in seconds for starting/stopping the service. Defaults to `10`.
             *args: Additional arguments for `subprocess.Popen` constructor.
             **kwargs: Additional keyword arguments for `subprocess.Popen` constructor.
@@ -79,7 +80,7 @@ class BaseService:
             self._driver_location = file_path(driver_location)
         except Exception as err:
             raise errors.ServiceExecutableNotFoundError(
-                "`<{}>`\nService webdriver executable not found at: {}".format(
+                "`<{}>`\nService WebDriver executable not found at: {}".format(
                     self.__class__.__name__, repr(driver_location)
                 )
             ) from err
@@ -105,21 +106,21 @@ class BaseService:
     # Driver ------------------------------------------------------------------------------
     @property
     def driver_version(self) -> Version:
-        """Return the version of the webdriver executable.
+        """Return the version of the WebDriver executable.
 
         Returns:
-            The version of the webdriver executable.
+            The version of the WebDriver executable.
         """
         return self._driver_version
 
     @property
-    def driver_location(self) -> str:
-        """Return the location for the webdriver executable.
+    def driver_location(self) -> Path:
+        """Return the validated WebDriver executable path.
 
         Returns:
-            The location for the webdriver executable.
+            The absolute ``Path`` retained by the service for its full lifecycle.
         """
-        return str(self._driver_location)
+        return self._driver_location
 
     # Timeout -----------------------------------------------------------------------------
     @property
@@ -172,6 +173,7 @@ class BaseService:
         """
         if self._port == -1:
             self.port
+        assert self._port_str is not None
         return self._port_str
 
     @property
@@ -245,7 +247,7 @@ class BaseService:
         """Check if the socket port is in use.
 
         Args:
-            port: Port used by this operation.
+            port: TCP port number to probe on localhost.
 
         Returns:
             True if the socket port is in use; otherwise False.
@@ -265,7 +267,7 @@ class BaseService:
         """Remove the socket port from the service.
 
         Args:
-            port: Port used by this operation.
+            port: Reserved TCP port number to release.
         """
         try:
             self.__PORTS.remove(port)
@@ -296,8 +298,11 @@ class BaseService:
         Returns:
             True if the service process is running; otherwise False.
         """
+        process = self._process
+        if process is None:
+            return False
         try:
-            return self._process.is_running()
+            return process.is_running()
         except Exception:
             return False
 
@@ -309,7 +314,7 @@ class BaseService:
 
         # Start process
         try:
-            options = dict(
+            options: dict[str, Any] = dict(
                 stdin=DEVNULL,
                 stdout=DEVNULL,
                 stderr=DEVNULL,
@@ -320,22 +325,30 @@ class BaseService:
             options.update(self._kwargs)
             if options.get("shell"):
                 raise errors.ServiceProcessError("Service commands cannot use a shell")
-            process = Popen(
-                [str(self._driver_location), *self.port_args, *self._args], **options
-            )
+            command: list[str | bytes | PathLike[str] | PathLike[bytes]] = [
+                self._driver_location,
+                *self.port_args,
+            ]
+            for argument in self._args:
+                if not isinstance(argument, (str, bytes, PathLike)):
+                    raise errors.ServiceProcessError(
+                        "Service command arguments must be text, bytes, or path-like"
+                    )
+                command.append(argument)
+            process: Popen[bytes] = Popen(command, **options)
             self._popen = process
             self._process = Process(process.pid)
         except OSError as err:
             if err.errno == ENOENT:
                 raise errors.ServiceProcessError(
-                    "<{}>\nService webdriver executable not "
+                    "<{}>\nService WebDriver executable not "
                     "found at: '{}'\nError: {}".format(
                         self.__class__.__name__, self._driver_location, err
                     )
                 ) from err
             elif err.errno == EACCES:
                 raise errors.ServiceProcessError(
-                    "<{}>\nService webdriver executable may not have the "
+                    "<{}>\nService WebDriver executable may not have the "
                     "correct permissions: '{}'\nError: {}".format(
                         self.__class__.__name__, self._driver_location, err
                     )
@@ -477,8 +490,11 @@ class BaseService:
         Returns:
             True if the service http session is connectable; otherwise False.
         """
+        session = self._session
+        if session is None:
+            return False
         try:
-            return not self._session.closed
+            return not session.closed
         except Exception:
             return False
 
@@ -506,7 +522,10 @@ class BaseService:
 
     async def _shutdown_remote(self) -> None:
         """Request driver shutdown before local process cleanup."""
-        async with self._session.post("/shutdown", timeout=1):
+        session = self._session
+        if session is None:
+            return
+        async with session.post("/shutdown", timeout=1):
             pass
 
     # Service -----------------------------------------------------------------------------
@@ -550,6 +569,8 @@ class BaseService:
                     await self._stop_owned()
                 await run_blocking(self._start_process)
                 self._start_session()
+                session = self._session
+                assert session is not None
                 deadline = unix_time() + self._timeout
                 while unix_time() < deadline:
                     if not self.process_running:
@@ -557,18 +578,18 @@ class BaseService:
                             "Service exited during startup"
                         )
                     try:
-                        async with self._session.get(
+                        async with session.get(
                             "/status", timeout=min(1, max(0.01, deadline - unix_time()))
                         ) as response:
-                            payload = await response.json()
-                            if (
-                                response.status == 200
-                                and isinstance(payload, dict)
-                                and isinstance(payload.get("value"), dict)
-                                and payload["value"].get("ready") is True
-                            ):
-                                return
-                    except (ClientConnectorError, TimeoutError, ValueError):
+                            if response.status == 200:
+                                payload = await response.json()
+                                if (
+                                    isinstance(payload, dict)
+                                    and isinstance(payload.get("value"), dict)
+                                    and payload["value"].get("ready") is True
+                                ):
+                                    return
+                    except (ClientError, TimeoutError, ValueError):
                         pass
                     await sleep(min(0.1, max(0, deadline - unix_time())))
                 raise errors.ServiceStartError(
@@ -613,23 +634,23 @@ class BaseService:
         return "<%s (url=%r)>" % (self.__class__.__name__, self._url)
 
     def __hash__(self) -> int:
-        """Return the hash used by sets and dictionary keys.
+        """Return a stable identity hash for this mutable process owner.
 
         Returns:
-            The hash used by sets and dictionary keys.
+            The service object's identity.
         """
         return id(self)
 
     def __eq__(self, __o: object) -> bool:
-        """Return whether this instance compares equal to another object.
+        """Return whether another reference is this exact service owner.
 
         Args:
             __o: Object to compare with this instance.
 
         Returns:
-            True if this instance compares equal to another object; otherwise False.
+            ``True`` only for this same object.
         """
-        return hash(self) == hash(__o) if isinstance(__o, self.__class__) else False
+        return self is __o
 
     def __del__(self) -> None:
         """Release references during finalization; explicit cleanup remains preferred."""
@@ -642,17 +663,17 @@ class BaseService:
 
 # Chromium Base Service ---------------------------------------------------------------------------
 class ChromiumBaseService(BaseService):
-    """The base class for the chromium based webdriver service."""
+    """Manage a Chromium-family WebDriver service process."""
 
     # Driver ------------------------------------------------------------------------------
     @property
     def driver_version(self) -> ChromiumVersion:
-        """Return the version of the webdriver executable.
+        """Return the version of the WebDriver executable.
 
         Returns:
-            The version of the webdriver executable.
+            The version of the WebDriver executable.
         """
-        return self._driver_version
+        return cast("ChromiumVersion", self._driver_version)
 
     # Socket ------------------------------------------------------------------------------
     @property

@@ -56,7 +56,7 @@ def test_base_service_public_state_and_abstract_port_arguments(
     version = ChromiumVersion("120.0.1.2")
     service = BaseService(version, executable, timeout=2.5)
     assert service.driver_version is version
-    assert service.driver_location == str(executable)
+    assert service.driver_location == executable
     assert service._driver_location == executable
     assert service.timeout == 2.5
     assert service.process is None
@@ -95,22 +95,23 @@ async def test_session_context_retains_paths_across_installation_handoff(
             "64",
             False,
         ),
-        str(driver),
+        driver,
         "120.0.1.2",
-        str(browser),
+        browser,
         "120.0.1.2",
         "stable",
     )
-    cache = SimpleNamespace(lease=Mock(return_value=None))
+    cache = SimpleNamespace(_lease_path=Mock(return_value=None))
     manager = SimpleNamespace(
         _file_manager=cache,
         install_result=AsyncMock(return_value=installation),
-        _parse_browser_version=Mock(return_value="parsed-browser-version"),
+        _parse_browser_version=Mock(return_value=ChromiumVersion("120.0.1.2")),
         _parse_driver_version=Mock(return_value="parsed-driver-version"),
     )
     service_factory = Mock(return_value=SimpleNamespace(stop=AsyncMock()))
     session = SimpleNamespace(start=AsyncMock(), quit=AsyncMock())
     session_factory = Mock(return_value=session)
+    options = ChromeOptions()
     context = SessionContext(
         manager,
         (),
@@ -119,19 +120,19 @@ async def test_session_context_retains_paths_across_installation_handoff(
         7,
         (),
         {},
-        SimpleNamespace(arguments=(), browser_version=None, browser_location=None),
+        options,
     )
     context._SESSION_CLS = session_factory
 
     assert await context.start() is session
 
-    lease_paths = [call.args[0] for call in cache.lease.call_args_list]
+    lease_paths = [call.args[0] for call in cache._lease_path.call_args_list]
     assert len(lease_paths) == 2
     assert all(isinstance(location, Path) for location in lease_paths)
     assert service_factory.call_args.args[1] is lease_paths[0]
     assert context._options.browser_location is lease_paths[1]
-    assert installation.driver_location == str(driver)
-    assert installation.browser_location == str(browser)
+    assert installation.driver_location is driver
+    assert installation.browser_location is browser
     session.start.assert_awaited_once_with()
 
     await context.quit()
@@ -154,6 +155,30 @@ def test_service_timeout_invalid_update_preserves_current_value(
     with pytest.raises(errors.InvalidArgumentError):
         service.timeout = timeout
     assert service.timeout == 2
+
+
+@pytest.mark.parametrize(
+    "timeout", [0, -1, True, None, "1", float("inf"), float("nan")]
+)
+def test_facade_rejects_invalid_service_timeout_eagerly(
+    tmp_path: Path, timeout: Any
+) -> None:
+    """Reject an unusable service deadline while constructing the facade.
+
+    Args:
+        tmp_path: Existing cache parent used by the manager constructor.
+        timeout: Nonnumeric, boolean, nonfinite, or nonpositive deadline.
+    """
+    with pytest.raises(errors.InvalidArgumentError, match="service_timeout"):
+        WebDriver(
+            ChromeDriverManager,
+            ChromeService,
+            ChromeOptions,
+            ChromeSessionContext,
+            directory=tmp_path,
+            service_timeout=timeout,
+        )
+    assert not (tmp_path / ".aselenium").exists()
 
 
 def test_service_port_allocation_skips_busy_and_reserved_ports(

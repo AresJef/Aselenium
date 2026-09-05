@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import ast
 import copy
 import json
 import runpy
@@ -21,6 +22,24 @@ try:
 finally:
     sys.path[:] = _IMPORT_PATH
 COVERAGE = runpy.run_path(str(ROOT / "scripts/check_coverage.py"))
+
+
+@pytest.mark.parametrize(
+    "relative",
+    (
+        "scripts/smoke_browser.py",
+        "scripts/benchmark_download.py",
+        "scripts/benchmark_manager.py",
+    ),
+)
+def test_operational_validations_survive_optimized_python(relative: str) -> None:
+    """Keep acceptance and benchmark checks active when ``assert`` is removed.
+
+    Args:
+        relative: Repository-relative operational script to inspect.
+    """
+    tree = ast.parse((ROOT / relative).read_text(), filename=relative)
+    assert not [node.lineno for node in ast.walk(tree) if isinstance(node, ast.Assert)]
 
 
 def report(browser: str = "chrome") -> dict[str, Any]:

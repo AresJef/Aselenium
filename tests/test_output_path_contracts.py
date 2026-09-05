@@ -12,12 +12,22 @@ from unittest.mock import AsyncMock
 import pytest
 
 from aselenium import errors
-from aselenium._paths import parse_path
+from aselenium._paths import (
+    directory_path as validate_dir,
+)
+from aselenium._paths import (
+    file_path as validate_file,
+)
+from aselenium._paths import (
+    parse_path,
+)
+from aselenium._paths import (
+    save_file_path as validate_save_file_path,
+)
 from aselenium.chrome.options import ChromeOptions
 from aselenium.element import Element
 from aselenium.firefox.options import FirefoxOptions
 from aselenium.firefox.session import FirefoxSession
-from aselenium.utils import validate_dir, validate_file, validate_save_file_path
 
 
 class TextPath:
@@ -40,6 +50,21 @@ class TextPath:
         """
         self.calls += 1
         return self.value
+
+
+class DeceptivePath(TextPath):
+    """Compare equal to every object while still exposing a distinct path value."""
+
+    def __eq__(self, other: object) -> bool:
+        """Return true regardless of the comparison target.
+
+        Args:
+            other: Ignored comparison target.
+
+        Returns:
+            Always true, to exercise validation before equality shortcuts.
+        """
+        return True
 
 
 @pytest.fixture
@@ -247,8 +272,8 @@ def test_input_validators_make_relative_pathlikes_absolute(
         "custom": TextPath(target.name),
     }[path_kind]
     result = validate(source)
-    assert result == str(target) and isinstance(result, str)
-    assert Path(result).samefile(target)
+    assert result == target and isinstance(result, Path)
+    assert result.samefile(target)
 
 
 @pytest.mark.parametrize("kind", ["file", "directory"])
@@ -277,8 +302,8 @@ def test_input_validators_expand_home_and_preserve_symlink_names(
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("USERPROFILE", str(home))
     result = validate("~/alias")
-    assert result == str(alias)
-    assert Path(result).samefile(target)
+    assert result == alias
+    assert result.samefile(target)
 
 
 @pytest.mark.parametrize("kind", ["file", "directory"])
@@ -312,9 +337,9 @@ def test_input_validators_preserve_native_symlink_parent_traversal(
     assert target_is_native is not decoy_is_native
 
     result = validate(source)
-    assert Path(result).is_absolute() and ".." in Path(result).parts
-    assert Path(result).samefile(target) is target_is_native
-    assert Path(result).samefile(decoy) is decoy_is_native
+    assert result.is_absolute() and ".." in result.parts
+    assert result.samefile(target) is target_is_native
+    assert result.samefile(decoy) is decoy_is_native
 
 
 @pytest.mark.asyncio
@@ -341,7 +366,7 @@ async def test_output_path_preserves_symlink_parent_destination(
     launch_is_native = native_parent.samefile(launch)
     assert actual_is_native is not launch_is_native
     validated = validate_save_file_path("launch/link/../capture", ".png")
-    assert Path(validated).is_absolute() and ".." in Path(validated).parts
+    assert validated.is_absolute() and ".." in validated.parts
 
     assert await output_session.save_screenshot("launch/link/../capture") is True
     expected_parent = actual if actual_is_native else launch
@@ -374,7 +399,26 @@ async def test_relative_upload_and_browser_binary_are_stored_as_absolute_paths(
     browser_path = TextPath("fixture")
     options.browser_location = browser_path
     assert browser_path.calls == 1
-    assert options.browser_location == str(target)
+    assert options.browser_location == target
+
+
+def test_browser_location_validates_before_comparing_with_existing_path(
+    tmp_path: Path,
+) -> None:
+    """Prevent adversarial equality from bypassing executable-path validation.
+
+    Args:
+        tmp_path: Isolated directory holding the existing browser executable.
+    """
+    binary = tmp_path / "browser"
+    binary.touch()
+    options = ChromeOptions()
+    options.browser_location = binary
+
+    with pytest.raises(errors.InvalidOptionsError):
+        options.browser_location = DeceptivePath(str(tmp_path / "missing"))
+
+    assert options.browser_location == binary
 
 
 def test_directory_validator_accepts_explicit_current_directory_and_root(
@@ -387,9 +431,9 @@ def test_directory_validator_accepts_explicit_current_directory_and_root(
         monkeypatch: Fixture restoring the working directory after the test.
     """
     monkeypatch.chdir(tmp_path)
-    assert validate_dir(Path(".")) == str(tmp_path)
+    assert validate_dir(Path(".")) == tmp_path
     root = Path(tmp_path.anchor)
-    assert validate_dir(root) == str(root)
-    assert validate_dir("~") == str(Path.home())
+    assert validate_dir(root) == root
+    assert validate_dir("~") == Path.home()
     with pytest.raises(errors.AseleniumFileNotFoundError):
         validate_file(root)

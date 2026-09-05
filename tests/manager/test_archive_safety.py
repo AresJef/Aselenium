@@ -6,7 +6,7 @@ import os
 import stat
 import tarfile
 from io import BytesIO
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
@@ -308,6 +308,94 @@ def test_contained_tar_hardlink_to_regular_data_is_supported(tmp_path: Path) -> 
     )
     assert result.read_bytes() == PAYLOAD
     assert result.stat().st_ino == (result.parent / "real-driver").stat().st_ino
+
+
+def test_archive_writer_retains_validated_link_targets_as_pure_posix_paths(
+    tmp_path: Path,
+) -> None:
+    """Keep portable link metadata parsed between validation and publication.
+
+    Args:
+        tmp_path: Isolated directory containing the private extraction root.
+    """
+    writer = safety.ArchiveWriter(tmp_path / "extracted")
+    writer.add(
+        "bundle/bin/chromedriver",
+        "symlink",
+        0,
+        0o777,
+        link="../lib/driver",
+    )
+
+    assert writer.links == [
+        (
+            tmp_path / "extracted/bundle/bin/chromedriver",
+            PurePosixPath("../lib/driver"),
+            "symlink",
+        )
+    ]
+    assert isinstance(writer.links[0][1], PurePosixPath)
+
+
+@pytest.mark.skipif(
+    os.name == "nt", reason="Native Windows symlink privileges are not assumed"
+)
+def test_contained_symlink_parent_traversal_is_supported(tmp_path: Path) -> None:
+    """Allow meaningful ``..`` targets that remain inside the extraction root.
+
+    Args:
+        tmp_path: Isolated directory containing the published archive.
+    """
+    result = download(
+        "tar",
+        [
+            ("bundle/bin/chromedriver", "symlink", b"../lib/driver", 0o777),
+            ("bundle/lib/driver", "file", PAYLOAD, 0o755),
+        ],
+    ).unpack(tmp_path / "entry")
+
+    link = tmp_path / "entry/extracted/bundle/bin/chromedriver"
+    assert result == tmp_path / "entry/extracted/bundle/lib/driver"
+    assert link.is_symlink()
+    assert result.read_bytes() == PAYLOAD
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        "NUL",
+        "aux.txt",
+        "COM1.log",
+        "folder/trailing.",
+        "folder/trailing ",
+        "folder/bad\nname",
+        "folder:stream",
+        "C:/absolute",
+        "../outside",
+        "\ud800",
+    ],
+)
+def test_nonportable_or_escaping_link_targets_are_rejected(
+    target: str,
+) -> None:
+    """Reject link targets that are unsafe on any supported host filesystem.
+
+    Args:
+        target: Adversarial archive link target.
+    """
+    with pytest.raises(ValueError):
+        safety.link_path(target, PurePosixPath())
+
+
+def test_link_target_depth_is_bounded_after_parent_resolution() -> None:
+    """Bound both raw target depth and the resulting archive-relative path."""
+    too_deep = "/".join("part" for _ in range(safety.MAX_PATH_DEPTH + 1))
+    with pytest.raises(ValueError, match="Unsafe|depth"):
+        safety.link_path(too_deep, PurePosixPath())
+
+    deep_origin = PurePosixPath(*("parent" for _ in range(safety.MAX_PATH_DEPTH)))
+    with pytest.raises(ValueError, match="depth"):
+        safety.link_path("child", deep_origin)
 
 
 @pytest.mark.parametrize(

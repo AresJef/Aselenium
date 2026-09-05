@@ -267,10 +267,10 @@ python -m ruff check src tests scripts
 
 The offline tests validate CLI defaults, browser argument dispatch, policy/pin
 handling, defensive configuration, cloned profiles, fixture path restrictions,
-report outcomes, and owned-task cleanup. Distribution tests verify the demo and
-assets survive source-distribution packaging without becoming runtime packages
-in the wheel. The demo is supplied with the source checkout/sdist; installing
-only the wheel does not install a `demo` command or fixture files.
+report outcomes, and owned-task cleanup. Distribution tests verify that repository
+demo files do not leak into either production artifact. The demos are supplied
+with the source checkout; installing a wheel or unpacking the production source
+distribution does not install a `demo` command or fixture files.
 
 Live validation results for this rewrite are recorded in
 [`baselines/demo-validation.json`](baselines/demo-validation.json). They are dated

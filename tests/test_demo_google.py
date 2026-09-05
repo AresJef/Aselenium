@@ -699,3 +699,37 @@ def test_google_import_does_not_import_local_tour_or_its_http_server(demo: Any) 
     assert "fixture_server" not in demo.__dict__
     assert "demo_local" not in demo.__dict__
     assert demo.make_driver.__module__ == "_demo_support"
+
+
+def test_google_report_serializes_paths_only_at_json_boundary(
+    demo: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Serialize retained installation paths when the final report reaches JSON.
+
+    Args:
+        demo: Imported Google demonstration module.
+        monkeypatch: Pytest fixture for reversible workflow replacement.
+        tmp_path: Isolated parent for the generated report directory.
+    """
+
+    async def fake_run(args: Any, output: Path, report: dict[str, Any]) -> None:
+        """Add a Path-bearing installation field without launching a browser.
+
+        Args:
+            args: Parsed Google demo arguments, unused by this synthetic run.
+            output: Unique run directory used to construct the synthetic path.
+            report: Mutable report receiving the Path-bearing installation field.
+        """
+        report["installation"] = {"driver_location": output / "chromedriver"}
+
+    monkeypatch.setattr(demo, "run_demo", fake_run)
+    assert demo.main(["run", "--output-dir", str(tmp_path / "reports")]) == 0
+
+    reports = list((tmp_path / "reports").glob("google-chrome-*/report.json"))
+    assert len(reports) == 1
+    report = json.loads(reports[0].read_text())
+    assert report["installation"]["driver_location"] == str(
+        reports[0].parent / "chromedriver"
+    )

@@ -87,9 +87,8 @@ Distribution tests inspect both wheels and the source archive to ensure deleted
 implementation modules and the old demo entry point do not ship. The source
 checkout's old `setup.cfg` is also absent; setuptools may generate an egg-info-only
 `setup.cfg` inside an sdist as build metadata, not legacy project configuration.
-The source archive retains dated audit reports as historical evidence, not as executable
-compatibility features; older reports describing migration or visibility behavior
-are superseded by this guide. Original license notices remain intact.
+Repository-only documentation, tests, demos, and maintenance scripts are excluded
+from the production source archive. Original package license notices remain intact.
 
 Run from the checkout with the configured development environment:
 
@@ -116,8 +115,3 @@ See the [validation record](baselines/legacy-removal-validation.json) for exact
 versions, commands, reports, and limitations. Firefox, Safari, other operating
 systems, vendor downloads, and the Google live-site demo were not rerun in this
 cleanup. A Python 3.13 full test-suite run is not claimed.
-
-Removed source files, stale bytecode, obsolete test assets, and old build
-candidates are recoverable under
-`/private/tmp/aselenium-legacy-removal.zdqbBy/`. This is temporary system storage,
-not a permanent archive; retain a separate copy if recovery may be needed later.

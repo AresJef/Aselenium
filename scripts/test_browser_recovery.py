@@ -632,6 +632,7 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
     """
     state = PageState()
     initial_tasks = set(asyncio.all_tasks())
+    selected_launcher = await asyncio.to_thread(Path(args.binary).resolve)
     result: dict[str, Any] = {"scenario": scenario, "status": "failed"}
     with (
         TemporaryDirectory(prefix="aselenium-recovery-template-") as template,
@@ -677,7 +678,7 @@ async def scenario_run(args: argparse.Namespace, scenario: str) -> dict[str, Any
                     target = selected.identity
                     result["target"] = asdict(target)
                     result["target_executable"] = selected.executable
-                    result["selected_launcher"] = str(Path(args.binary).resolve())
+                    result["selected_launcher"] = str(selected_launcher)
                     result["command_acknowledged_before_fault"] = True
                     validate_injection_window(
                         pending, command_started, args.command_timeout

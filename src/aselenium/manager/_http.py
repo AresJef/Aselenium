@@ -10,10 +10,7 @@ import time
 from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import AsyncExitStack, asynccontextmanager
 from email.utils import parsedate_to_datetime
-from typing import (
-    TYPE_CHECKING,
-    Any,
-)
+from typing import TYPE_CHECKING, Any, Literal, TypeAlias
 from urllib.parse import urljoin, urlsplit
 from weakref import ReferenceType, WeakKeyDictionary, ref
 
@@ -35,26 +32,31 @@ if TYPE_CHECKING:
 
 MAX_METADATA_BYTES = 8 * 1024 * 1024
 MAX_DOWNLOAD_BYTES = 2 * 1024 * 1024 * 1024
+ResponseKind: TypeAlias = Literal["file", "json", "text", "url"]
 _DOWNLOAD_GATES: WeakKeyDictionary[
     asyncio.AbstractEventLoop, ReferenceType[asyncio.Semaphore]
 ] = WeakKeyDictionary()
 
 
 class Download:
-    """Temporary file with deterministic ownership and an observed SHA-256."""
+    """Own a temporary vendor payload and its running SHA-256 digest.
+
+    ``size`` is populated with the complete observed byte count after streaming
+    succeeds; partial payloads are closed and discarded by the request helper.
+    """
 
     def __init__(self) -> None:
-        """Initialize the instance."""
+        """Open a private temporary binary stream and initialize digest state."""
         self.stream = tempfile.TemporaryFile()
         self.sha256 = hashlib.sha256()
         self.size = 0
 
     def close(self) -> None:
-        """Close the temporary download stream and release its file descriptor."""
+        """Close the temporary payload stream and release its file descriptor."""
         self.stream.close()
 
     def write(self, chunk: bytes) -> None:
-        """Append a download chunk and update its observed SHA-256.
+        """Append one response chunk and update the running SHA-256 digest.
 
         Args:
             chunk: Downloaded bytes to append to the temporary stream.
@@ -64,10 +66,10 @@ class Download:
 
 
 def retry_delay(headers: Mapping[str, str], attempt: int) -> float:
-    """Parse Retry-After or calculate a bounded exponential retry delay.
+    """Parse ``Retry-After`` or calculate bounded exponential backoff.
 
     Args:
-        headers: HTTP response headers used to interpret Retry-After.
+        headers: HTTP response headers that may contain ``Retry-After``.
         attempt: Zero-based retry attempt used for exponential backoff.
 
     Returns:
@@ -87,25 +89,35 @@ def retry_delay(headers: Mapping[str, str], attempt: int) -> float:
 async def request(
     manager: DriverManager,
     url: str,
-    kind: str,
+    kind: ResponseKind,
     session_factory: Callable[[], ClientSession],
 ) -> Any:
-    """Perform a bounded vendor GET with shared invocation resources and download admission control.
+    """Perform a bounded vendor GET with invocation-owned resources.
+
+    File downloads additionally share a four-request admission gate per event
+    loop. The outer deadline includes time spent waiting for that capacity.
 
     Args:
-        manager: Driver manager owning the provisioning state and request configuration.
-        url: URL used for the request or browser navigation.
-        kind: Operation or artifact kind selected by the caller.
-        session_factory: Factory creating the HTTP client session owned by this request scope.
+        manager: Driver manager supplying online policy, timeouts, proxy, and
+            invocation-owned resources.
+        url: HTTPS vendor resource URL without embedded credentials.
+        kind: Required response representation: file, JSON, text, or final URL
+            filename.
+        session_factory: Factory that creates the owned HTTP client session.
 
     Returns:
-        Text, decoded JSON, the final URL's last path component (kind="url"),
-        or an owned download record (kind="file"). A missing resource returns None.
+        Text, decoded JSON, the final URL's last path component for ``"url"``,
+        or an owned download record for ``"file"``. A 404 response returns
+        ``None``.
 
     Raises:
+        errors.DriverRequestFailedError: URL validation, transport, response
+            status, response-size, or decoding checks fail.
         errors.FileDownloadTimeoutError: The download budget expires, including
-            admission and client-creation waits. Owned cleanup finishes before returning.
-        errors.DriverRequestTimeoutError: A metadata request exceeds its total budget.
+            admission and client-creation waits. Owned cleanup finishes before
+            the exception propagates.
+        errors.DriverRequestTimeoutError: A metadata request exceeds its total
+            budget.
     """
     manager._require_online()
     timeout = manager.download_timeout if kind == "file" else manager.requests_timeout
@@ -113,6 +125,12 @@ async def request(
         return await asyncio.wait_for(
             _admitted_request(manager, url, kind, session_factory), timeout
         )
+    except errors.AseleniumError:
+        # ``_request`` has already translated transport/client deadlines into
+        # the package's public timeout hierarchy.  Those timeout classes also
+        # inherit ``asyncio.TimeoutError``, so preserve their type, message,
+        # traceback, and original cause instead of wrapping them a second time.
+        raise
     except asyncio.TimeoutError as cause:
         error = (
             errors.FileDownloadTimeoutError
@@ -125,10 +143,10 @@ async def request(
 async def _admitted_request(
     manager: DriverManager,
     url: str,
-    kind: str,
+    kind: ResponseKind,
     session_factory: Callable[[], ClientSession],
 ) -> Any:
-    """Wait for download capacity inside the caller's total request budget.
+    """Gate file-download concurrency before issuing the vendor request.
 
     Args:
         manager: Manager supplying request policy and invocation-owned resources.
@@ -137,7 +155,7 @@ async def _admitted_request(
         session_factory: Factory used only after admission to create an HTTP client.
 
     Returns:
-        The decoded resource, or None for a missing vendor resource.
+        Decoded metadata, an owned download record, or ``None`` for HTTP 404.
     """
     if kind != "file":
         return await _request(manager, url, kind, session_factory)
@@ -155,7 +173,11 @@ def _validate_vendor_url(url: str) -> None:
     """Require an HTTPS vendor URL without embedded credentials.
 
     Args:
-        url: URL used for the request or browser navigation.
+        url: Candidate vendor resource or redirect URL.
+
+    Raises:
+        errors.DriverRequestFailedError: The URL is not HTTPS, has no hostname,
+            or embeds a username or password.
     """
     parsed = urlsplit(url)
     if (
@@ -173,19 +195,25 @@ def _validate_vendor_url(url: str) -> None:
 async def _get_response(
     session: ClientSession, url: str, deadline: float, proxy: str | None
 ) -> AsyncIterator[ClientResponse]:
-    # CDN redirects may change hosts, but may never downgrade transport or
-    # introduce credentials. Validate before following, not after the request.
     """Follow a bounded chain of validated HTTPS redirects for an idempotent GET.
 
     Args:
-        session: Active session that owns the browser or HTTP operation.
-        url: URL used for the request or browser navigation.
+        session: Active HTTP client owned by this provisioning invocation.
+        url: Initial HTTPS vendor resource URL.
         deadline: Absolute monotonic deadline shared by the request and redirects.
         proxy: Explicit provisioning proxy URL, or None for a direct connection.
 
     Yields:
-        The resource managed by this context; cleanup runs when the context exits.
+        The first non-redirect response. The client response closes when the
+        context exits.
+
+    Raises:
+        errors.DriverRequestFailedError: A redirect is missing its location,
+            exceeds the five-hop limit, or points to a disallowed URL.
+        asyncio.TimeoutError: The shared monotonic deadline expires.
     """
+    # CDN redirects may change hosts, but may never downgrade transport or
+    # introduce credentials. Validate before following, not after the request.
     for redirect in range(6):
         _validate_vendor_url(url)
         remaining = deadline - time.monotonic()
@@ -212,19 +240,28 @@ async def _get_response(
 async def _request(
     manager: DriverManager,
     url: str,
-    kind: str,
+    kind: ResponseKind,
     session_factory: Callable[[], ClientSession],
 ) -> Any:
-    """Fetch one vendor resource with a total deadline, bounded body, and classified retries.
+    """Fetch one vendor resource with a deadline, body limit, and safe retries.
 
     Args:
-        manager: Driver manager owning the provisioning state and request configuration.
-        url: URL used for the request or browser navigation.
-        kind: Operation or artifact kind selected by the caller.
-        session_factory: Factory creating the HTTP client session owned by this request scope.
+        manager: Driver manager supplying policy and invocation resources.
+        url: Candidate HTTPS vendor resource URL, validated before network I/O.
+        kind: Required response representation.
+        session_factory: Factory that creates an HTTP client when the invocation
+            does not already own one.
 
     Returns:
-        Decoded response data for the requested transport operation.
+        Text, decoded JSON, a final URL filename, an owned download record, or
+        ``None`` for HTTP 404.
+
+    Raises:
+        errors.DriverRequestRateLimitError: Three attempts all receive HTTP 429.
+        errors.DriverRequestFailedError: TLS, transport, status, response-size,
+            decoding, or JSON validation fails.
+        errors.DriverRequestTimeoutError: A metadata request exceeds its deadline.
+        errors.FileDownloadTimeoutError: A file request exceeds its deadline.
     """
     manager._require_online()
     _validate_vendor_url(url)

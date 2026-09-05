@@ -1,10 +1,11 @@
 # Release acceptance and reliability testing
 
-The later [final production review](final-production-review.md) records **2,823
-passing tests per environment** and refreshed installed-wheel native checks after
-additional fixes. The 2,652-test results below remain the historical acceptance
-expansion snapshot; the reproduction guidance and stated scope boundaries still
-apply.
+The latest [pre-deployment review](pre-deployment-review.md) records the current
+candidate after additional concurrency and deadline fixes. The preceding
+[final production review](final-production-review.md) retains its 3,227-test
+snapshot and expanded typing/path/docstring gates. The 2,652-test results below
+remain the historical acceptance-expansion snapshot; the reproduction guidance
+and stated scope boundaries still apply.
 
 This guide separates deterministic regressions, real local transport tests,
 installed-wheel browser acceptance, and environment-specific validation.
@@ -21,8 +22,8 @@ publication, and subsequent offline reuse. Only the fixture certificate is
 trusted, through a test-owned client factory. System trust is never modified.
 
 The PEM files in `tests/fixtures/tls` are deliberately public test material, not
-production credentials. The source distribution includes them so the test suite
-can run after unpacking an sdist.
+production credentials. They remain in the repository checkout for CI and local
+development; the production source distribution excludes the test suite.
 
 ```bash
 python -m pytest tests/manager/test_http_integration.py --asyncio-debug -q
@@ -130,9 +131,9 @@ not execute arbitrary examples against personal data or uncontrolled websites.
 
 `scripts/check_public_typing.py` checks consumer programs against the installed
 typed wheel. It also requires invalid navigation argument types and dereferencing
-an optional element without checking it to be rejected. This supplements, but
-does not replace, the existing 19-module mypy gate; whole-package strict typing
-remains a separate scope.
+an optional element without checking it to be rejected. This complements the
+configured mypy gate, which checks all maintained Python under `src/` and
+`scripts/`.
 
 ## CI and release gates
 
@@ -181,7 +182,31 @@ the repository's default branch.
 
 ## Evidence and remaining boundaries
 
-### Local verification on 2026-09-05
+### Preceding 2.0.0 follow-up on 2026-09-05
+
+The preceding unrestricted Python 3.13.12 run passed **3,227 tests**, with only the
+Windows-specific drive-relative syntax case skipped on macOS. Statement and
+branch coverage are **92.41%** and **83.45%**, respectively, and all configured
+component floors pass. Ruff checks 136 formatted files; mypy checks all 78
+maintained source/demo/script files; the structural audit covers 135 files,
+2,407 functions/methods, 294 classes and 196 prompted examples. The 2.0.0 wheel
+and source archive pass strict metadata/integrity checks, and the refreshed
+resolved-environment advisory audit reports no known vulnerabilities.
+
+That exact wheel also passes fresh installed-package local-fixture tours on
+macOS Chrome (15/15 stages), Firefox (15/15), and Safari (12/12 applicable, with
+the three documented facade exclusions). Its isolated public-typing consumer and
+all three deliberate negative controls pass.
+
+The hosted Python/OS/native-browser matrix must still run on the final tagged
+commit. The earlier Python 3.11/minimum-dependency, Edge, and Chrome/Edge
+reliability evidence below is retained as a dated baseline and must not be read
+as a fresh execution of the final 2.0.0 bytes.
+
+The subsequent [pre-deployment review](pre-deployment-review.md) supersedes this
+snapshot for current source and distribution evidence.
+
+### Earlier multi-environment and native verification on 2026-09-05
 
 The final regression suite passed **2,652 tests in each environment**, with no
 failures, errors, expected failures or skipped tests:

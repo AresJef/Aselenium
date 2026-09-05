@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from aselenium import errors
+from aselenium.chrome.options import ChromeOptions
 from aselenium.manager import ChromeDriverManager, ChromiumVersion
 from aselenium.manager._installation import owned_gather
 from aselenium.webdriver import SessionContext
@@ -56,7 +57,7 @@ def prepare(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Any:
         """
         await asyncio.sleep(0)
         manager._driver_version = ChromiumVersion(str(version))
-        manager._driver_location = str(tmp_path / ("driver-" + str(version)))
+        manager._driver_location = tmp_path / ("driver-" + str(version))
         return manager._driver_location
 
     monkeypatch.setattr(manager, "_request_driver_version", resolve)
@@ -135,7 +136,7 @@ async def test_inflight_target_fields_are_not_visible_in_an_unrelated_task(
         entered.set()
         await release.wait()
         manager._driver_version = version
-        return "driver"
+        return tmp_path / "driver"
 
     monkeypatch.setattr(manager, "_install_driver_executable", download)
     task = asyncio.create_task(manager.install_result("120.0.1.1", binary=browser))
@@ -179,7 +180,7 @@ async def test_distinct_cache_roots_can_install_without_a_global_lock(
         if len(started) == 2:
             both.set()
         await both.wait()
-        return "driver"
+        return tmp_path / "driver"
 
     for manager, _ in instances:
         monkeypatch.setattr(manager, "_install_driver_executable", download)
@@ -289,12 +290,13 @@ async def test_acquisition_consumes_its_result_even_after_a_later_install(
             """Quit."""
             pass
 
-    context = SessionContext(manager, (), {}, service, 10, (), {}, SimpleNamespace())
+    options = ChromeOptions()
+    context = SessionContext(manager, (), {}, service, 10, (), {}, options)
     context._SESSION_CLS = Session
     session = await context.start()
     try:
-        assert services == [(result.driver_version, Path(result.driver_location))]
-        assert services[0][1] != Path(later.driver_location)
+        assert services == [(result.driver_version, result.driver_location)]
+        assert services[0][1] != later.driver_location
         assert str(session.options.browser_version) == result.browser_version
     finally:
         await context.quit()

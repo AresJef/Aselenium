@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium service implementation and supporting types."""
+"""SafariDriver service specialization and port argument syntax."""
 
 from __future__ import annotations
 
@@ -27,14 +26,14 @@ __all__ = ["SafariService"]
 
 # Safari Service ----------------------------------------------------------------------------------
 class SafariService(BaseService):
-    """Safari Service."""
+    """Launch and supervise Apple's system SafariDriver executable."""
 
     # Socket ------------------------------------------------------------------------------
     @property
     def port_args(self) -> list[str]:
-        """Return the part arguments for the service Process constructor.
+        """Return SafariDriver arguments for the reserved service port.
 
         Returns:
-            `["-p", self.port_str]`
+            ``["-p", PORT]`` for SafariDriver's command-line interface.
         """
         return ["-p", self.port_str]

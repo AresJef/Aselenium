@@ -43,9 +43,14 @@ F = TypeVar("F", bound="FileManager")
 
 
 class CacheEntry(TypedDict):
-    """Validated executable location and parsed version returned by cache lookups."""
+    """Validated executable path and parsed version returned by cache lookups.
 
-    location: str
+    Attributes:
+        location: Absolute path to the cached executable.
+        version: Parsed version associated with the cached artifact.
+    """
+
+    location: Path
     version: Version
 
 
@@ -86,7 +91,7 @@ def artifact_lock(root: Path, key: str, timeout: float = 30) -> Iterator[None]:
 
     Args:
         root: Absolute, validated cache directory retained by the file manager.
-        key: Lookup key used by the current operation.
+        key: Lowercase SHA-256 identity of the artifact or schema resource to lock.
         timeout: Finite nonnegative wait budget in seconds. Zero attempts the lock once.
 
     Yields:
@@ -198,10 +203,16 @@ class FileManager:
     version_class: type[Version] = ChromiumVersion
 
     def __init__(self, base_dir: PathInput | None = None) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Open or initialize the versioned cache below an existing directory.
 
         Args:
-            base_dir: Existing cache parent directory; None selects the current user home.
+            base_dir: Existing cache parent supplied as text, ``Path``, or a
+                string-valued ``os.PathLike``. ``None`` selects the current
+                user's home directory.
+
+        Raises:
+            errors.DriverManagerError: The cache parent is invalid, unsafe, or
+                inaccessible, or the on-disk schema is unsupported.
         """
         try:
             base = (
@@ -333,8 +344,8 @@ class FileManager:
         """Hash the product, platform, artifact kind, and version into a cache key.
 
         Args:
-            kind: Operation or artifact kind selected by the caller.
-            version: Version object or version selector for this operation.
+            kind: Artifact namespace, normally ``driver`` or ``binary``.
+            version: Exact version identity stored in the cache key.
 
         Returns:
             The lowercase SHA-256 key of the artifact identity.
@@ -361,14 +372,18 @@ class FileManager:
                 )
             ]
 
-    def _valid(self, row: Mapping[str, Any] | sqlite3.Row) -> bool:
-        """Verify an indexed artifact identity, executable path, and SHA-256.
+    def _validated_location(self, row: Mapping[str, Any] | sqlite3.Row) -> Path | None:
+        """Validate an indexed artifact and return its executable path.
 
         Args:
             row: Artifact metadata from the index or its recovery manifest.
 
         Returns:
-            True when the checked condition is satisfied; otherwise False.
+            Absolute executable path when the file and digest match, or None when
+            the indexed artifact is missing or has changed.
+
+        Raises:
+            errors.DriverManagerError: The row identity or executable path is unsafe.
         """
         expected = hashlib.sha256(
             json.dumps(
@@ -382,19 +397,22 @@ class FileManager:
             path = checked_path(folder, folder / row["executable"])
         except ValueError as cause:
             raise errors.DriverManagerError("Unsafe cache executable path") from cause
-        return path.is_file() and digest(path) == row["sha256"]
+        return path if path.is_file() and digest(path) == row["sha256"] else None
 
-    def _result(self, row: Mapping[str, Any] | sqlite3.Row) -> CacheEntry:
-        """Convert a validated cache row to its executable location and parsed version.
+    def _result(
+        self, row: Mapping[str, Any] | sqlite3.Row, location: Path
+    ) -> CacheEntry:
+        """Combine a validated cache row and executable path into a result.
 
         Args:
             row: Artifact metadata from the index or its recovery manifest.
+            location: Already-validated absolute executable path for the row.
 
         Returns:
             A cache entry with an executable location and parsed Version.
         """
         return {
-            "location": str(self._directory / row["key"] / row["executable"]),
+            "location": location,
             "version": self.version_class(row["version"]),
         }
 
@@ -404,8 +422,8 @@ class FileManager:
         """Find the newest integrity-checked artifact matching the requested version prefix.
 
         Args:
-            kind: Operation or artifact kind selected by the caller.
-            version: Version object or version selector for this operation.
+            kind: Artifact namespace, normally ``driver`` or ``binary``.
+            version: Exact version or version prefix to match.
             match_method: Version match granularity: major, build, or patch.
 
         Returns:
@@ -435,27 +453,28 @@ class FileManager:
                 params += (prefix, prefix + ".%")
             rows = db.execute(query, params).fetchall()
         if not rows and exact:
-            row = self._recover_key(self._key(kind, version))
-            if row is not None:
-                return self._result(row)
+            recovered = self._recover_key(self._key(kind, version))
+            if recovered is not None:
+                return recovered
         for row in sorted(
             rows, key=lambda r: tuple(map(int, r["version"].split("."))), reverse=True
         ):
             if row["version"].split(".")[:count] != parts[:count]:
                 continue
             with artifact_lock(self._directory, row["key"]):
-                if self._valid(row):
-                    return self._result(row)
+                location = self._validated_location(row)
+                if location is not None:
+                    return self._result(row, location)
         return None
 
-    def _recover_key(self, key: str) -> dict[str, Any] | None:
+    def _recover_key(self, key: str) -> CacheEntry | None:
         """Reindex a validated orphan publication for one artifact key.
 
         Args:
-            key: Lookup key used by the current operation.
+            key: Lowercase SHA-256 artifact identity naming the published folder.
 
         Returns:
-            Recovered artifact metadata, or None if no valid publication can be recovered.
+            Recovered cache entry, or None if no valid publication can be recovered.
         """
         folder = self._managed_path(self._directory / key)
         if not folder.is_dir():
@@ -470,9 +489,10 @@ class FileManager:
                     or row["platform"] != self._platform
                 ):
                     return None
-                if self._valid(row):
+                location = self._validated_location(row)
+                if location is not None:
                     self._publish(row)
-                    return row
+                    return self._result(row, location)
             except (OSError, ValueError, KeyError, TypeError):
                 return None
         return None
@@ -534,7 +554,7 @@ class FileManager:
         """Find an integrity-checked cached driver for the requested version.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Driver version or version prefix to match.
             match_method: Version match granularity: major, build, or patch.
 
         Returns:
@@ -548,7 +568,7 @@ class FileManager:
         """Find an integrity-checked cached browser binary for the requested version.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Browser version or version prefix to match.
             match_method: Version match granularity: major, build, or patch.
 
         Returns:
@@ -586,8 +606,8 @@ class FileManager:
         """Validate or atomically publish an artifact, then apply scoped cache retention.
 
         Args:
-            kind: Operation or artifact kind selected by the caller.
-            version: Version object or version selector for this operation.
+            kind: Artifact namespace, either ``driver`` or ``binary``.
+            version: Exact version recorded in the new artifact manifest.
             archive: Downloaded archive whose contents will be validated before publication.
             limit: Maximum retained artifact count; None leaves retention unbounded.
 
@@ -603,10 +623,15 @@ class FileManager:
                 try:
                     row = json.loads(marker.read_text())
                     expected = (key, self.product, self._platform, kind, str(version))
-                    if tuple(
-                        row[k]
-                        for k in ("key", "product", "platform", "kind", "version")
-                    ) != expected or not self._valid(row):
+                    location = self._validated_location(row)
+                    if (
+                        tuple(
+                            row[k]
+                            for k in ("key", "product", "platform", "kind", "version")
+                        )
+                        != expected
+                        or location is None
+                    ):
                         raise ValueError("Artifact identity or checksum mismatch")
                 except (OSError, ValueError, KeyError, TypeError) as cause:
                     raise errors.DriverManagerError(
@@ -638,10 +663,12 @@ class FileManager:
                         stream.flush()
                         os.fsync(stream.fileno())
 
-                archive.unpack(folder, _before_publish=before_publish, _owner_key=key)
+                location = archive._unpack_to(
+                    folder, _before_publish=before_publish, _owner_key=key
+                )
             self._publish(row)
         self.prune(kind, limit, keep=key)
-        return self._result(row)
+        return self._result(row, location)
 
     def cache_driver(
         self, version: Version | str, driver: File, max_cache_size: int | None = None
@@ -649,8 +676,8 @@ class FileManager:
         """Publish a downloaded driver archive and return its validated cache entry.
 
         Args:
-            version: Version object or version selector for this operation.
-            driver: Driver object or downloaded driver artifact required by this operation.
+            version: Exact driver version recorded in the artifact manifest.
+            driver: Downloaded driver archive to validate and consume.
             max_cache_size: Maximum retained artifact count; None leaves retention unbounded.
 
         Returns:
@@ -664,8 +691,8 @@ class FileManager:
         """Publish a downloaded browser archive and return its validated cache entry.
 
         Args:
-            version: Version object or version selector for this operation.
-            binary: Browser executable or downloaded browser artifact required by this operation.
+            version: Exact browser version recorded in the artifact manifest.
+            binary: Downloaded browser archive to validate and consume.
             max_cache_size: Maximum retained artifact count; None leaves retention unbounded.
 
         Returns:
@@ -679,8 +706,8 @@ class FileManager:
         """Set or clear eviction protection for an indexed artifact.
 
         Args:
-            version: Version object or version selector for this operation.
-            kind: Operation or artifact kind selected by the caller.
+            version: Exact indexed artifact version.
+            kind: Artifact namespace, either ``driver`` or ``binary``.
             pinned: Whether the indexed artifact is protected from automatic eviction.
         """
         key = self._key(kind, version)
@@ -697,6 +724,28 @@ class FileManager:
             A lease token, or None if the location is outside this cache.
         """
         path = parse_path(location)
+        return self._lease_path(path)
+
+    def _lease_path(self, path: Path) -> str | None:
+        """Lease an executable whose path is already parsed.
+
+        This Path-only core is for manager and session workflows that retain a
+        ``Path`` after their public filesystem boundary.
+
+        Args:
+            path: Absolute executable path retained by the calling workflow.
+
+        Returns:
+            A lease token, or None if the path is outside this cache.
+
+        Raises:
+            errors.DriverManagerError: The path is not an absolute ``Path`` or a
+                matching indexed artifact disappeared before acquisition.
+        """
+        if not isinstance(path, Path) or not path.is_absolute():
+            raise errors.DriverManagerError(
+                "Cache lease path must be an absolute pathlib.Path"
+            )
         try:
             relative = path.relative_to(self._directory)
         except ValueError:
@@ -708,10 +757,17 @@ class FileManager:
             return None
         with artifact_lock(self._directory, key), self._db() as db:
             row = db.execute("SELECT * FROM artifacts WHERE key=?", (key,)).fetchone()
-            if row is None or not self._valid(row):
+            if row is None:
                 raise errors.DriverManagerError(
                     "Cached artifact disappeared before acquisition; retry installation"
                 )
+            indexed_location = self._validated_location(row)
+            if indexed_location is None:
+                raise errors.DriverManagerError(
+                    "Cached artifact disappeared before acquisition; retry installation"
+                )
+            if path != indexed_location:
+                return None
             token = uuid.uuid4().hex
             db.execute(
                 "INSERT INTO leases VALUES (?,?,?,?)",
@@ -734,7 +790,7 @@ class FileManager:
         """Evict eligible old artifacts while preserving pins, leases, and the keep key.
 
         Args:
-            kind: Operation or artifact kind selected by the caller.
+            kind: Artifact namespace, either ``driver`` or ``binary``.
             limit: Maximum retained artifact count; None leaves retention unbounded.
             keep: Artifact key that this pruning operation must preserve, or None.
         """
@@ -751,8 +807,8 @@ class FileManager:
         """Apply the retention limit while the caller owns the product pruning lock.
 
         Args:
-            kind: Operation or artifact kind selected by the caller.
-            limit: Maximum retained artifact count; None leaves retention unbounded.
+            kind: Artifact namespace, either ``driver`` or ``binary``.
+            limit: Positive maximum retained artifact count.
             keep: Artifact key that this pruning operation must preserve, or None.
         """
         with self._db() as db:
@@ -805,8 +861,6 @@ class FileManager:
 
 class ChromiumBaseFileManager(FileManager):
     """Share Chromium cache behavior with product-specific subclasses."""
-
-    pass
 
 
 class ChromeFileManager(ChromiumBaseFileManager):

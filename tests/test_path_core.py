@@ -248,10 +248,10 @@ def test_firefox_profile_root_rejects_unsupported_geckodriver(
         FirefoxService(GeckoVersion(version), executable, profile_root=tmp_path)
 
 
-def test_firefox_facade_defers_profile_root_parsing_to_service(
+def test_firefox_facade_parses_profile_root_once_for_all_acquisitions(
     tmp_path: Path,
 ) -> None:
-    """Preserve flexible path-like input until the Firefox service boundary.
+    """Retain one parsed profile-root Path across reusable facade acquisitions.
 
     Args:
         tmp_path: Dedicated cache parent and existing profile-root directory.
@@ -261,9 +261,13 @@ def test_firefox_facade_defers_profile_root_parsing_to_service(
     supplied = CountingTextPath(str(profile_root))
     driver = Firefox(directory=tmp_path, profile_root=supplied)
     try:
-        context = driver.acquire()
-        assert supplied.calls == 0
-        assert driver._service_kwargs["profile_root"] is supplied
-        assert context._service_kwargs["profile_root"] is supplied
+        first = driver.acquire()
+        second = driver.acquire()
+        assert supplied.calls == 1
+        retained = driver._service_kwargs["profile_root"]
+        assert retained == profile_root
+        assert isinstance(retained, Path)
+        assert first._service_kwargs["profile_root"] is retained
+        assert second._service_kwargs["profile_root"] is retained
     finally:
         driver.options.close()

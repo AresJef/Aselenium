@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium driver implementation and supporting types."""
+"""Discover browsers and resolve, download, cache, and validate WebDriver binaries."""
 
 from __future__ import annotations
 
@@ -41,6 +40,7 @@ from subprocess import (
 from typing import (
     TYPE_CHECKING,
     Any,
+    Generic,
     Literal,
     NoReturn,
     TypeVar,
@@ -86,12 +86,14 @@ from aselenium.manager.version import (
     SafariVersion,
     Version,
 )
-from aselenium.utils import load_plist_file
+from aselenium.utils import _load_plist_file
 
 if TYPE_CHECKING:
     from asyncio import Lock
 
 V = TypeVar("V", bound=Version)
+DV = TypeVar("DV", bound=Version)
+BV = TypeVar("BV", bound=Version)
 
 __all__ = [
     "EdgeDriverManager",
@@ -106,18 +108,9 @@ __all__ = [
 class OSType:
     """Operating-system identifiers understood by driver vendors."""
 
-    LINUX = "linux"
-    MAC = "mac"
-    WIN = "win"
-
-
-class BrowserType:
-    """Browser product identifiers used during discovery."""
-
-    EDGE = "edge"
-    CHROME = "chrome"
-    CHROMIUM = "chromium"
-    FIREFOX = "firefox"
+    LINUX: Literal["linux"] = "linux"
+    MAC: Literal["mac"] = "mac"
+    WIN: Literal["win"] = "win"
 
 
 class ChannelType:
@@ -129,8 +122,8 @@ class ChannelType:
 
 
 # Driver Manager -----------------------------------------------------------------------------------
-class DriverManager:
-    """Represent the webdriver manager for a browser."""
+class DriverManager(Generic[DV, BV]):
+    """Coordinate request-local browser discovery and WebDriver provisioning."""
 
     _RESULT_FIELDS = (
         "_channel",
@@ -139,23 +132,28 @@ class DriverManager:
         "_browser_version",
         "_browser_location",
     )
-    _channel = RequestField()
-    _target_version = RequestField()
-    _target_binary = RequestField()
-    _target_driver = RequestField()
-    _driver_version = RequestField()
-    _driver_location = RequestField()
-    _browser_version = RequestField()
-    _browser_location = RequestField()
+    _channel: RequestField[str | None] = RequestField()
+    _target_version: RequestField[DV | None] = RequestField()
+    _target_binary: RequestField[Path | None] = RequestField()
+    _target_driver: RequestField[Path | None] = RequestField()
+    _driver_version: RequestField[DV | None] = RequestField()
+    _driver_location: RequestField[Path | None] = RequestField()
+    _browser_version: RequestField[BV | None] = RequestField()
+    _browser_location: RequestField[Path | None] = RequestField()
+    _max_cache_size: int | None
+    _requests_timeout: ClientTimeout
+    _download_timeout: ClientTimeout
+    _proxy: str | None
     _PROBE_TIMEOUT: float = 10.0
+    """Maximum seconds allowed for a browser version probe."""
     _PROBE_KILL_TIMEOUT: float = 1.0
-    """The lock to prevent multiple installation at the same time."""
+    """Maximum seconds allowed to reap a failed or timed-out probe."""
     _MAC_BINARY_PATHS: dict[str, list[str]] | None = None
-    """The partial paths to the browser binary on MacOS."""
+    """Channel-indexed application-relative browser paths for macOS discovery."""
     _WIN_BINARY_PATHS: dict[str, list[str]] | None = None
-    """The partial paths to the browser binary on Windows."""
+    """Channel-indexed installation-relative browser paths for Windows discovery."""
     _LINUX_BINARY_PATHS: dict[str, list[str]] | None = None
-    """The partial paths to the browser binary on Linux."""
+    """Channel-indexed executable names searched through Linux PATH entries."""
 
     def __init__(
         self,
@@ -169,10 +167,10 @@ class DriverManager:
         download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
-        r"""Initialize the instance with the supplied configuration.
+        r"""Configure browser-specific cache, archive, timeout, and proxy collaborators.
 
         Args:
-            name: Name identifying the requested item.
+            name: Browser product name used for cache identity and diagnostics.
             file_manager_cls: Cache-manager class, or None for a system-managed driver.
             driver_file_cls: Downloaded driver-archive class, or None when downloads are unsupported.
             binary_file_cls: Downloaded browser-archive class, or None when downloads are unsupported.
@@ -204,41 +202,41 @@ class DriverManager:
         self._last_result: InstallationResult | None = None
         self._name: str = name
         # Installation
-        self._channel: str | None = None
-        # File manager
+        self._channel = None
+        # Validate all scalar configuration before constructing the file
+        # manager, which may create the cache hierarchy on disk.
         self.max_cache_size = max_cache_size
-        if file_manager_cls is not None:
-            self._file_manager: FileManager = file_manager_cls(directory)
-        else:
-            self._file_manager: FileManager | None = None
-        self._driver_file_cls: type[File] | None = driver_file_cls
-        self._binary_file_cls: type[File] | None = binary_file_cls
-        # Request
         self.requests_timeout = request_timeout
         self.download_timeout = download_timeout
         self.proxy = proxy
+        # File manager
+        self._file_manager: FileManager | None = (
+            file_manager_cls(directory) if file_manager_cls is not None else None
+        )
+        self._driver_file_cls: type[File] | None = driver_file_cls
+        self._binary_file_cls: type[File] | None = binary_file_cls
         # Target
-        self._target_version: Version | None = None
-        self._target_binary: Path | None = None
+        self._target_version = None
+        self._target_binary = None
         # Driver
-        self._driver_version: Version | None = None
-        self._driver_location: str | None = None
+        self._driver_version = None
+        self._driver_location = None
         # Browser
-        self._browser_version: Version | None = None
-        self._browser_location: str | None = None
+        self._browser_version = None
+        self._browser_location = None
         # Platform
-        self.__os_name: str | None = None
-        self.__os_arch: str | None = None
+        self.__os_name: Literal["linux", "mac", "win"] | None = None
+        self.__os_arch: Literal["32", "64"] | None = None
         self.__os_is_arm: bool | None = None
         self.__environ_paths: list[Path] | None = None
 
     # Installation ------------------------------------------------------------------------
     @property
     def _cache_view(self) -> FileManager | None:
-        """Return the cache manager view for the detected operating system and architecture.
+        """Bind the product cache to the current operating system and architecture.
 
         Returns:
-            The cache manager view for the detected operating system and architecture.
+            Platform-scoped cache manager, or None for a system-managed driver.
         """
         cache = self._file_manager
         if isinstance(cache, FileManager):
@@ -251,7 +249,7 @@ class DriverManager:
         """Protect a cached version from eviction, or explicitly unpin it.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Numeric cached artifact version whose eviction pin is changed.
             artifact: Artifact kind: driver or binary.
             pinned: Whether the indexed artifact is protected from automatic eviction.
 
@@ -259,24 +257,35 @@ class DriverManager:
             >>> await driver.manager.pin("120.0.6099.71", pinned=True)
             >>> await driver.manager.pin("120.0.6099.71", pinned=False)
         """
-        if self._file_manager is None or artifact not in {"driver", "binary"}:
+        if type(version) is not str or not version:
+            raise errors.InvalidArgumentError(
+                "Cached artifact version must be non-empty text"
+            )
+        if type(artifact) is not str or artifact not in {"driver", "binary"}:
+            raise errors.InvalidArgumentError("Unsupported cached artifact")
+        if type(pinned) is not bool:
+            raise errors.InvalidArgumentError("pinned must be a boolean")
+        if self._file_manager is None:
             raise errors.InvalidArgumentError("Unsupported cached artifact")
         parsed = (
             self._parse_driver_version(version)
             if artifact == "driver"
             else self._parse_browser_version(version)
         )
-        await run_blocking(self._cache_view.pin, parsed, artifact, pinned)
+        cache = self._cache_view
+        if cache is None:
+            raise errors.InvalidArgumentError("Unsupported cached artifact")
+        await run_blocking(cache.pin, parsed, artifact, pinned)
 
-    async def install(self, *args: Any, **kwargs: Any) -> str:
-        """Install a webdriver.
+    async def install(self, *args: Any, **kwargs: Any) -> Path:
+        """Resolve and install a WebDriver executable.
 
         Args:
             *args: Positional arguments forwarded to the wrapped operation.
             **kwargs: Keyword arguments forwarded to the wrapped operation.
 
         Returns:
-            The install string.
+            Absolute path to the installed WebDriver executable.
         """
         raise NotImplementedError(
             "<DriverManager> `install()` method must be implemented in "
@@ -316,13 +325,15 @@ class DriverManager:
         remain available when policy is omitted.
 
         Args:
-            policy: Policy used by this operation.
-            validate_compatibility: Validate compatibility used by this operation.
+            policy: Explicit cache/vendor resolution strategy, or None to derive it
+                from the version selector.
+            validate_compatibility: Whether to reject a resolved driver/browser pair
+                that violates the manager's recorded compatibility rule.
             *args: Positional arguments forwarded to the wrapped operation.
             **kwargs: Keyword arguments forwarded to the wrapped operation.
 
         Returns:
-            The InstallationResult value produced by this operation.
+            Immutable request, executable paths, versions, and channel snapshot.
 
         Example:
             >>> result = await driver.manager.install_result(
@@ -330,6 +341,8 @@ class DriverManager:
             ... )
             >>> print(result.driver_version, result.browser_version)
         """
+        if policy is not None and type(policy) is not str:
+            raise errors.InvalidArgumentError("Resolution policy must be text or None")
         if policy not in {
             None,
             "exact",
@@ -341,6 +354,10 @@ class DriverManager:
         }:
             raise errors.InvalidArgumentError(
                 "Unknown driver resolution policy: %r" % policy
+            )
+        if type(validate_compatibility) is not bool:
+            raise errors.InvalidArgumentError(
+                "validate_compatibility must be a boolean"
             )
         token = self._policy_override.set(policy)
         validation = self._validate_pair.set(validate_compatibility)
@@ -358,11 +375,11 @@ class DriverManager:
             self._validate_pair.reset(validation)
             self._completed_result.reset(completed)
 
-    def _resolution_policy(self, version: str | None = None) -> str:
+    def _resolution_policy(self, version: Version | str | None = None) -> str:
         """Resolve the active policy or derive it from the requested selector.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Original version selector used when no explicit policy is active.
 
         Returns:
             The active explicit policy or the policy implied by the version selector.
@@ -371,7 +388,12 @@ class DriverManager:
         override = active.request.policy if active is not None else "default"
         if override != "default":
             return override
-        if version in ("offline", "cached", "auto", "latest"):
+        if isinstance(version, str) and version in (
+            "offline",
+            "cached",
+            "auto",
+            "latest",
+        ):
             return {
                 "offline": "offline",
                 "cached": "cached-compatible",
@@ -401,7 +423,7 @@ class DriverManager:
         """Raise a diagnostic error for an offline cache miss without making a request.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Requested version or selector that could not be found in cache.
         """
         raise errors.DriverExecutableNotDetectedError(
             "No cached %s driver matches %s on %s/%s%s. Provision it online first using the same cache."
@@ -420,7 +442,7 @@ class DriverManager:
         """Validate a numeric selector before parsing it as a version object.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Numeric version text or an existing compatible Version instance.
             parser: Callable that constructs the requested version subtype from text.
             segments: Maximum number of numeric components accepted in the selector.
 
@@ -441,12 +463,21 @@ class DriverManager:
 
     def _validate_installed_pair(self) -> None:
         """Check the installed driver and browser against the active compatibility policy."""
-        if self._name == "Firefox":
-            self._validate_gecko_pair(self._driver_version, self._browser_version)
-        elif self._name != "Safari" and (
-            self._driver_version is None
-            or self._browser_version is None
-            or self._driver_version.build != self._browser_version.build
+        self._validate_version_pair(self._driver_version, self._browser_version)
+
+    def _validate_version_pair(
+        self, driver_version: DV | None, browser_version: BV | None
+    ) -> None:
+        """Validate one resolved driver/browser version pair.
+
+        Args:
+            driver_version: Resolved browser-driver version, or None when unavailable.
+            browser_version: Detected or provisioned browser version, or None when unavailable.
+        """
+        if self._name != "Safari" and (
+            driver_version is None
+            or browser_version is None
+            or driver_version.build != browser_version.build
         ):
             raise errors.InvalidDriverVersionError(
                 "Installed driver/browser builds are incompatible"
@@ -457,65 +488,66 @@ class DriverManager:
         """The last successful result; use install_result() for concurrent calls.
 
         Returns:
-            The stored last result. None indicates that no value is available.
+            Most recently published installation snapshot, or None after reset or
+            before the first successful installation.
         """
         return self._last_result
 
     # File manager ------------------------------------------------------------------------
     @property
     def max_cache_size(self) -> int | None:
-        """Return the maximum webdriver cache size.
+        """Return the configured retained-artifact count limit.
 
         Returns:
-            The maximum webdriver cache size.
+            Positive artifact limit, or None when count-based eviction is disabled.
         """
         return self._max_cache_size
 
     @max_cache_size.setter
     def max_cache_size(self, value: int | None) -> None:
         # Unlimit cache size
-        """Set the max cache size.
+        """Set the retained-artifact count limit.
 
         Args:
-            value: New max cache size value. None is handled according to the property's reset/ignore semantics.
+            value: Positive artifact limit, or None to disable count-based eviction.
         """
         if value is None:
-            self._max_cache_size: int | None = None
+            self._max_cache_size = None
             return None  # exit
 
-        # Set cache size
-        try:
-            value = int(value)
-        except Exception as err:
+        if type(value) is not int:
             raise errors.InvalidArgumentError(
                 "<{}>\nInvalid webdriver max cache size: {} {}.".format(
                     self.__class__.__name__, repr(value), type(value)
                 )
-            ) from err
+            )
         if value < 1:
             raise errors.InvalidArgumentError(
                 "<{}>\nWebdriver max cache size must be >= 1, instead got: {}.".format(
                     self.__class__.__name__, value
                 )
             )
-        self._max_cache_size: int | None = value
+        self._max_cache_size = value
 
     # Request -----------------------------------------------------------------------------
     @property
     def requests_timeout(self) -> int | float:
-        """Return the timeout in seconds for api requests. Defaults to `10` seconds.
+        """Return the total deadline for one vendor metadata request.
 
         Returns:
-            The timeout in seconds for api requests. defaults to `10` seconds.
+            Positive finite deadline in seconds, including retry delays.
         """
-        return self._requests_timeout.total
+        total = self._requests_timeout.total
+        if total is None:
+            raise errors.DriverManagerError("Requests timeout has no total deadline")
+        return total
 
     @requests_timeout.setter
     def requests_timeout(self, value: int | float) -> None:
-        """Set the requests timeout.
+        """Set the total vendor metadata request deadline.
 
         Args:
-            value: New requests timeout value.
+            value: Positive finite number of seconds, including retry delays.
         """
         if (
             isinstance(value, bool)
@@ -536,19 +568,22 @@ class DriverManager:
 
     @property
     def download_timeout(self) -> int | float:
-        """Return the timeout in seconds for file download. Defaults to `300` seconds.
+        """Return the total deadline for one artifact download.
 
         Returns:
-            The timeout in seconds for file download. defaults to `300` seconds.
+            Positive finite deadline in seconds, including admission and retry waits.
         """
-        return self._download_timeout.total
+        total = self._download_timeout.total
+        if total is None:
+            raise errors.DriverManagerError("Download timeout has no total deadline")
+        return total
 
     @download_timeout.setter
     def download_timeout(self, value: int | float) -> None:
-        """Set the download timeout.
+        """Set the total artifact download deadline.
 
         Args:
-            value: New download timeout value.
+            value: Positive finite number of seconds for download and retry work.
         """
         if (
             isinstance(value, bool)
@@ -569,34 +604,34 @@ class DriverManager:
 
     @property
     def proxy(self) -> str | None:
-        """Return the proxy for http requests.
+        """Return the provisioning-only HTTP proxy URL.
 
         Returns:
-            The proxy for http requests.
+            Explicit HTTP proxy URL, or None for direct vendor connections.
         """
         return self._proxy
 
     @proxy.setter
     def proxy(self, value: str | None) -> None:
         # Remove proxy
-        """Set the proxy.
+        """Set or clear the provisioning-only HTTP proxy URL.
 
         Args:
-            value: New proxy value. None is handled according to the property's reset/ignore semantics.
+            value: HTTP proxy URL, or None to use direct vendor connections.
         """
         if value is None:
-            self._proxy: str | None = None
+            self._proxy = None
             return None  # exit
         # Set proxy
         if not isinstance(value, str) or not value.startswith("http://"):
             raise errors.InvalidArgumentError("Proxy must be an HTTP proxy URL")
-        self._proxy: str | None = value
+        self._proxy = value
 
     async def _request_response_text(self, url: str) -> str | None:
         """Fetch bounded vendor metadata and decode it as text.
 
         Args:
-            url: URL used for the request or browser navigation.
+            url: Validated vendor metadata URL to fetch.
 
         Returns:
             Decoded vendor response text.
@@ -607,7 +642,7 @@ class DriverManager:
         """Fetch and decode bounded vendor JSON metadata.
 
         Args:
-            url: URL used for the request or browser navigation.
+            url: Validated vendor JSON metadata URL to fetch.
 
         Returns:
             The decoded JSON value; the vendor endpoint determines its shape.
@@ -618,7 +653,7 @@ class DriverManager:
         """Resolve the final URL through validated vendor redirects.
 
         Args:
-            url: URL used for the request or browser navigation.
+            url: Validated vendor URL whose redirect target is resolved.
 
         Returns:
             The final validated HTTPS URL's last path component, or None when
@@ -631,7 +666,7 @@ class DriverManager:
         """Stream a vendor artifact into an owned temporary download.
 
         Args:
-            url: URL used for the request or browser navigation.
+            url: Validated vendor artifact URL to stream.
 
         Returns:
             A mapping containing the requested URL and an owned Download object,
@@ -644,20 +679,23 @@ class DriverManager:
     # Target ------------------------------------------------------------------------------
     @property
     def channel(self) -> str:
-        """Return the webdriver channel. Please access this attribute after executing the `install()` method.
+        """Return the browser release channel published by the last installation.
 
         Returns:
-            The webdriver channel. please access this attribute after executing the `install()` method.
+            Stable, beta, development, or Chrome-for-Testing channel identifier.
+
+        Raises:
+            errors.DriverInstallationError: No installation has published a channel.
         """
         if self._channel is None:
             self._raise_installation_error("channel")
         return self._channel
 
     def _parse_target_version(self, version: Any) -> None:
-        """Parse the target version for the installation.
+        """Validate and retain the subclass-specific driver version selector.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Public version object or selector to validate and store.
         """
         raise NotImplementedError(
             "<DriverManager> `_parse_target_version()` method must be "
@@ -665,10 +703,10 @@ class DriverManager:
         )
 
     def _parse_target_binary(self, binary: PathInput | None) -> None:
-        """Parse the target browser binary for the installation.
+        """Normalize an explicit browser executable for request-local use.
 
         Args:
-            binary: Browser executable or downloaded browser artifact required by this operation.
+            binary: Explicit browser executable path, or None to enable discovery.
         """
         if binary is None:
             self._target_binary = None
@@ -687,7 +725,7 @@ class DriverManager:
         lexical location. Empty and byte-valued paths are not supported.
 
         Args:
-            path: Filesystem path to inspect or operate on.
+            path: Existing browser executable supplied at the public path boundary.
 
         Returns:
             Absolute path to the existing file without resolving symbolic links.
@@ -696,11 +734,14 @@ class DriverManager:
 
     # Driver ------------------------------------------------------------------------------
     @property
-    def driver_version(self) -> Version:
-        """Return the version of the installed webdriver. Please access this attribute after executing the `install()` method.
+    def driver_version(self) -> DV:
+        """Return the driver version published by the last installation.
 
         Returns:
-            The version of the installed webdriver. please access this attribute after executing the `install()` method.
+            Concrete driver-version subtype for this browser family.
+
+        Raises:
+            errors.DriverInstallationError: No installation has published a version.
         """
         if self._driver_version is None:
             self._raise_installation_error("driver_version")
@@ -708,38 +749,42 @@ class DriverManager:
 
     def _match_driver_executable(
         self,
-        version: Version,
+        version: DV,
         match_method: str,
-    ) -> str | None:
-        """Match the webdriver executable from cache. Returns the driver location  if matched, otherwise returns `None`.
+    ) -> Path | None:
+        """Match a cached WebDriver executable.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Parsed driver version whose cache entry is requested.
             match_method: Version match granularity: major, build, or patch.
 
         Returns:
-            The stored driver location. None indicates that no value is available.
+            Absolute cached executable path, or None when no artifact matches.
         """
         # Match driver from cache
-        driver = self._cache_view.match_driver(version, match_method=match_method)
+        cache = self._cache_view
+        if cache is None:
+            self._raise_attribute_implementation_error("_file_manager")
+        driver = cache.match_driver(version, match_method=match_method)
         if driver is None:
             return None
 
         # Set version & location
-        self._driver_version = driver["version"]
+        self._driver_version = self._parse_driver_version(driver["version"])
         self._driver_location = driver["location"]
 
         # Return driver location
         return self._driver_location
 
-    async def _request_driver_version(self, driver_version: Version) -> Version:
-        """Request the available webdriver version.
+    async def _request_driver_version(self, driver_version: DV | None) -> DV:
+        """Resolve an installable driver version from vendor metadata.
 
         Args:
-            driver_version: Resolved browser-driver version.
+            driver_version: Browser-derived or explicitly selected target version;
+                None requests the latest release where the vendor supports it.
 
         Returns:
-            The Version value produced by this operation.
+            Concrete driver version selected from the vendor response.
         """
         raise NotImplementedError(
             "<DriverManager> `_request_driver_version()` must be "
@@ -747,47 +792,53 @@ class DriverManager:
         )
 
     @property
-    def driver_location(self) -> str:
-        """Return the path to the installed webdriver executable. Please access this attribute after executing the `install()` method.
+    def driver_location(self) -> Path:
+        """Return the installed WebDriver executable path.
 
         Returns:
-            The path to the installed webdriver executable. please access this attribute after executing the `install()` method.
+            Absolute path published by the last successful installation.
         """
         if self._driver_location is None:
             self._raise_installation_error("executable")
         return self._driver_location
 
-    async def _install_driver_executable(self, driver_version: Version) -> str:
-        """Install & cache the webdriver executable. Returns the installed webdriver executable location.
+    async def _install_driver_executable(self, driver_version: DV) -> Path:
+        """Install and cache a WebDriver executable.
 
         Args:
             driver_version: Resolved browser-driver version.
 
         Returns:
-            The install driver executable string.
+            Absolute path to the cached executable.
         """
         raise NotImplementedError(
             "<DriverManager> `_install_driver_executable()` method must be "
             "implemented in subclass: <{}>.".format(self.__class__.__name__)
         )
 
-    def _cache_driver_executable(self, version: Version, res: dict[str, Any]) -> str:
-        """Cache the downloaded webdriver executable, and returns the installed driver location.
+    def _cache_driver_executable(self, version: DV, res: dict[str, Any]) -> Path:
+        """Cache a downloaded WebDriver executable.
 
         Args:
-            version: Version object or version selector for this operation.
-            res: Res used by this operation.
+            version: Exact driver version assigned to the downloaded archive.
+            res: Download metadata containing the source URL and owned archive content.
 
         Returns:
-            The stored driver location.
+            Absolute path to the cached executable.
         """
         try:
-            driver = self._cache_view.cache_driver(
+            cache = self._cache_view
+            driver_file_cls = self._driver_file_cls
+            if cache is None:
+                self._raise_attribute_implementation_error("_file_manager")
+            if driver_file_cls is None:
+                self._raise_attribute_implementation_error("_driver_file_cls")
+            driver = cache.cache_driver(
                 version,
-                self._driver_file_cls(self._os_name, **res),
+                driver_file_cls(self._os_name, **res),
                 max_cache_size=self._max_cache_size,
             )
-            self._driver_version = driver["version"]
+            self._driver_version = self._parse_driver_version(driver["version"])
             self._driver_location = driver["location"]
             return self._driver_location
 
@@ -796,24 +847,27 @@ class DriverManager:
 
     # Browser -----------------------------------------------------------------------------
     @property
-    def browser_version(self) -> Version:
-        """Return the version of the browser that pairs with the installed driver. Please access this attribute after executing the `install()` method.
+    def browser_version(self) -> BV:
+        """Return the browser version published by the last installation.
 
         Returns:
-            The version of the browser that pairs with the installed driver. please access this attribute after executing the `install()` method.
+            Concrete browser-version subtype paired with the resolved driver.
+
+        Raises:
+            errors.DriverInstallationError: No installation has published a version.
         """
         if self._browser_version is None:
             self._raise_installation_error("browser_version")
         return self._browser_version
 
-    def _detect_browser_version(self, browser_location: Path) -> Version:
-        """Detect the version of the browser.
+    def _detect_browser_version(self, browser_location: Path) -> BV:
+        """Probe a browser executable and parse its vendor-specific version output.
 
         Args:
             browser_location: Validated browser executable path used for the probe.
 
         Returns:
-            The Version value produced by this operation.
+            Concrete browser version parsed from the executable's probe output.
         """
         try:
             # Subprocess arguments are an intentional text boundary. All
@@ -859,11 +913,11 @@ class DriverManager:
             self._raise_invalid_browser_location_error(browser_location, cause=err)
 
     @property
-    def browser_location(self) -> str:
-        """Return the location of the browser binary that pairs with the installed driver. Please access this attribute after executing the `install()` method.
+    def browser_location(self) -> Path:
+        """Return the browser executable paired with the installed driver.
 
         Returns:
-            The location of the browser binary that pairs with the installed driver. please access this attribute after executing the `install()` method.
+            Absolute browser executable path published by the last installation.
         """
         if self._browser_location is None:
             self._raise_installation_error("browser_location")
@@ -871,25 +925,28 @@ class DriverManager:
 
     def _match_browser_binary(
         self,
-        version: Version,
+        version: BV,
         match_method: str,
-    ) -> str | None:
-        """Match the browser binary from cache. Returns the binary location  if matched, otherwise returns `None`.
+    ) -> Path | None:
+        """Match a cached browser executable.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Parsed browser version whose cache entry is requested.
             match_method: Version match granularity: major, build, or patch.
 
         Returns:
-            The stored browser location. None indicates that no value is available.
+            Absolute cached browser path, or None when no artifact matches.
         """
         # Match driver from cache
-        binary = self._cache_view.match_binary(version, match_method=match_method)
+        cache = self._cache_view
+        if cache is None:
+            self._raise_attribute_implementation_error("_file_manager")
+        binary = cache.match_binary(version, match_method=match_method)
         if binary is None:
             return None
 
         # Set version & location
-        self._browser_version = binary["version"]
+        self._browser_version = self._parse_browser_version(binary["version"])
         self._browser_location = binary["location"]
 
         # Return driver location
@@ -915,10 +972,10 @@ class DriverManager:
         return location
 
     def _browser_paths_for_channel(self) -> list[str]:
-        """Validate platform/channel even when an explicit binary is supplied.
+        """Return discovery candidates after validating platform and release channel.
 
         Returns:
-            Platform/channel even when an explicit binary is supplied.
+            Relative executable paths or command names for the active platform/channel.
         """
         attribute = {
             OSType.MAC: "_MAC_BINARY_PATHS",
@@ -937,7 +994,7 @@ class DriverManager:
         """Find the path to the browser binary on MacOS.
 
         Args:
-            *paths: Paths used by this operation.
+            *paths: Application-relative executable paths to test under macOS roots.
 
         Returns:
             Absolute browser path, or None when no candidate exists.
@@ -958,7 +1015,7 @@ class DriverManager:
         """Find the path to the browser binary on Windows.
 
         Args:
-            *paths: Paths used by this operation.
+            *paths: Installation-relative executable paths to test under Windows roots.
 
         Returns:
             Absolute browser path, or None when no candidate exists.
@@ -974,7 +1031,7 @@ class DriverManager:
         """Find the path to the browser binary on Linux.
 
         Args:
-            *paths: Paths used by this operation.
+            *paths: Executable command names to search through validated PATH roots.
 
         Returns:
             Absolute browser path, or None when no executable candidate exists.
@@ -988,37 +1045,43 @@ class DriverManager:
                     return candidate
         return None
 
-    async def _install_browser_binary(self, browser_version: Version) -> str:
-        """Install & cache the browser binary and returns the installed browser binary location.
+    async def _install_browser_binary(self, browser_version: BV) -> Path:
+        """Install and cache a browser executable.
 
         Args:
             browser_version: Detected or explicitly selected browser version.
 
         Returns:
-            The install browser binary string.
+            Absolute path to the cached browser executable.
         """
         raise NotImplementedError(
             "<DriverManager> `_install_browser_binary()` method must be "
             "implemented in subclass: <{}>.".format(self.__class__.__name__)
         )
 
-    def _cache_browser_binary(self, version: Version, res: dict[str, Any]) -> str:
-        """Cache the downloaded browser binary, and returns the installed binary location.
+    def _cache_browser_binary(self, version: BV, res: dict[str, Any]) -> Path:
+        """Cache a downloaded browser executable.
 
         Args:
-            version: Version object or version selector for this operation.
-            res: Res used by this operation.
+            version: Exact browser version assigned to the downloaded archive.
+            res: Download metadata containing the source URL and owned archive content.
 
         Returns:
-            The stored browser location.
+            Absolute path to the cached browser executable.
         """
         try:
-            binary = self._cache_view.cache_binary(
+            cache = self._cache_view
+            binary_file_cls = self._binary_file_cls
+            if cache is None:
+                self._raise_attribute_implementation_error("_file_manager")
+            if binary_file_cls is None:
+                self._raise_attribute_implementation_error("_binary_file_cls")
+            binary = cache.cache_binary(
                 version,
-                self._binary_file_cls(self._os_name, **res),
+                binary_file_cls(self._os_name, **res),
                 max_cache_size=self._max_cache_size,
             )
-            self._browser_version = binary["version"]
+            self._browser_version = self._parse_browser_version(binary["version"])
             self._browser_location = binary["location"]
             return self._browser_location
 
@@ -1028,16 +1091,23 @@ class DriverManager:
     # Platform Utils ----------------------------------------------------------------------
     @property
     def _os_name(self) -> Literal["linux", "mac", "win"]:
-        """Return the name of the operating system.
-
-        Expected values: `'linux'`, `'mac'`, `'win'`.
+        """Return the normalized operating-system identifier used by vendors.
 
         Returns:
-            The name of the operating system.
+            ``linux``, ``mac``, or ``win`` for the active installation request.
         """
         active = self._invocation.get()
         if active is not None:
-            return active.request.os_name
+            os_name = active.request.os_name
+            if os_name == OSType.LINUX:
+                return OSType.LINUX
+            if os_name == OSType.MAC:
+                return OSType.MAC
+            if os_name == OSType.WIN:
+                return OSType.WIN
+            raise errors.UnsupportedPlatformError(
+                "Invalid installation operating system: %r" % os_name
+            )
         if self.__os_name is None:
             syst = system()
             if syst == "Darwin":
@@ -1056,16 +1126,21 @@ class DriverManager:
 
     @property
     def _os_arch(self) -> Literal["32", "64"]:
-        """Return the architecture bit of the platform.
-
-        Expected values: `'32'`, `'64'`.
+        """Return the normalized process architecture width used by vendors.
 
         Returns:
-            The architecture bit of the platform.
+            ``32`` or ``64`` for the active installation request.
         """
         active = self._invocation.get()
         if active is not None:
-            return active.request.architecture
+            architecture_name = active.request.architecture
+            if architecture_name == "32":
+                return "32"
+            if architecture_name == "64":
+                return "64"
+            raise errors.UnsupportedPlatformError(
+                "Invalid installation architecture: %r" % architecture_name
+            )
         if self.__os_arch is None:
             if "64" in architecture()[0]:
                 self.__os_arch = "64"
@@ -1075,7 +1150,7 @@ class DriverManager:
 
     @property
     def _os_is_arm(self) -> bool:
-        """Return whether the platform is arm based.
+        """Return whether vendor artifact selection targets an ARM architecture.
 
         Returns:
             True if the platform is arm based; otherwise False.
@@ -1095,7 +1170,7 @@ class DriverManager:
 
     @property
     def _environ_paths(self) -> list[Path]:
-        """Return system environmental paths to find browser binary.
+        """Build validated, deduplicated browser discovery roots from the environment.
 
         Returns:
             Deduplicated absolute search roots in environment order.
@@ -1141,7 +1216,7 @@ class DriverManager:
         """Run literal arguments with a deadline; never evaluate a shell string.
 
         Args:
-            cmd: Cmd used by this operation.
+            cmd: Executable and literal argument vector for the version probe.
 
         Returns:
             Decoded executable probe output after the child process has been reaped.
@@ -1178,28 +1253,28 @@ class DriverManager:
                 stdout.close()
 
     # Version Utils -----------------------------------------------------------------------
-    def _parse_driver_version(self, version: Any) -> Version:
-        """Parse the driver version.
+    def _parse_driver_version(self, version: Any) -> DV:
+        """Convert vendor or cached version data to the manager's driver subtype.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Vendor response text, cached version, or existing version object.
 
         Returns:
-            The Version value produced by this operation.
+            Concrete driver-version subtype used by this manager.
         """
         raise NotImplementedError(
             "<DriverManager> `_parse_driver_version()` method must be "
             "implemented in subclass: <{}>.".format(self.__class__.__name__)
         )
 
-    def _parse_browser_version(self, version: Any) -> Version:
-        """Parse the browser version.
+    def _parse_browser_version(self, version: Any) -> BV:
+        """Convert probe or result data to the manager's browser-version subtype.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Probe output, result text, or existing version object.
 
         Returns:
-            The Version value produced by this operation.
+            Concrete browser-version subtype used by this manager.
         """
         raise NotImplementedError(
             "<DriverManager> `_parse_browser_version()` method must be "
@@ -1211,7 +1286,7 @@ class DriverManager:
         """Raise an installation error.
 
         Args:
-            attr_name: Attr name used by this operation.
+            attr_name: Public result property accessed before installation completed.
 
         Raises:
             errors.DriverInstallationError: Always raised with the supplied diagnostic context.
@@ -1225,13 +1300,13 @@ class DriverManager:
         """Raise an attribute not implemented error.
 
         Args:
-            attr_name: Attr name used by this operation.
+            attr_name: Required subclass attribute that has no implementation.
 
         Raises:
             NotImplementedError: Always raised with the supplied diagnostic context.
         """
         raise NotImplementedError(
-            "<DriverManager>\nCritial class attribute '{}' not implemented in "
+            "<DriverManager>\nCritical class attribute '{}' not implemented in "
             "subclass: <{}>.".format(attr_name, self.__class__.__name__)
         )
 
@@ -1251,7 +1326,7 @@ class DriverManager:
         """Raise the invalid driver version error.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Rejected driver-version input included in the diagnostic.
 
         Raises:
             errors.InvalidDriverVersionError: Always raised with the supplied diagnostic context.
@@ -1269,11 +1344,11 @@ class DriverManager:
             )
         )
 
-    def _raise_invalid_driver_location_error(self, path: Any) -> NoReturn:
+    def _raise_invalid_driver_location_error(self, path: object) -> NoReturn:
         """Raise an invalid webdriver location error.
 
         Args:
-            path: Filesystem path to inspect or operate on.
+            path: Missing or invalid driver path included in the diagnostic.
 
         Raises:
             errors.DriverExecutableNotDetectedError: Always raised with the supplied diagnostic context.
@@ -1304,11 +1379,11 @@ class DriverManager:
                 )
             )
 
-    def _raise_driver_request_failed_error(self, version: Version) -> NoReturn:
+    def _raise_driver_request_failed_error(self, version: Version | None) -> NoReturn:
         """Raise a driver version request failed error.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Requested target version, or None for an unresolved latest request.
 
         Raises:
             errors.DriverRequestFailedError: Always raised with the supplied diagnostic context.
@@ -1331,8 +1406,8 @@ class DriverManager:
         """Raise a driver download failed error.
 
         Args:
-            version: Version object or version selector for this operation.
-            url: URL used for the request or browser navigation.
+            version: Driver version whose artifact could not be downloaded.
+            url: Vendor artifact URL that exhausted the download policy.
 
         Raises:
             errors.DriverDownloadFailedError: Always raised with the supplied diagnostic context.
@@ -1355,7 +1430,7 @@ class DriverManager:
         """Raise the invalid browser version error.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Rejected browser-version input included in the diagnostic.
 
         Raises:
             errors.InvalidBrowserVersionError: Always raised with the supplied diagnostic context.
@@ -1374,13 +1449,13 @@ class DriverManager:
         )
 
     def _raise_invalid_browser_location_error(
-        self, path: Any, cause: BaseException | None = None
+        self, path: object, cause: BaseException | None = None
     ) -> NoReturn:
         """Raise an invalid binary location error.
 
         Args:
-            path: Filesystem path to inspect or operate on.
-            cause: Cause used by this operation.
+            path: Missing or invalid browser path included in the diagnostic.
+            cause: Underlying validation or probe failure, when available.
 
         Raises:
             errors.BrowserBinaryNotDetectedError: Always raised with the supplied diagnostic context.
@@ -1417,8 +1492,8 @@ class DriverManager:
         """Raise a browser download failed error.
 
         Args:
-            version: Version object or version selector for this operation.
-            url: URL used for the request or browser navigation.
+            version: Browser version whose artifact could not be downloaded.
+            url: Vendor artifact URL that exhausted the download policy.
 
         Raises:
             errors.BrowserDownloadFailedError: Always raised with the supplied diagnostic context.
@@ -1436,12 +1511,12 @@ class DriverManager:
         )
 
 
-class ChromiumBaseDriverManager(DriverManager):
-    """Represent the webdriver manager for the Chromium based browser."""
+class ChromiumBaseDriverManager(DriverManager[ChromiumVersion, ChromiumVersion]):
+    """Share installed-browser discovery and CfT-era resolution across Chromium products."""
 
     # fmt: off
     _CHROMELABS_ENDPOINT_URL: str = "https://googlechromelabs.github.io/chrome-for-testing"
-    """The chromelab url to request the Chrome webdriver."""
+    """Chrome for Testing metadata endpoint used for release and asset lookup."""
     _MIN_CHROME_VERSION: ChromiumVersion = ChromiumVersion("115")
     """Chrome/Chromium driver provisioning requires the CfT release pipeline."""
 
@@ -1459,13 +1534,14 @@ class ChromiumBaseDriverManager(DriverManager):
         download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Configure a Chromium-family product and its cache/archive implementations.
 
         Args:
-            name: Name identifying the requested item.
-            file_manager_cls: Cache-manager class, or None for a system-managed driver.
-            driver_file_cls: Downloaded driver-archive class, or None when downloads are unsupported.
-            binary_file_cls: Downloaded browser-archive class, or None when downloads are unsupported.
+            name: Chromium-family product name used in diagnostics and cache identity.
+            file_manager_cls: Product-specific cache manager implementation.
+            driver_file_cls: Product-specific driver archive implementation.
+            binary_file_cls: Browser archive implementation, or None when the product
+                cannot provision browser binaries.
             directory: Cache parent directory; None uses the default per-user cache location.
             max_cache_size: Maximum retained artifact count; None leaves retention unbounded.
             request_timeout: Positive timeout in seconds for vendor metadata requests.
@@ -1493,44 +1569,22 @@ class ChromiumBaseDriverManager(DriverManager):
 
     # Installation ------------------------------------------------------------------------
     @isolated_install
-    async def install(
+    async def _install_chromium(
         self,
         version: ChromiumVersion | str = "build",
         channel: Literal["stable", "beta", "dev"] = "stable",
         binary: PathInput | None = None,
-    ) -> str:
-        """Install a webdriver.
+    ) -> Path:
+        """Resolve a driver for an installed Chromium-family browser.
 
         Args:
-            version: Defaults to `'build'`. Accepts the following values:
-                - `'major'`: Install webdriver that has the same major version as the browser.
-                - `'build'`: Install webdriver that has the same major & build version as the browser.
-                - `'patch'`: Install webdriver that has the same major, build & patch version as the browser.
-                - `'118.0.5982.0'`: Install the exact webdriver version regardless of the browser version.
-            channel: Defaults to `'stable'`. Accepts the following values:
-                - `'stable'`: Locate the `STABLE` (normal) browser binary in the system
-                and use it to determine the webdriver version.
-                - `'beta'`:   Locate the `BETA` browser binary in the system and use it to
-                determine the webdriver version.
-                - `'dev'`:    Locate the `DEV` browser binary in the system and use it to
-                determine the webdriver version.
-            binary: The path to a specific browser binary. Defaults to `None`.
-                If specified, will use this given browser binary to determine
-                the webdriver version.
+            version: Numeric Chromium version or major, build, patch, latest, cached,
+                or offline compatibility selector.
+            channel: Installed browser release channel used for automatic discovery.
+            binary: Explicit browser executable, or None to discover the selected channel.
 
         Returns:
-            The path to the installed webdriver executable.
-
-        Example:
-            >>> from aselenium import EdgeDriverManager
-            >>> mgr = EdgeDriverManager()
-            >>> driver_executable = await mgr.install("build", "beta")
-
-            >>> mgr.driver_version
-
-            >>> mgr.browser_location
-
-            >>> mgr.browser_version
+            Absolute path to an integrity-checked cached driver executable.
         """
         try:
             # Parse arguments
@@ -1545,7 +1599,7 @@ class ChromiumBaseDriverManager(DriverManager):
                 if self._target_binary is None
                 else self._target_binary
             )
-            self._browser_location = str(browser_location)
+            self._browser_location = browser_location
 
             # Detect browser version
             self._browser_version = await run_blocking(
@@ -1602,7 +1656,7 @@ class ChromiumBaseDriverManager(DriverManager):
                         % (driver_version, target)
                     )
 
-                # . match from cache - 2rd
+                # . match exact resolved version from cache
                 driver_location = await run_blocking(
                     self._match_driver_executable, driver_version, "patch"
                 )
@@ -1624,8 +1678,8 @@ class ChromiumBaseDriverManager(DriverManager):
         """Reject unsupported Chrome or Chromium versions before cache lookup.
 
         Args:
-            version: Version object or version selector for this operation.
-            browser: Browser used by this operation.
+            version: Parsed Chrome or Chromium version to compare with the CfT floor.
+            browser: Whether an unsupported value should raise a browser-version error.
         """
         if self._name != "Edge" and version < self._MIN_CHROME_VERSION:
             error = (
@@ -1638,10 +1692,10 @@ class ChromiumBaseDriverManager(DriverManager):
             )
 
     def _parse_target_version(self, version: Any) -> None:
-        """Parse the target version for the installation.
+        """Validate a Chromium driver version or compatibility selector.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Public Chromium version or compatibility selector to validate.
         """
         if version in ["major", "build", "patch", "latest", "cached", "offline", None]:
             self._target_version = None
@@ -1658,22 +1712,27 @@ class ChromiumBaseDriverManager(DriverManager):
     # Driver ------------------------------------------------------------------------------
     @property
     def driver_version(self) -> ChromiumVersion:
-        """Return the version of the installed webdriver. Please access this attribute after executing the `install()` method.
+        """Return the Chromium driver version published by the last installation.
 
         Returns:
-            The version of the installed webdriver. please access this attribute after executing the `install()` method.
+            Parsed four-component Chromium driver version.
         """
         return super().driver_version
 
-    async def _request_driver_version(self, driver_version: Version) -> ChromiumVersion:
-        """Request the available webdriver version.
+    async def _request_driver_version(
+        self, driver_version: ChromiumVersion | None
+    ) -> ChromiumVersion:
+        """Resolve the newest vendor driver matching a Chromium major or build.
 
         Args:
             driver_version: Resolved browser-driver version.
 
         Returns:
-            The ChromiumVersion value produced by this operation.
+            Full Chromium driver version returned by the CfT release endpoint.
         """
+        if driver_version is None:
+            self._raise_driver_request_failed_error(driver_version)
+
         # Construct check version url
         version = (
             driver_version.major
@@ -1694,14 +1753,14 @@ class ChromiumBaseDriverManager(DriverManager):
             self._raise_driver_request_failed_error(driver_version)
 
     @artifact_install("driver")
-    async def _install_driver_executable(self, driver_version: Version) -> str:
+    async def _install_driver_executable(self, driver_version: ChromiumVersion) -> Path:
         """Install and cache a Chromium driver with cross-process ownership.
 
         Args:
             driver_version: Resolved browser-driver version.
 
         Returns:
-            The install driver executable string.
+            Absolute path to the cached Chromium driver executable.
         """
         url = await self._cft_asset_url(driver_version, "chromedriver")
 
@@ -1714,12 +1773,12 @@ class ChromiumBaseDriverManager(DriverManager):
         return await run_blocking(self._cache_driver_executable, driver_version, res)
 
     def _generate_chromelabs_arch(self) -> str:
-        """Generate the webdriver architecture for chromelabs endpoint. Use to construct webdriver download url.
+        """Map the active platform to a Chrome for Testing artifact label.
 
         For example: `'win64'`, `'mac-arm64'`, `'linux64'`.
 
         Returns:
-            The stored chromelabs arch.
+            Vendor platform label such as ``win64``, ``mac-arm64``, or ``linux64``.
         """
         if self._chromelabs_arch is None:
             if self._os_name == OSType.WIN:
@@ -1735,11 +1794,11 @@ class ChromiumBaseDriverManager(DriverManager):
         """Select an exact artifact/architecture from the vendor's version manifest.
 
         Args:
-            version: Version object or version selector for this operation.
-            artifact: Artifact kind: driver or binary.
+            version: Exact four-component CfT version whose manifest is requested.
+            artifact: Manifest artifact key, either ``chromedriver`` or ``chrome``.
 
         Returns:
-            The cft asset url string.
+            Validated Google Storage HTTPS URL for the active vendor platform.
         """
         self._validate_supported_version(version)
         metadata = await self._request_response_json(
@@ -1797,22 +1856,22 @@ class ChromiumBaseDriverManager(DriverManager):
     # Browser -----------------------------------------------------------------------------
     @property
     def browser_version(self) -> ChromiumVersion:
-        """Return the version of the browser that pairs with the installed driver. Please access this attribute after executing the `install()` method.
+        """Return the Chromium browser version published by the last installation.
 
         Returns:
-            The version of the browser that pairs with the installed driver. please access this attribute after executing the `install()` method.
+            Parsed version of the discovered or provisioned Chromium-family browser.
         """
         return super().browser_version
 
     # Version Utils -----------------------------------------------------------------------
     def _parse_driver_version(self, version: Any) -> ChromiumVersion:
-        """Parse the driver version.
+        """Parse Chromium driver metadata into a four-component-aware version.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Vendor response text, cached version, or ChromiumVersion instance.
 
         Returns:
-            A new ChromiumVersion instance constructed from the current values.
+            Parsed ChromiumVersion preserving the vendor's available components.
         """
         try:
             return ChromiumVersion(version)
@@ -1820,13 +1879,13 @@ class ChromiumBaseDriverManager(DriverManager):
             self._raise_invalid_driver_version_error(version)
 
     def _parse_browser_version(self, version: Any) -> ChromiumVersion:
-        """Parse the browser version.
+        """Parse Chromium browser probe output into a comparable version.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Browser probe text, result text, or ChromiumVersion instance.
 
         Returns:
-            A new ChromiumVersion instance constructed from the current values.
+            Parsed ChromiumVersion preserving the browser's available components.
         """
         try:
             return ChromiumVersion(version)
@@ -1835,7 +1894,7 @@ class ChromiumBaseDriverManager(DriverManager):
 
 
 class EdgeDriverManager(ChromiumBaseDriverManager):
-    """Represent the webdriver manager for the Edge browser."""
+    """Discover Microsoft Edge and provision its matching EdgeDriver."""
 
     # fmt: off
     _MAC_BINARY_PATHS: dict[str, list[str]] = {
@@ -1857,7 +1916,7 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
     }
     """The partial paths to the Edge binary on Linux."""
     _AZUREEDGE_ENDPOINT_URL: str = "https://msedgedriver.microsoft.com"
-    """The azureedge url to request the Edge webdriver."""
+    """Microsoft endpoint used to resolve and download EdgeDriver releases."""
     # fmt: on
 
     def __init__(
@@ -1868,7 +1927,7 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
         download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Configure Edge discovery, provisioning, and cache retention.
 
         Args:
             directory: Cache parent directory; None uses the default per-user cache location.
@@ -1891,16 +1950,40 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
         # Installation
         self._azureedge_arch: str | None = None
 
+    # Installation ------------------------------------------------------------------------
+    async def install(
+        self,
+        version: ChromiumVersion | str = "build",
+        channel: Literal["stable", "beta", "dev"] = "stable",
+        binary: PathInput | None = None,
+    ) -> Path:
+        """Resolve and install an Edge WebDriver executable.
+
+        Args:
+            version: Driver version or compatibility selector.
+            channel: Installed Edge release channel used for browser discovery.
+            binary: Explicit Edge executable, or None for automatic discovery.
+
+        Returns:
+            Absolute path to the resolved Edge WebDriver executable.
+        """
+        return await self._install_chromium(version, channel, binary)
+
     # Driver version ----------------------------------------------------------------------
-    async def _request_driver_version(self, driver_version: Version) -> ChromiumVersion:
-        """Request the available webdriver version.
+    async def _request_driver_version(
+        self, driver_version: ChromiumVersion | None
+    ) -> ChromiumVersion:
+        """Resolve the EdgeDriver release for an installed Edge major version.
 
         Args:
             driver_version: Resolved browser-driver version.
 
         Returns:
-            The ChromiumVersion value produced by this operation.
+            Full EdgeDriver version returned by Microsoft's platform endpoint.
         """
+        if driver_version is None:
+            self._raise_driver_request_failed_error(driver_version)
+
         # Construct check version url
         version = driver_version.major
         if self._os_name == OSType.WIN:
@@ -1921,14 +2004,14 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
 
     # Driver executable -------------------------------------------------------------------
     @artifact_install("driver")
-    async def _install_driver_executable(self, driver_version: ChromiumVersion) -> str:
-        """Install & cache the webdriver executable. Returns the installed webdriver executable location.
+    async def _install_driver_executable(self, driver_version: ChromiumVersion) -> Path:
+        """Download, validate, and publish one EdgeDriver archive.
 
         Args:
             driver_version: Resolved browser-driver version.
 
         Returns:
-            The install driver executable string.
+            Absolute path to the cached EdgeDriver executable.
         """
         # Generate download url
         driver_arch = self._generate_azureedge_arch()
@@ -1946,12 +2029,12 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
         return await run_blocking(self._cache_driver_executable, driver_version, res)
 
     def _generate_azureedge_arch(self) -> str:
-        """Generate the webdriver architecture for azureedge endpoint. Use to construct webdriver download url.
+        """Map the active platform to Microsoft's EdgeDriver archive label.
 
         For example: `'win64'`, `'mac64_m1'`, `'linux64'`.
 
         Returns:
-            The stored azureedge arch.
+            Vendor archive label such as ``win64``, ``mac64_m1``, or ``linux64``.
         """
         if self._azureedge_arch is None:
             if self._os_name == OSType.WIN:
@@ -1969,7 +2052,7 @@ class EdgeDriverManager(ChromiumBaseDriverManager):
 
 
 class ChromeDriverManager(ChromiumBaseDriverManager):
-    """Represent the webdriver manager for the Chrome browser."""
+    """Discover Google Chrome or provision a matched Chrome-for-Testing pair."""
 
     # fmt: off
     _MAC_BINARY_PATHS: dict[str, list[str]] = {
@@ -2000,7 +2083,7 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
         download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Configure Chrome discovery, CfT provisioning, and cache retention.
 
         Args:
             directory: Cache parent directory; None uses the default per-user cache location.
@@ -2028,7 +2111,7 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
         version: ChromiumVersion | str = "build",
         channel: Literal["stable", "beta", "dev", "cft"] = "stable",
         binary: PathInput | None = None,
-    ) -> str:
+    ) -> Path:
         """Resolve and install a Chrome driver, optionally with Chrome for Testing.
 
         Each call owns isolated installation state. Prefer install_result when
@@ -2042,13 +2125,15 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
             channel: Installed-browser channel stable, beta, or dev. Choose cft to
                 provision both Chrome for Testing and its matching driver.
             binary: Installed Chrome executable used for version discovery, or None
-                for automatic discovery. Ignored when channel is cft.
+                for automatic discovery. It must be None when channel is cft because
+                that channel provisions its own matching browser executable.
 
         Returns:
             The validated driver executable path. With cft, browser_location also
             identifies the provisioned browser. Cache paths are implementation details.
 
         Raises:
+            errors.InvalidArgumentError: ``binary`` is supplied with the cft channel.
             errors.DriverManagerError: Resolution, download, validation, or publication
                 fails. More specific subclasses describe the failure category.
 
@@ -2064,17 +2149,21 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
         """
         #### Driver installation
         if channel != "cft":
-            return await super().install(version, channel, binary)
+            return await self._install_chromium(version, channel, binary)
 
         #### Chrome for Testing installation
         try:
+            if binary is not None:
+                raise errors.InvalidArgumentError(
+                    "binary cannot be supplied when channel='cft'"
+                )
             # Parse arguments
             self._channel = channel
             self._parse_target_version(version)
             if self._target_version is None:
                 raise errors.InvalidDriverVersionError(
-                    "<{}>\nMust specific version for [cft] (Chrome for Testing) "
-                    "channel. Instead of: {} {}.".format(
+                    "<{}>\nThe [cft] (Chrome for Testing) channel requires a "
+                    "numeric version; received: {} {}.".format(
                         self.__class__.__name__, repr(version), type(version)
                     )
                 )
@@ -2106,7 +2195,7 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
                     self._target_version
                 )
 
-                # . match from cache - 2rd
+                # . match exact resolved pair from cache
                 driver_location = await run_blocking(
                     self._match_cft_driver_and_binary, driver_version, binary_version
                 )
@@ -2129,23 +2218,26 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
         self,
         driver_version: ChromiumVersion,
         binary_version: ChromiumVersion,
-    ) -> str | None:
-        """Match the CFT driver & binary from cache. Returns the driver location if both driver & binary are matched, otherwise returns `None`.
+    ) -> Path | None:
+        """Match a cached Chrome-for-Testing driver and browser pair.
 
         Args:
             driver_version: Resolved browser-driver version.
-            binary_version: Binary version used by this operation.
+            binary_version: Required Chrome browser version for the cached pair.
 
         Returns:
-            Match the CFT driver & binary from cache. Returns the driver location if both driver & binary are matched, otherwise returns `None`.
+            Cached driver path when both artifacts match, or None otherwise.
         """
         if len(driver_version) == 4:
             candidates = [driver_version]
         else:
+            cache = self._cache_view
+            if cache is None:
+                self._raise_attribute_implementation_error("_file_manager")
             candidates = sorted(
                 (
                     self._parse_driver_version(value)
-                    for value in self._cache_view.cached_versions()
+                    for value in cache.cached_versions()
                 ),
                 reverse=True,
             )
@@ -2169,13 +2261,13 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
         self,
         cft_version: ChromiumVersion,
     ) -> tuple[ChromiumVersion, ChromiumVersion]:
-        """Request available Chrome for Testing version.
+        """Resolve an exact available Chrome-for-Testing driver/browser pair.
 
         Args:
-            cft_version: Cft version used by this operation.
+            cft_version: Exact version or build prefix requested by the caller.
 
         Returns:
-            Request available Chrome for Testing version.
+            Identical full versions for the matched Chrome and ChromeDriver assets.
         """
         self._validate_supported_version(cft_version)
         if (
@@ -2198,14 +2290,14 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
         return version, version
 
     @artifact_install("binary")
-    async def _install_browser_binary(self, binary_version: ChromiumVersion) -> str:
-        """Install & cache the browser binary and returns the installed browser binary location.
+    async def _install_browser_binary(self, binary_version: ChromiumVersion) -> Path:
+        """Download, validate, and publish one Chrome-for-Testing browser archive.
 
         Args:
-            binary_version: Binary version used by this operation.
+            binary_version: Exact Chrome-for-Testing browser version to download.
 
         Returns:
-            The install browser binary string.
+            Absolute path to the cached Chrome executable.
         """
         # Generate browser architecture
         url = await self._cft_asset_url(binary_version, "chrome")
@@ -2240,7 +2332,7 @@ class ChromeDriverManager(ChromiumBaseDriverManager):
 
 
 class ChromiumDriverManager(ChromiumBaseDriverManager):
-    """Represent the webdriver manager for the Chromium browser."""
+    """Discover a development-channel Chromium binary and provision ChromeDriver."""
 
     # fmt: off
     _MAC_BINARY_PATHS: dict[str, list[str]] = {
@@ -2265,7 +2357,7 @@ class ChromiumDriverManager(ChromiumBaseDriverManager):
         download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Configure Chromium discovery, ChromeDriver provisioning, and cache retention.
 
         Args:
             directory: Cache parent directory; None uses the default per-user cache location.
@@ -2291,23 +2383,16 @@ class ChromiumDriverManager(ChromiumBaseDriverManager):
         self,
         version: ChromiumVersion | str = "build",
         binary: PathInput | None = None,
-    ) -> str:
-        """Install a webdriver.
+    ) -> Path:
+        """Resolve ChromeDriver for an installed development-channel Chromium.
 
         Args:
-            version: Defaults to `'build'`. Accepts the following values:
-                - `'major'`: Install webdriver that has the same major version as the browser.
-                - `'build'`: Install webdriver that has the same major & build version as the browser.
-                - `'patch'`: Install webdriver that has the same major, build & patch version as the browser.
-                - `'118.0.5982.0'`: Install the exact webdriver version regardless of the browser version.
-            binary: The path to a specific browser binary. Defaults to `None`.
-                - If `None`, will try to locate the Chromium browser binary installed
-                in the system and use it to determine the webdriver version.
-                - If specified, will use the given browser binary to determine the
-                webdriver version.
+            version: Numeric Chromium version or major, build, patch, latest, cached,
+                or offline compatibility selector.
+            binary: Explicit Chromium executable, or None for automatic discovery.
 
         Returns:
-            The path to the installed webdriver executable.
+            Absolute path to the integrity-checked cached ChromeDriver executable.
 
         Example:
             >>> from aselenium import ChromiumDriverManager
@@ -2320,11 +2405,11 @@ class ChromiumDriverManager(ChromiumBaseDriverManager):
 
             >>> mgr.browser_version
         """
-        return await super().install(version, "dev", binary)
+        return await self._install_chromium(version, "dev", binary)
 
 
-class FirefoxDriverManager(DriverManager):
-    """Represent the webdriver manager for Firefox browser."""
+class FirefoxDriverManager(DriverManager[GeckoVersion, FirefoxVersion]):
+    """Discover Firefox and resolve GeckoDriver through recorded compatibility bounds."""
 
     # fmt: off
     _MAC_BINARY_PATHS: dict[str, list[str]] = {
@@ -2343,22 +2428,22 @@ class FirefoxDriverManager(DriverManager):
     }
     """The partial paths to the Firefox binary on Linux."""
     _MOZILLA_GITHUB_URL: str = "https://github.com/mozilla/geckodriver/releases"
-    """The github url to request the compatible Firefox webdriver version."""
+    """Mozilla GeckoDriver release endpoint used as the redirect fallback."""
     _MOZILLA_GITHUBAPI_URL: str = "https://api.github.com/repos/mozilla/geckodriver/releases"
-    """The github api url to request the compatible Firefox webdriver version."""
+    """GitHub API endpoint used to resolve GeckoDriver release tags."""
     _GECKODRIVER_MACARM_VERSION: GeckoVersion = GeckoVersion("0.29.1")
     """Version below this does not provide arm64 driver for MacOS."""
     _GECKODRIVER_WINARM_VERSION: GeckoVersion = GeckoVersion("0.32.0")
     """Version below this does not provide arm64 driver for Windows."""
     _GECKODRIVER_LINUXARM_ARCH_VERSION: GeckoVersion = GeckoVersion("0.32.0")
     """Version below this does not provide arm64 driver for Linux."""
-    _GECKODRIVER_MAX_VERSION: GeckoVersion = None
-    """The maximum version of GeckoDriver available by the manager."""
+    _GECKODRIVER_MAX_VERSION: GeckoVersion | None = None
+    """Newest GeckoDriver observed in bundled data or a successful vendor response."""
     _GECKODRIVER_MIN_VERSION: GeckoVersion = GeckoVersion("0.30.0")
     """The minimum version of GeckoDriver supported by the manager."""
-    _GECKODRIVER_TABLE: dict[GeckoVersion, dict[str, FirefoxVersion]] = None
-    """The compatibility table between Firefox and GeckoDriver."""
-    _GECKODRIVER_TABLE_MAX_VERSION: GeckoVersion = None
+    _GECKODRIVER_TABLE: dict[GeckoVersion, dict[str, FirefoxVersion]] | None = None
+    """Validated GeckoDriver-to-Firefox minimum and maximum version bounds."""
+    _GECKODRIVER_TABLE_MAX_VERSION: GeckoVersion | None = None
     """The maximum version of GeckoDriver recorded in the compatibility table."""
     _FIREFOX_MIN_VERSION: FirefoxVersion = FirefoxVersion("78.0.0")
     """Firefox version below this is not supported by the manager."""
@@ -2372,7 +2457,7 @@ class FirefoxDriverManager(DriverManager):
         download_timeout: int | float = 300,
         proxy: str | None = None,
     ) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Configure Firefox discovery, GeckoDriver resolution, and cache retention.
 
         Args:
             directory: Cache parent directory; None uses the default per-user cache location.
@@ -2403,7 +2488,7 @@ class FirefoxDriverManager(DriverManager):
     # Class methods -----------------------------------------------------------------------
     @classmethod
     def load_driver_compatibility_table(cls) -> None:
-        """(Class method) Load the compatibility table between Firefox and GeckoDriver into memory using the installed package resource."""
+        """Load and validate the bundled GeckoDriver compatibility resource once."""
         # Already loaded
         if cls._GECKODRIVER_TABLE is not None:
             return None  # exit
@@ -2461,8 +2546,8 @@ class FirefoxDriverManager(DriverManager):
         self,
         version: GeckoVersion | str = "latest",
         binary: PathInput | None = None,
-    ) -> str:
-        """Install a geckodriver.
+    ) -> Path:
+        """Resolve and install a GeckoDriver compatible with the detected Firefox.
 
         Args:
             version: Defaults to `'latest'`. Accepts the following values:
@@ -2482,7 +2567,7 @@ class FirefoxDriverManager(DriverManager):
                 compatible webdriver version.
 
         Returns:
-            The path to the installed webdriver executable.
+            Absolute path to the integrity-checked cached GeckoDriver executable.
 
         Example:
             >>> from aselenium import FirefoxDriverManager
@@ -2508,7 +2593,7 @@ class FirefoxDriverManager(DriverManager):
                 if self._target_binary is None
                 else self._target_binary
             )
-            self._browser_location = str(browser_location)
+            self._browser_location = browser_location
 
             # Detect browser version
             self._browser_version = await run_blocking(
@@ -2572,10 +2657,10 @@ class FirefoxDriverManager(DriverManager):
 
     # Target ------------------------------------------------------------------------------
     def _parse_target_version(self, version: Any) -> None:
-        """Parse the target version for the installation.
+        """Validate a GeckoDriver release or resolution selector.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Public GeckoDriver version or latest, auto, cached, or offline selector.
         """
         if version in ["latest", "auto", "cached", "offline", None]:
             self._target_version = None
@@ -2587,21 +2672,23 @@ class FirefoxDriverManager(DriverManager):
     # Driver ------------------------------------------------------------------------------
     @property
     def driver_version(self) -> GeckoVersion:
-        """Return the version of the installed webdriver. Please access this attribute after executing the `install()` method.
+        """Return the GeckoDriver version published by the last installation.
 
         Returns:
-            The version of the installed webdriver. please access this attribute after executing the `install()` method.
+            Parsed three-component GeckoDriver version.
         """
         return super().driver_version
 
-    async def _request_driver_version(self, version: Version | None) -> GeckoVersion:
-        """Request the available geckodriver version.
+    async def _request_driver_version(
+        self, version: GeckoVersion | None
+    ) -> GeckoVersion:
+        """Resolve a GeckoDriver release tag through the GitHub API or redirect URL.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Exact GeckoDriver version, or None to request the latest release.
 
         Returns:
-            The GeckoVersion value produced by this operation.
+            Parsed GeckoDriver version returned by Mozilla's release metadata.
         """
 
         async def request_from_api(version: GeckoVersion | None) -> str | None:
@@ -2609,10 +2696,10 @@ class FirefoxDriverManager(DriverManager):
             """Resolve the requested GeckoDriver version from the vendor API.
 
             Args:
-                version: Version object or version selector for this operation.
+                version: Exact GeckoDriver version, or None for the latest release.
 
             Returns:
-                The requested geckodriver version from the vendor api. None indicates that no value is available.
+                Release tag text, or None when both API and fallback resource are absent.
             """
             if version is None:
                 url = self._MOZILLA_GITHUBAPI_URL + "/latest"
@@ -2636,7 +2723,7 @@ class FirefoxDriverManager(DriverManager):
             """Resolve the requested GeckoDriver version from the release URL.
 
             Args:
-                version: Version object or version selector for this operation.
+                version: Exact GeckoDriver version, or None for the latest redirect.
 
             Returns:
                 The release URL's final path component, or None when the release
@@ -2656,26 +2743,27 @@ class FirefoxDriverManager(DriverManager):
 
         # Parse driver version
         try:
-            version = self._parse_driver_version(res)
+            resolved = self._parse_driver_version(res)
         except errors.InvalidDriverVersionError:
             self._raise_driver_request_failed_error(version)
 
         # Update max version
-        if version > self._GECKODRIVER_MAX_VERSION:
-            self._GECKODRIVER_MAX_VERSION = version
+        maximum = self._GECKODRIVER_MAX_VERSION
+        if maximum is None or resolved > maximum:
+            self._GECKODRIVER_MAX_VERSION = resolved
 
         # Return version
-        return version
+        return resolved
 
     @artifact_install("driver")
-    async def _install_driver_executable(self, driver_version: GeckoVersion) -> str:
-        """Install & cache the webdriver executable. Returns the installed webdriver executable location.
+    async def _install_driver_executable(self, driver_version: GeckoVersion) -> Path:
+        """Download, validate, and publish one GeckoDriver archive.
 
         Args:
             driver_version: Resolved browser-driver version.
 
         Returns:
-            The install driver executable string.
+            Absolute path to the cached GeckoDriver executable.
         """
         # Generate download url
         driver_arch = self._generate_mozilla_arch(driver_version)
@@ -2694,7 +2782,7 @@ class FirefoxDriverManager(DriverManager):
         return await run_blocking(self._cache_driver_executable, driver_version, res)
 
     def _generate_mozilla_arch(self, driver_version: GeckoVersion) -> str:
-        """Generate the webdriver architecture for mozilla github repository. Use to construct webdriver download url.
+        """Select Mozilla's GeckoDriver archive label for the active platform.
 
         For example: `'win64.zip'`, `'mac64-aarch64.tar.gz'`, `'linux64.tar.gz'`.
 
@@ -2702,7 +2790,8 @@ class FirefoxDriverManager(DriverManager):
             driver_version: Resolved browser-driver version.
 
         Returns:
-            The webdriver architecture for mozilla github repository. use to construct webdriver download url.
+            Version-aware archive label such as ``win64.zip`` or
+            ``macos-aarch64.tar.gz``.
         """
         # Validate version
         if driver_version < self._GECKODRIVER_MIN_VERSION:
@@ -2736,26 +2825,12 @@ class FirefoxDriverManager(DriverManager):
     # Browser -----------------------------------------------------------------------------
     @property
     def browser_version(self) -> FirefoxVersion:
-        """Return the version of the browser that pairs with the installed driver. Please access this attribute after executing the `install()` method.
+        """Return the Firefox version published by the last installation.
 
         Returns:
-            The version of the browser that pairs with the installed driver. please access this attribute after executing the `install()` method.
+            Parsed version of the discovered or explicitly selected Firefox binary.
         """
         return super().browser_version
-
-    def _find_max_compatible_driver_version(
-        self,
-        browser_version: FirefoxVersion,
-    ) -> GeckoVersion:
-        """Find browser's maximum compatible driver version based on the compatibility table.
-
-        Args:
-            browser_version: Detected or explicitly selected browser version.
-
-        Returns:
-            The GeckoVersion value produced by this operation.
-        """
-        return self._compatible_gecko_versions(browser_version)[0]
 
     def _compatible_gecko_versions(
         self, browser_version: FirefoxVersion
@@ -2768,10 +2843,15 @@ class FirefoxDriverManager(DriverManager):
         Returns:
             Recorded compatible geckodriver versions in descending order.
         """
+        table = self._GECKODRIVER_TABLE
+        if table is None:
+            raise errors.DriverManagerError(
+                "Firefox compatibility data has not been loaded"
+            )
         candidates = sorted(
             (
                 version
-                for version, bounds in self._GECKODRIVER_TABLE.items()
+                for version, bounds in table.items()
                 if version >= self._GECKODRIVER_MIN_VERSION
                 and bounds["min_firefox_version"]
                 <= browser_version
@@ -2794,7 +2874,16 @@ class FirefoxDriverManager(DriverManager):
             driver_version: Resolved browser-driver version.
             browser_version: Detected or explicitly selected browser version.
         """
-        bounds = self._GECKODRIVER_TABLE.get(driver_version)
+        if driver_version is None or browser_version is None:
+            raise errors.InvalidDriverVersionError(
+                "Cannot validate an incomplete Gecko/Firefox version pair"
+            )
+        table = self._GECKODRIVER_TABLE
+        if table is None:
+            raise errors.DriverManagerError(
+                "Firefox compatibility data has not been loaded"
+            )
+        bounds = table.get(driver_version)
         if bounds is None:
             raise errors.InvalidDriverVersionError(
                 "No recorded Firefox compatibility bounds for Gecko %s; update compatibility data"
@@ -2810,15 +2899,28 @@ class FirefoxDriverManager(DriverManager):
                 % (driver_version, browser_version)
             )
 
-    # Version Utils -----------------------------------------------------------------------
-    def _parse_driver_version(self, version: Any) -> GeckoVersion:
-        """Parse the driver version.
+    def _validate_version_pair(
+        self,
+        driver_version: GeckoVersion | None,
+        browser_version: FirefoxVersion | None,
+    ) -> None:
+        """Validate a resolved GeckoDriver and Firefox version pair.
 
         Args:
-            version: Version object or version selector for this operation.
+            driver_version: Resolved GeckoDriver version, or None when unavailable.
+            browser_version: Detected Firefox version, or None when unavailable.
+        """
+        self._validate_gecko_pair(driver_version, browser_version)
+
+    # Version Utils -----------------------------------------------------------------------
+    def _parse_driver_version(self, version: Any) -> GeckoVersion:
+        """Parse GeckoDriver metadata into a comparable three-component version.
+
+        Args:
+            version: Vendor response text, cached version, or GeckoVersion instance.
 
         Returns:
-            A new GeckoVersion instance constructed from the current values.
+            Parsed GeckoVersion preserving the available components.
         """
         try:
             return GeckoVersion(version)
@@ -2826,13 +2928,13 @@ class FirefoxDriverManager(DriverManager):
             self._raise_invalid_driver_version_error(version)
 
     def _parse_browser_version(self, version: Any) -> FirefoxVersion:
-        """Parse the browser version.
+        """Parse Firefox probe output into a comparable browser version.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Browser probe text, result text, or FirefoxVersion instance.
 
         Returns:
-            A new FirefoxVersion instance constructed from the current values.
+            Parsed FirefoxVersion preserving the available components.
         """
         try:
             return FirefoxVersion(version)
@@ -2844,21 +2946,21 @@ class FirefoxDriverManager(DriverManager):
         """Raise an unavailable driver error.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: GeckoDriver version rejected by support or platform constraints.
 
         Raises:
             errors.InvalidDriverVersionError: Always raised with the supplied diagnostic context.
         """
         if version < self._GECKODRIVER_MIN_VERSION:
             raise errors.InvalidDriverVersionError(
-                "<{}>\nGeokodriver version below '{}' is not supported "
+                "<{}>\nGeckoDriver version below '{}' is not supported "
                 "by the manager. Target version: '{}'".format(
                     self.__class__.__name__, self._GECKODRIVER_MIN_VERSION, version
                 )
             )
         else:
             raise errors.InvalidDriverVersionError(
-                "<{}>\nGeokodriver version '{}' is not available for {} ({}{}{}).".format(
+                "<{}>\nGeckoDriver version '{}' is not available for {} ({}{}{}).".format(
                     self.__class__.__name__,
                     version,
                     self._name,
@@ -2872,7 +2974,7 @@ class FirefoxDriverManager(DriverManager):
         """Raise a failed to find compatible driver error.
 
         Args:
-            version: Version object or version selector for this operation.
+            version: Firefox version with no supported compatible GeckoDriver.
 
         Raises:
             errors.InvalidBrowserVersionError: Always raised with the supplied diagnostic context.
@@ -2903,49 +3005,29 @@ class FirefoxDriverManager(DriverManager):
             )
 
 
-class SafariDriverManager(DriverManager):
-    """Represent the webdriver manager for the Safari."""
+class SafariDriverManager(DriverManager[SafariVersion, SafariVersion]):
+    """Discover Safari and its operating-system-managed SafariDriver executable."""
 
     # fmt: off
     _MAC_BINARY_PATHS: dict[str, list[str]] = {
         ChannelType.STABLE: ["Safari.app/Contents/MacOS/Safari"],
         ChannelType.DEV: ["Safari Technology Preview.app/Contents/MacOS/Safari Technology Preview"],
     }
-    """The partial paths to the browser binary on MacOS."""
+    """Application-relative executables for Safari and Safari Technology Preview."""
     _MAC_DRIVER_DEFAULT_PATH: Path = Path("/usr/bin/safaridriver")
-    """The default path to the webdriver executable on MacOS."""
+    """System SafariDriver path used for the stable browser channel."""
     _DRIVER_EXECUTABLE_NAME: str = "safaridriver"
-    """The name of the webdriver executable."""
+    """Executable name searched inside a selected Safari application bundle."""
     # fmt: on
 
-    def __init__(
-        self,
-        directory: PathInput | None = None,
-        max_cache_size: int | None = None,
-        request_timeout: int | float = 10,
-        download_timeout: int | float = 300,
-        proxy: str | None = None,
-    ) -> None:
-        """Initialize the instance with the supplied configuration.
+    def __init__(self) -> None:
+        """Initialize Safari's system-managed driver resolver.
 
-        Args:
-            directory: Cache parent directory; None uses the default per-user cache location.
-            max_cache_size: Maximum retained artifact count; None leaves retention unbounded.
-            request_timeout: Positive timeout in seconds for vendor metadata requests.
-            download_timeout: Positive total timeout in seconds for an artifact download.
-            proxy: Explicit provisioning proxy URL, or None for a direct connection.
+        Safari uses the operating system's browser and ``safaridriver`` binaries;
+        it has no managed cache, vendor download, request timeout, or provisioning
+        proxy configuration.
         """
-        super().__init__(
-            "Safari",
-            None,
-            None,
-            None,
-            directory,
-            max_cache_size,
-            request_timeout,
-            download_timeout,
-            proxy,
-        )
+        super().__init__("Safari", None, None, None)
         # Target
         self._target_driver: Path | None = None
 
@@ -2953,11 +3035,11 @@ class SafariDriverManager(DriverManager):
     @isolated_install
     async def install(
         self,
-        channel: SafariVersion | Literal["stable", "dev"] = "stable",
+        channel: Literal["stable", "dev"] = "stable",
         driver: PathInput | None = None,
         binary: PathInput | None = None,
-    ) -> str:
-        """Install a webdriver.
+    ) -> Path:
+        """Resolve the system Safari WebDriver executable.
 
         Args:
             channel: Defaults to `'stable'`. Accepts the following values:
@@ -2973,7 +3055,7 @@ class SafariDriverManager(DriverManager):
                 the webdriver executable.
 
         Returns:
-            The path to the webdriver executable.
+            Absolute path to the Safari WebDriver executable.
 
         Example:
             >>> from aselenium import SafariDriverManager
@@ -3008,7 +3090,7 @@ class SafariDriverManager(DriverManager):
                 if self._target_binary is None
                 else self._target_binary
             )
-            self._browser_location = str(browser_location)
+            self._browser_location = browser_location
 
             # Detect browser version
             self._browser_version = await run_blocking(
@@ -3021,7 +3103,7 @@ class SafariDriverManager(DriverManager):
                 if self._target_driver is None
                 else self._target_driver
             )
-            self._driver_location = str(driver_location)
+            self._driver_location = driver_location
             self._driver_version = self._browser_version
 
             # Return driver location
@@ -3033,10 +3115,10 @@ class SafariDriverManager(DriverManager):
 
     # Target ------------------------------------------------------------------------------
     def _parse_target_driver(self, driver: PathInput | None) -> None:
-        """Parse the target webdriver executable for the installation.
+        """Validate and retain an explicit SafariDriver executable override.
 
         Args:
-            driver: Driver object or downloaded driver artifact required by this operation.
+            driver: Existing SafariDriver path, or None to use bundle/system discovery.
         """
         if driver is None:
             self._target_driver = None
@@ -3052,15 +3134,15 @@ class SafariDriverManager(DriverManager):
     # Driver ------------------------------------------------------------------------------
     @property
     def driver_version(self) -> SafariVersion:
-        """Return the version of the installed webdriver. Please access this attribute after executing the `install()` method.
+        """Return the SafariDriver version published by the last installation.
 
         Returns:
-            The version of the installed webdriver. please access this attribute after executing the `install()` method.
+            Safari browser version associated with the system-managed driver.
         """
         return super().driver_version
 
     def _detect_driver_location(self, browser_location: Path) -> Path:
-        """Detect the driver location.
+        """Locate SafariDriver beside the app executable or at the system path.
 
         Args:
             browser_location: Validated Safari executable path.
@@ -3097,30 +3179,30 @@ class SafariDriverManager(DriverManager):
     # Browser -----------------------------------------------------------------------------
     @property
     def browser_version(self) -> SafariVersion:
-        """Return the version of the browser that pairs with the installed driver. Please access this attribute after executing the `install()` method.
+        """Return the Safari version published by the last installation.
 
         Returns:
-            The version of the browser that pairs with the installed driver. please access this attribute after executing the `install()` method.
+            Parsed version of Safari or Safari Technology Preview.
         """
         return super().browser_version
 
     def _detect_browser_version(self, browser_location: Path) -> SafariVersion:
-        """Detect the browser version.
+        """Read Safari's bundle metadata and parse its short version string.
 
         Args:
             browser_location: Validated Safari executable path used for the probe.
 
         Returns:
-            A new SafariVersion instance constructed from the current values.
+            SafariVersion from ``version.plist`` or the bundle's ``Info.plist``.
         """
         try:
             # Application folder
             content_dir = browser_location.parent.parent
             # Load plist file
             try:
-                plist = load_plist_file(content_dir / "version.plist")
+                plist = _load_plist_file(content_dir / "version.plist")
             except FileNotFoundError:
-                plist = load_plist_file(content_dir / "Info.plist")
+                plist = _load_plist_file(content_dir / "Info.plist")
             # Return version
             return SafariVersion(plist["CFBundleShortVersionString"])
 

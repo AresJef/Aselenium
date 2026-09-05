@@ -178,7 +178,7 @@ def test_safari_version_discovery_reads_real_synthetic_plist(
     (contents / plist_name).write_bytes(
         plistlib.dumps({"CFBundleShortVersionString": "17.4.1"}, fmt=plist_format)
     )
-    manager = drivers.SafariDriverManager(directory=str(tmp_path))
+    manager = drivers.SafariDriverManager()
 
     assert manager._detect_browser_version(executable).version == "17.4.1"
 
@@ -197,8 +197,8 @@ def test_safari_driver_discovery_finds_executable_beside_browser(
     driver = folder / "safaridriver"
     browser.write_bytes(b"synthetic browser")
     driver.write_bytes(b"synthetic driver")
-    manager = drivers.SafariDriverManager(directory=str(tmp_path))
+    manager = drivers.SafariDriverManager()
     manager._channel = "dev"
-    manager._browser_location = str(browser)
+    manager._browser_location = browser
 
     assert manager._detect_driver_location(browser) == driver

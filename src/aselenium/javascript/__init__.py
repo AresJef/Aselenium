@@ -15,9 +15,12 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
+"""Browser-side scripts for DOM lookup, geometry, scrolling, and form actions.
 
-"""Public exports for the aselenium.javascript package."""
+Each snippet is sent through WebDriver's script endpoint. Positional
+``arguments`` references therefore correspond to values supplied by the Python
+session or element method that selects the snippet.
+"""
 
 __all__ = [
     "GET_PAGE_VIEWPORT",
@@ -98,9 +101,9 @@ ELEMENT_IS_VALID: str = "return !!arguments[0];"
 ELEMENT_SCROLL_INTO_VIEW: str = "arguments[0].scrollIntoView(true);"
 ELEMENT_SUBMIT_FORM: str = """
 var form = arguments[0];
-while (form.nodeName != "FORM" && form.parentNode) { form = form.parentNode; }
-if (!form) { throw Error('Unable to find containing form element'); }
+while (form.nodeName !== "FORM" && form.parentNode) { form = form.parentNode; }
+if (form.nodeName !== "FORM") { throw Error('Unable to find containing form element'); }
 if (!form.ownerDocument) { throw Error('Unable to find owning document'); }
 var e = form.ownerDocument.createEvent('Event');
 e.initEvent('submit', true, true);
-if (form.dispatchEvent(e)) { HTMLFormElement.prototype.submit.call(form) }"""
+if (form.dispatchEvent(e)) { HTMLFormElement.prototype.submit.call(form); }"""

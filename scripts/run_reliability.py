@@ -28,7 +28,7 @@ RECOVERY_FAILURES = {
     "ConnectionClosedError",
     "InvalidSessionError",
     "UnknownError",
-    "WindowNotFountError",
+    "WindowNotFoundError",
 }
 RECOVERY_COMMAND_TIMEOUT = 5
 MANAGER_PROXY_CASES = {

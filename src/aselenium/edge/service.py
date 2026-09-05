@@ -15,8 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# -*- coding: UTF-8 -*-
-"""Aselenium service implementation and supporting types."""
+"""Microsoft Edge WebDriver service specialization."""
 
 from aselenium.service import ChromiumBaseService
 
@@ -25,4 +24,4 @@ __all__ = ["EdgeService"]
 
 # Edge Service ------------------------------------------------------------------------------------
 class EdgeService(ChromiumBaseService):
-    """Edge Service."""
+    """Launch and supervise a Microsoft Edge WebDriver process."""

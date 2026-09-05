@@ -52,6 +52,50 @@ def device_actions(chain: Actions, device: str) -> list[dict[str, Any]]:
     return chain.actions[device].get("actions", [])
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("value", [None, 1, False, [], {}])
+async def test_alert_text_rejects_non_string_response(
+    input_session: Session, value: Any
+) -> None:
+    """Reject malformed alert text while preserving empty text as valid.
+
+    Args:
+        input_session: Synthetic session with a recording command boundary.
+        value: Malformed alert text returned by the driver.
+    """
+    input_session.execute_command.return_value = {"value": value}
+
+    with pytest.raises(errors.InvalidResponseError):
+        await Alert(input_session).text
+
+
+@pytest.mark.asyncio
+async def test_alert_text_accepts_empty_string(input_session: Session) -> None:
+    """Preserve an empty but valid JavaScript-dialog message.
+
+    Args:
+        input_session: Synthetic session with a recording command boundary.
+    """
+    input_session.execute_command.return_value = {"value": ""}
+
+    assert await Alert(input_session).text == ""
+
+
+@pytest.mark.asyncio
+async def test_unknown_method_participates_in_unsupported_fallbacks(
+    input_session: Session,
+) -> None:
+    """Treat the W3C unknown-method classification as an unsupported operation.
+
+    Args:
+        input_session: Synthetic session with a recording command boundary.
+    """
+    assert issubclass(errors.UnknownMethodError, errors.InvalidMethodError)
+    input_session.execute_command.side_effect = errors.UnknownMethodError("unsupported")
+
+    assert await Alert(input_session).text is None
+
+
 @pytest.mark.parametrize("pointer", ["mouse", "pen", "touch"])
 def test_pointer_origins_and_default_duration(
     input_session: Session, pointer: str
@@ -349,7 +393,7 @@ async def test_alert_text_absence_malformed_and_protocol_errors(
 async def test_alert_pause_none_invalid_and_cancellation(
     input_session: Session, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Avoid sleeping for None, wrap ordinary sleep failures, and preserve cancellation.
+    """Avoid sleeping for invalid delays and preserve cooperative cancellation.
 
     Args:
         input_session: Session owning the alert.
@@ -360,11 +404,9 @@ async def test_alert_pause_none_invalid_and_cancellation(
     alert = Alert(input_session)
     await alert.pause(None)
     sleep.assert_not_awaited()
-    cause = TypeError("invalid duration")
-    sleep.side_effect = cause
-    with pytest.raises(errors.InvalidArgumentError) as caught:
+    with pytest.raises(errors.InvalidArgumentError):
         await alert.pause("bad")
-    assert caught.value.__cause__ is cause
+    sleep.assert_not_awaited()
     sleep.side_effect = asyncio.CancelledError
     with pytest.raises(asyncio.CancelledError):
         await alert.pause(1)

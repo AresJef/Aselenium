@@ -9,7 +9,7 @@ description = "Asynchronous web browser automation for Python."
 readme = "README.md"
 requires-python = ">=3.10"
 license = "Apache-2.0"
-license-files = ["LICENSE"]
+license-files = ["LICENSE", "NOTICE"]
 authors = [{name = "Jiefu Chen", email = "keppa1991@163.com"}]
 keywords = ["async", "asynchronous", "automation", "arsenic", "selenium"]
 classifiers = [
@@ -41,7 +41,7 @@ aselenium = ["py.typed"]
 "aselenium.manager" = ["geckodriver/compatibility.json"]
 
 [tool.ruff.lint]
-select = ["E9", "F", "I", "D", "ANN"]
+select = ["E9", "F", "I", "D", "ANN", "ASYNC"]
 # Protocol payloads, JavaScript values, extensible service kwargs, and test doubles
 # legitimately contain Any; missing annotations are still rejected.
 ignore = ["ANN401"]
@@ -49,12 +49,19 @@ ignore = ["ANN401"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.per-file-ignores]
+# Async tests intentionally use tiny polling loops and direct temporary-path
+# operations to exercise race windows; production and operational code do not.
+"tests/**/*.py" = ["ASYNC110", "ASYNC240"]
+
 [tool.mypy]
 python_version = "3.10"
-files = ["src/aselenium/_async.py", "src/aselenium/_wait.py", "src/aselenium/_paths.py", "src/aselenium/_profiles.py", "src/aselenium/_output.py", "src/aselenium/valuewrap.py", "src/aselenium/manager/_cache.py", "src/aselenium/manager/_http.py", "src/aselenium/manager/_installation.py", "src/aselenium/manager/_filesystem.py", "src/aselenium/manager/version.py", "src/aselenium/firefox/utils.py", "src/aselenium/connection.py", "src/aselenium/errors.py", "src/aselenium/webdriver.py", "src/aselenium/actions.py", "src/aselenium/alert.py", "src/aselenium/utils.py", "src/aselenium/manager/file.py", "src/aselenium/element.py"]
+files = ["src", "scripts"]
+mypy_path = "src"
 follow_imports = "silent"
 ignore_missing_imports = true
 check_untyped_defs = true
+explicit_package_bases = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from base64 import b64decode
 from collections.abc import Iterator
+from contextlib import nullcontext
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
@@ -450,8 +451,10 @@ async def test_safari_permission_validation_precedes_any_wire_request(
     """
     options = SafariOptions()
     session = SafariSession(options, SimpleNamespace())
+    session._base_url = "/session/safari-permission-test"
     session._conn = SimpleNamespace(
-        execute=AsyncMock(return_value={"value": {"permissions": {}}})
+        execute=AsyncMock(return_value={"value": {"permissions": {}}}),
+        transaction=nullcontext,
     )
     with pytest.raises(errors.InvalidPermissionStateError):
         await session.set_permission("getUserMedia", invalid)

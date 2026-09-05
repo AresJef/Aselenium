@@ -14,7 +14,7 @@ import platform
 import tempfile
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, TypeVar
 from urllib.parse import quote
 
 from aselenium import Chrome, Edge
@@ -28,6 +28,42 @@ HTML = """<!doctype html><title>Aselenium local fixture</title>
 <div id='covered' style='position:fixed;left:400px;top:50px;width:100px;height:40px'>covered</div>
 <div id='overlay' style='position:fixed;left:400px;top:50px;width:100px;height:40px;background:white'>overlay</div>
 <script>document.querySelector('#host').attachShadow({mode:'open'}).innerHTML='<span id="shadow">shadow</span>';</script>"""
+T = TypeVar("T")
+
+
+def require(condition: bool, label: str) -> None:
+    """Fail explicitly when an acceptance condition is false.
+
+    Unlike an ``assert`` statement, this check remains active when Python runs
+    with optimization enabled.
+
+    Args:
+        condition: Evaluated acceptance condition.
+        label: Short description included in the failure.
+
+    Raises:
+        AssertionError: The condition is false.
+    """
+    if not condition:
+        raise AssertionError(f"Smoke-test condition failed: {label}")
+
+
+def require_value(value: T | None, label: str) -> T:
+    """Return a required smoke-test value or fail with useful context.
+
+    Args:
+        value: Optional value returned by a public lookup API.
+        label: Short description included in the assertion failure.
+
+    Returns:
+        The non-None value.
+
+    Raises:
+        AssertionError: The required value is None.
+    """
+    if value is None:
+        raise AssertionError(f"Missing required smoke-test value: {label}")
+    return value
 
 
 async def smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
@@ -57,51 +93,80 @@ async def smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
         async with facade.acquire(selector, binary=args.binary) as session:
             provisioned = time.monotonic()
             await session.load("data:text/html;charset=utf-8," + quote(HTML))
-            assert await session.title == "Aselenium local fixture"
+            require(await session.title == "Aselenium local fixture", "fixture title")
             await session.set_timeouts(implicit=0)
-            hidden = await session.find_element("#hidden")
-            assert await hidden.dom_text == "hidden text"
+            hidden = require_value(await session.find_element("#hidden"), "#hidden")
+            require(await hidden.dom_text == "hidden text", "hidden DOM text")
             for selector_id in ("#hidden", "#zero", "#offscreen"):
-                target = await session.find_element(selector_id)
-                assert not await target.in_viewport
-                assert not await target.unobscured
-            covered = await session.find_element("#covered")
-            assert await covered.in_viewport
-            assert not await covered.unobscured
-            host = await session.find_element("#host")
-            shadow_target = await (await host.shadow).find_element("#shadow")
-            assert await shadow_target.unobscured
-            assert await session.save_screenshot(root / "capture.png")
-            assert (root / "capture.png").read_bytes().startswith(b"\x89PNG")
-            assert await session.save_page(root / "page.pdf")
-            assert (root / "page.pdf").read_bytes().startswith(b"%PDF")
-            element = await session.find_1st_element("#missing", "#input")
-            assert element is not None
+                target = require_value(
+                    await session.find_element(selector_id), selector_id
+                )
+                require(not await target.in_viewport, selector_id + " viewport state")
+                require(not await target.unobscured, selector_id + " hit-test state")
+            covered = require_value(await session.find_element("#covered"), "#covered")
+            require(await covered.in_viewport, "covered element viewport state")
+            require(not await covered.unobscured, "covered element hit-test state")
+            host = require_value(await session.find_element("#host"), "#host")
+            shadow = require_value(await host.shadow, "#host shadow root")
+            shadow_target = require_value(
+                await shadow.find_element("#shadow"), "#shadow"
+            )
+            require(await shadow_target.unobscured, "shadow element hit-test state")
+            require(
+                await session.save_screenshot(root / "capture.png"),
+                "screenshot save",
+            )
+            require(
+                (root / "capture.png").read_bytes().startswith(b"\x89PNG"),
+                "screenshot signature",
+            )
+            require(await session.save_page(root / "page.pdf"), "PDF save")
+            require(
+                (root / "page.pdf").read_bytes().startswith(b"%PDF"),
+                "PDF signature",
+            )
+            element = require_value(
+                await session.find_1st_element("#missing", "#input"), "#input"
+            )
             await element.send("local fixture")
             await element.click()
             await session.actions().send_keys("-actions").perform()
-            assert await element.get_property("value") == "local fixture-actions"
-            button = await session.find_element("#button")
+            require(
+                await element.get_property("value") == "local fixture-actions",
+                "action input value",
+            )
+            button = require_value(await session.find_element("#button"), "#button")
             await button.click()
-            assert await button.text == "clicked"
-            host = await session.find_element("#host")
-            shadow = await host.shadow
-            assert await (await shadow.find_element("#shadow")).text == "shadow"
-            assert await session.switch_frame("#frame", timeout=2)
-            assert await (await session.find_element("#inside")).text == "frame"
-            assert await session.default_frame()
-            assert (await session.take_screenshot()).startswith(b"\x89PNG")
+            require(await button.text == "clicked", "button click")
+            host = require_value(await session.find_element("#host"), "#host")
+            shadow = require_value(await host.shadow, "#host shadow root")
+            shadow_target = require_value(
+                await shadow.find_element("#shadow"), "#shadow"
+            )
+            require(await shadow_target.text == "shadow", "shadow text")
+            require(await session.switch_frame("#frame", timeout=2), "frame switch")
+            inside = require_value(await session.find_element("#inside"), "#inside")
+            require(await inside.text == "frame", "frame text")
+            require(await session.default_frame(), "default-frame restoration")
+            require(
+                (await session.take_screenshot()).startswith(b"\x89PNG"),
+                "in-memory screenshot signature",
+            )
             async with session.transaction():
-                assert (
-                    await session.wait_for(lambda: button.text, timeout=1) == "clicked"
+                require(
+                    await session.wait_for(lambda: button.text, timeout=1) == "clicked",
+                    "transaction wait result",
                 )
-            original = await session.active_window
+            original = require_value(await session.active_window, "active window")
             await session.new_window("extra")
             await session.load("data:text/html,<title>Extra local window</title>")
-            assert await session.title == "Extra local window"
+            require(await session.title == "Extra local window", "new-window title")
             await session.close_window(switch_to=original)
             await session.switch_window(original)
-            assert await session.title == "Aselenium local fixture"
+            require(
+                await session.title == "Aselenium local fixture",
+                "original-window title",
+            )
             timings.append(
                 dict(
                     mode=selector,
@@ -110,19 +175,18 @@ async def smoke(args: argparse.Namespace, root: Path) -> dict[str, Any]:
                 )
             )
         timings[-1]["including_teardown_seconds"] = time.monotonic() - started
-    result = facade.manager.last_result
+    result = require_value(facade.manager.last_result, "installation result")
+    driver_version = require_value(result.driver_version, "driver version")
     identity = await asyncio.to_thread(
-        facade.manager._read_from_cmd, [result.driver_location, "--version"]
+        facade.manager._read_from_cmd, [str(result.driver_location), "--version"]
     )
-    assert result.driver_version in identity
+    require(driver_version in identity, "driver executable identity")
     return dict(
         browser=args.browser,
         browser_version=result.browser_version,
-        driver_version=result.driver_version,
+        driver_version=driver_version,
         driver_identity=identity.strip(),
-        driver_sha256=hashlib.sha256(
-            Path(result.driver_location).read_bytes()
-        ).hexdigest(),
+        driver_sha256=hashlib.sha256(result.driver_location.read_bytes()).hexdigest(),
         python=platform.python_version(),
         platform=platform.platform(),
         machine=platform.machine(),

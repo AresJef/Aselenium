@@ -15,12 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-# /usr/bin/python
-# -*- coding: UTF-8 -*-
-
-# Chromium Based --------------------------------------------------------------------------------------------
-# fmt: off
-# Common ----------------------------------------------------------------------------------------------------
 """Public exports for the aselenium package."""
 
 from aselenium.actions import Actions
@@ -38,8 +32,10 @@ from aselenium.element import Element, ElementRect
 from aselenium.errors import (
     AlertError,
     AlertNotFoundError,
+    AseleniumDirectoryNotFoundError,
     AseleniumError,
     AseleniumFileNotFoundError,
+    AseleniumInvalidPathError,
     AseleniumInvalidValueError,
     AseleniumOSError,
     AseleniumTimeout,
@@ -52,6 +48,7 @@ from aselenium.errors import (
     ConnectionClosedError,
     CookieError,
     CookieNotFoundError,
+    DetachedShadowRootError,
     DevToolsCMDError,
     DevToolsCMDNotFoundError,
     DriverDownloadFailedError,
@@ -70,7 +67,7 @@ from aselenium.errors import (
     FileDownloadTimeoutError,
     FrameError,
     FrameNotFoundError,
-    IncompatibleWebdriverError,
+    IncompatibleWebDriverError,
     InsecureCertificateError,
     InternetDisconnectedError,
     InvalidArgumentError,
@@ -128,13 +125,14 @@ from aselenium.errors import (
     UnknownMethodError,
     UnsupportedPlatformError,
     WebDriverError,
-    WebdriverNotFoundError,
+    WebDriverNotFoundError,
     WebDriverTimeoutError,
     WindowError,
-    WindowNotFountError,
+    WindowNotFoundError,
 )
 from aselenium.firefox import (
     Firefox,
+    FirefoxAddon,
     FirefoxOptions,
     FirefoxProfile,
     FirefoxService,
@@ -148,6 +146,8 @@ from aselenium.manager import (
     FirefoxDriverManager,
     FirefoxVersion,
     GeckoVersion,
+    InstallationRequest,
+    InstallationResult,
     SafariDriverManager,
     SafariVersion,
 )
@@ -168,72 +168,169 @@ from aselenium.shadow import Shadow
 from aselenium.utils import KeyboardKeys, MouseButtons
 from aselenium.webdriver import WebDriver
 
-# Exceptions ------------------------------------------------------------------------------------------------
-# fmt: on
-# . base
-# . platform
-# . driver manager
-# . options
-# . service
-# . webdriver
-
-# Gecko Based -----------------------------------------------------------------------------------------------
-# . Firefox
-
-# . Chrome
-# . Chromium
-# . Edge
-# Safari ----------------------------------------------------------------------------------------------------
-
-# All -------------------------------------------------------------------------------------------------------
-# fmt: off
 __all__ = [
     # Chromium Based
-    "ChromiumVersion", "ChromiumProfile",
-    "ChromeDriverManager", "Chrome", "ChromeOptions", "ChromeService", "ChromeSession",
-    "ChromiumDriverManager", "Chromium", "ChromiumOptions", "ChromiumService", "ChromiumSession",
-    "EdgeDriverManager", "Edge", "EdgeOptions", "EdgeService", "EdgeSession",
+    "ChromiumVersion",
+    "ChromiumProfile",
+    "ChromeDriverManager",
+    "Chrome",
+    "ChromeOptions",
+    "ChromeService",
+    "ChromeSession",
+    "ChromiumDriverManager",
+    "Chromium",
+    "ChromiumOptions",
+    "ChromiumService",
+    "ChromiumSession",
+    "EdgeDriverManager",
+    "Edge",
+    "EdgeOptions",
+    "EdgeService",
+    "EdgeSession",
     # Gecko Based
-    "FirefoxProfile", "FirefoxDriverManager", "GeckoVersion", "FirefoxVersion",
-    "Firefox", "FirefoxOptions", "FirefoxService", "FirefoxSession",
+    "FirefoxProfile",
+    "FirefoxAddon",
+    "FirefoxDriverManager",
+    "GeckoVersion",
+    "FirefoxVersion",
+    "Firefox",
+    "FirefoxOptions",
+    "FirefoxService",
+    "FirefoxSession",
     # Safari
-    "SafariDriverManager", "SafariVersion", "Safari", "SafariOptions", "SafariService", "SafariSession",
+    "SafariDriverManager",
+    "SafariVersion",
+    "Safari",
+    "SafariOptions",
+    "SafariService",
+    "SafariSession",
     # Common
-    "Actions", "Alert", "Connection", "Element", "ElementRect", "Proxy", "Timeouts", "Session", "Cookie", "DevToolsCMD", 
-    "JavaScript", "Network", "Permission", "Viewport", "Window", "WindowRect", "Shadow", "KeyboardKeys", "MouseButtons", "WebDriver",
+    "Actions",
+    "Alert",
+    "Connection",
+    "Element",
+    "ElementRect",
+    "Proxy",
+    "Timeouts",
+    "Session",
+    "Cookie",
+    "DevToolsCMD",
+    "JavaScript",
+    "Network",
+    "Permission",
+    "Viewport",
+    "Window",
+    "WindowRect",
+    "Shadow",
+    "KeyboardKeys",
+    "MouseButtons",
+    "WebDriver",
+    "InstallationRequest",
+    "InstallationResult",
     # Exceptions
     # . base
-    "AseleniumError", "AseleniumTimeout", "AseleniumFileNotFoundError", "AseleniumInvalidValueError", "AseleniumOSError",
+    "AseleniumError",
+    "AseleniumTimeout",
+    "AseleniumInvalidPathError",
+    "AseleniumDirectoryNotFoundError",
+    "AseleniumFileNotFoundError",
+    "AseleniumInvalidValueError",
+    "AseleniumOSError",
     # . platform
-    "PlatformError", "UnsupportedPlatformError",
+    "PlatformError",
+    "UnsupportedPlatformError",
     # . driver manager
-    "DriverManagerError", "DriverManagerTimeoutError", "DriverInstallationError", "DriverExecutableNotDetectedError",
-    "DriverRequestFailedError", "DriverRequestTimeoutError", "DriverRequestRateLimitError", "DriverDownloadFailedError",
-    "InvalidVersionError", "InvalidDriverVersionError", "InvalidBrowserVersionError", "BrowserBinaryNotDetectedError", 
-    "BrowserDownloadFailedError", "FileDownloadTimeoutError", "InvalidDownloadFileError", 
+    "DriverManagerError",
+    "DriverManagerTimeoutError",
+    "DriverInstallationError",
+    "DriverExecutableNotDetectedError",
+    "DriverRequestFailedError",
+    "DriverRequestTimeoutError",
+    "DriverRequestRateLimitError",
+    "DriverDownloadFailedError",
+    "InvalidVersionError",
+    "InvalidDriverVersionError",
+    "InvalidBrowserVersionError",
+    "BrowserBinaryNotDetectedError",
+    "BrowserDownloadFailedError",
+    "FileDownloadTimeoutError",
+    "InvalidDownloadFileError",
     # . options
-    "OptionsError", "InvalidOptionsError", "InvalidProxyError", "InvalidProfileError", "OptionsNotSetError",
+    "OptionsError",
+    "InvalidOptionsError",
+    "InvalidProxyError",
+    "InvalidProfileError",
+    "OptionsNotSetError",
     # . service
-    "ServiceError", "ServiceExecutableNotFoundError", "ServiceStartError", "ServiceStopError",
-    "ServiceSocketError", "ServiceProcessError", "ServiceTimeoutError",
+    "ServiceError",
+    "ServiceExecutableNotFoundError",
+    "ServiceStartError",
+    "ServiceStopError",
+    "ServiceSocketError",
+    "ServiceProcessError",
+    "ServiceTimeoutError",
     # . webdriver
-    "WebDriverError", "WebDriverTimeoutError", "WebdriverNotFoundError", "ConnectionClosedError", "InternetDisconnectedError",
-    "InvalidValueError", "InvalidArgumentError", "InvalidMethodError", "InvalidRectValueError",
-    "InvalidResponseError", "InvalidExtensionError", "UnknownMethodError", "SessionError",
-    "SessionClientError", "InvalidSessionError", "IncompatibleWebdriverError", "SessionDataError",
-    "SessionTimeoutError", "SessionShutdownError", "SessionQuitError", "WindowError", "ChangeWindowStateError",
-    "WindowNotFountError", "CookieError", "UnableToSetCookieError", "InvalidCookieDomainError",
-    "CookieNotFoundError", "JavaScriptError", "InvalidJavaScriptError", "JavaScriptNotFoundError",
-    "JavaScriptTimeoutError", "ElementError", "InvalidElementStateError",
-    "ElementNotInteractableError", "ElementClickInterceptedError",
-    "ElementNotFoundError", "ElementStaleReferenceError", "FrameError",
-    "FrameNotFoundError", "ShadowRootError", "ShadowRootNotFoundError", "SelectorError",
-    "InvalidSelectorError", "InvalidXPathSelectorError", "NetworkConditionsError",
-    "NetworkConditionsNotFoundError", "BrowserPermissionError", "InvalidPermissionNameError",
-    "InvalidPermissionStateError", "AlertError", "UnexpectedAlertFoundError", "AlertNotFoundError",
+    "WebDriverError",
+    "WebDriverTimeoutError",
+    "WebDriverNotFoundError",
+    "ConnectionClosedError",
+    "InternetDisconnectedError",
+    "InvalidValueError",
+    "InvalidArgumentError",
+    "InvalidMethodError",
+    "InvalidRectValueError",
+    "InvalidResponseError",
+    "InvalidExtensionError",
+    "UnknownMethodError",
+    "SessionError",
+    "SessionClientError",
+    "InvalidSessionError",
+    "IncompatibleWebDriverError",
+    "SessionDataError",
+    "SessionTimeoutError",
+    "SessionShutdownError",
+    "SessionQuitError",
+    "WindowError",
+    "ChangeWindowStateError",
+    "WindowNotFoundError",
+    "CookieError",
+    "UnableToSetCookieError",
+    "InvalidCookieDomainError",
+    "CookieNotFoundError",
+    "JavaScriptError",
+    "InvalidJavaScriptError",
+    "JavaScriptNotFoundError",
+    "JavaScriptTimeoutError",
+    "ElementError",
+    "InvalidElementStateError",
+    "ElementNotInteractableError",
+    "ElementClickInterceptedError",
+    "ElementNotFoundError",
+    "ElementStaleReferenceError",
+    "FrameError",
+    "FrameNotFoundError",
+    "ShadowRootError",
+    "ShadowRootNotFoundError",
+    "DetachedShadowRootError",
+    "SelectorError",
+    "InvalidSelectorError",
+    "InvalidXPathSelectorError",
+    "NetworkConditionsError",
+    "NetworkConditionsNotFoundError",
+    "BrowserPermissionError",
+    "InvalidPermissionNameError",
+    "InvalidPermissionStateError",
+    "AlertError",
+    "UnexpectedAlertFoundError",
+    "AlertNotFoundError",
     "CastingError",
-    "CastSinkNotFoundError", "DevToolsCMDError", "DevToolsCMDNotFoundError", "ScreenshotError",
-    "MoveTargetOutOfBoundsError", "InsecureCertificateError", "InvalidCoordinatesError",
-    "UnknownError", "UnknownCommandError",
+    "CastSinkNotFoundError",
+    "DevToolsCMDError",
+    "DevToolsCMDNotFoundError",
+    "ScreenshotError",
+    "MoveTargetOutOfBoundsError",
+    "InsecureCertificateError",
+    "InvalidCoordinatesError",
+    "UnknownError",
+    "UnknownCommandError",
 ]
-# fmt: on

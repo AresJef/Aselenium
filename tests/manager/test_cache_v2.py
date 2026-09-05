@@ -82,7 +82,7 @@ def install_with_report(base: PathInput, report_directory: Path) -> None:
             if add_note is not None:
                 add_note("Unable to publish child diagnostic: %s" % report_error)
         raise
-    write_child_report(report, "ok", entry["location"])
+    write_child_report(report, "ok", str(entry["location"]))
 
 
 def write_child_report(report: Path, status: str, detail: str) -> None:
@@ -427,6 +427,20 @@ def test_lease_queries_use_artifact_index(tmp_path: Path) -> None:
             "EXPLAIN QUERY PLAN SELECT * FROM leases WHERE key=?", ("fixture",)
         ).fetchall()
     assert any("lease_artifact_lookup" in row[3] for row in plan)
+
+
+def test_lease_requires_the_exact_indexed_executable(tmp_path: Path) -> None:
+    """Do not lease an artifact merely because a path shares its cache-key folder.
+
+    Args:
+        tmp_path: Isolated cache parent directory supplied by pytest.
+    """
+    entry = install(tmp_path)
+    cache = ChromeFileManager(tmp_path).for_platform("linux", "64")
+    unrelated = entry["location"].with_name("unrelated-file")
+    unrelated.write_bytes(b"not the indexed executable")
+
+    assert cache.lease(unrelated) is None
 
 
 @pytest.mark.parametrize("protection", ["pin", "lease"])

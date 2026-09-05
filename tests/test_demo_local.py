@@ -735,3 +735,41 @@ def test_failure_still_writes_unique_report_and_returns_nonzero(
         assert all(entry["status"] == "not-run" for entry in report["sections"])
         assert report["counts"]["not-run"] == len(demo.SECTIONS) + 2
     assert "Report:" in capsys.readouterr().out
+
+
+def test_install_report_serializes_paths_only_at_json_boundary(
+    demo: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Keep installation paths typed until the CLI encodes its JSON output.
+
+    Args:
+        demo: Imported local demonstration module.
+        monkeypatch: Pytest fixture for reversible dependency replacement.
+        tmp_path: Isolated path used as the synthetic installed executable.
+        capsys: Pytest fixture capturing the emitted installation JSON.
+    """
+
+    @dataclass
+    class Result:
+        """Represent the Path-bearing subset of an installation result."""
+
+        driver_location: Path
+        browser_location: Path | None
+
+    result = Result(tmp_path / "chromedriver", tmp_path / "chrome")
+    driver = SimpleNamespace(options=SimpleNamespace(close=Mock()))
+    monkeypatch.setattr(demo, "make_driver", Mock(return_value=driver))
+    monkeypatch.setattr(demo, "provision", AsyncMock(return_value=result))
+
+    assert demo.main(["install"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload == {
+        "driver_location": str(result.driver_location),
+        "browser_location": str(result.browser_location),
+    }
+    driver.options.close.assert_called_once()
+    with pytest.raises(TypeError, match="not JSON serializable"):
+        demo.json_default(object())

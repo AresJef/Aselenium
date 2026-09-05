@@ -1,4 +1,9 @@
-"""Minimal real-world Aselenium navigation example."""
+"""Minimal real-world Aselenium example using Google and managed ChromeDriver.
+
+The example needs Chrome and Internet access. Driver metadata or artifacts may
+be downloaded during provisioning; the acquired browser session then resolves
+from the populated cache without another vendor request.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +13,17 @@ from aselenium import Chrome
 
 
 async def main() -> None:
-    """Provision Chrome, open Google for five seconds, and clean up."""
+    """Provision ChromeDriver, visit Google, and release all owned resources.
+
+    The browser remains open for five seconds after printing the current URL and
+    title. The options-owned temporary data is closed even when provisioning,
+    session creation, navigation, or inspection fails.
+
+    Example:
+        Run the complete real-world example from an asynchronous program:
+
+        >>> await main()  # doctest: +SKIP
+    """
     driver = Chrome()
     driver.options.set_timeouts(implicit=0, pageLoad=20, script=5)
     driver.options.session_timeout = 30

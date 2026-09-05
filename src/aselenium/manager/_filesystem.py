@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import errno
 import os
-import stat
 import unicodedata
 from collections.abc import Callable
 from pathlib import Path, PurePosixPath
@@ -20,6 +19,7 @@ from typing import (
 )
 
 from aselenium import errors
+from aselenium._paths import _stat_is_link
 
 T = TypeVar("T")
 
@@ -31,6 +31,16 @@ MAX_TOTAL_BYTES = 4 * 1024**3
 MAX_PATH_DEPTH = 128
 MAX_LINK_BYTES = 4096
 COPY_CHUNK_BYTES = 1024 * 1024
+_WINDOWS_DEVICE_NAMES = {
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
+    "CONIN$",
+    "CONOUT$",
+    *("COM" + suffix for suffix in "123456789¹²³"),
+    *("LPT" + suffix for suffix in "123456789¹²³"),
+}
 
 
 def filesystem_operation(operation: Callable[[], T], description: str) -> T:
@@ -60,36 +70,6 @@ def filesystem_operation(operation: Callable[[], T], description: str) -> T:
                 ) from cause
             sleep(0.05 * (attempt + 1))
     raise AssertionError("Filesystem retry budget must contain at least one attempt")
-
-
-def is_link(path: Path) -> bool:
-    """Include Windows junctions/reparse points on Python versions before 3.12.
-
-    Args:
-        path: Filesystem path to inspect or operate on.
-
-    Returns:
-        True when the checked condition is satisfied; otherwise False.
-    """
-    try:
-        info = path.lstat()
-    except FileNotFoundError:
-        return False
-    return _stat_is_link(info)
-
-
-def _stat_is_link(info: os.stat_result) -> bool:
-    """Classify symbolic links and Windows reparse points from one stat result.
-
-    Args:
-        info: Result returned by a non-following ``Path.lstat()`` call.
-
-    Returns:
-        True for a symbolic link, junction, or other Windows reparse point.
-    """
-    return stat.S_ISLNK(info.st_mode) or bool(
-        getattr(info, "st_file_attributes", 0) & 0x400
-    )
 
 
 def checked_path(root: Path, value: Path, *, allow_root: bool = False) -> Path:
@@ -179,14 +159,39 @@ def checked_path(root: Path, value: Path, *, allow_root: bool = False) -> Path:
     raise ValueError("Managed path changed while it was validated: %s" % value)
 
 
-def member_path(name: str) -> PurePosixPath:
-    """Normalize portable archive names; reject ambiguous Windows aliases too.
+def _validate_portable_part(part: str, source: str) -> None:
+    """Reject a path component that is unsafe on supported host filesystems.
 
     Args:
-        name: Name identifying the requested item.
+        part: One non-navigation component from an archive path.
+        source: Original archive value included in validation diagnostics.
+
+    Raises:
+        ValueError: The component is a Windows device alias, contains a stream
+            separator or control character, or has an ambiguous trailing suffix.
+    """
+    stem = part.split(".", 1)[0].upper()
+    if (
+        ":" in part
+        or part.endswith((" ", "."))
+        or any(ord(char) < 32 for char in part)
+        or stem in _WINDOWS_DEVICE_NAMES
+    ):
+        raise ValueError("Non-portable archive path: %r" % source)
+
+
+def member_path(name: str) -> PurePosixPath:
+    """Parse a portable, relative archive member name.
+
+    Args:
+        name: Raw POSIX member name from ZIP or TAR metadata.
 
     Returns:
         A normalized portable relative archive path.
+
+    Raises:
+        ValueError: The name is empty, absolute, traverses a parent, exceeds the
+            depth limit, or is unsafe on a supported host filesystem.
     """
     if not isinstance(name, str) or not name or "\\" in name or "\0" in name:
         raise ValueError("Invalid archive member name: %r" % name)
@@ -194,16 +199,55 @@ def member_path(name: str) -> PurePosixPath:
     if path.is_absolute() or ".." in path.parts or len(path.parts) > MAX_PATH_DEPTH:
         raise ValueError("Unsafe archive member path: %r" % name)
     for part in path.parts:
-        stem = part.split(".", 1)[0].upper()
-        if (
-            ":" in part
-            or part.endswith((" ", "."))
-            or any(ord(char) < 32 for char in part)
-            or stem in {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$"}
-            or stem in {"COM" + c for c in "123456789¹²³"}
-            or stem in {"LPT" + c for c in "123456789¹²³"}
-        ):
-            raise ValueError("Non-portable archive member path: %r" % name)
+        _validate_portable_part(part, name)
+    return path
+
+
+def link_path(name: str, origin: PurePosixPath) -> PurePosixPath:
+    """Parse a portable archive link target contained beneath its origin.
+
+    Symbolic-link targets are relative to the link's parent member, while TAR
+    hard-link targets are relative to the archive root. Callers express that
+    distinction through ``origin``. Parent components are retained in the
+    returned path because they are meaningful link metadata, but their lexical
+    application may not escape the archive root.
+
+    Args:
+        name: Raw POSIX link target supplied by the archive.
+        origin: Validated archive-relative directory from which the target is resolved.
+
+    Returns:
+        Validated relative link target as a ``PurePosixPath``.
+
+    Raises:
+        ValueError: The target is empty, absolute, too long or deep, non-portable,
+            or its parent traversal escapes the archive root.
+    """
+    if not isinstance(name, str) or not name or "\\" in name or "\0" in name:
+        raise ValueError("Invalid archive link target: %r" % name)
+    try:
+        encoded_size = len(name.encode("utf-8"))
+    except UnicodeEncodeError as cause:
+        raise ValueError("Invalid archive link target: %r" % name) from cause
+    path = PurePosixPath(name)
+    if (
+        path.is_absolute()
+        or encoded_size > MAX_LINK_BYTES
+        or len(path.parts) > MAX_PATH_DEPTH
+    ):
+        raise ValueError("Unsafe archive link target: %r" % name)
+
+    destination = list(origin.parts)
+    for part in path.parts:
+        if part == "..":
+            if not destination:
+                raise ValueError("Archive link escapes extraction root: %r" % name)
+            destination.pop()
+            continue
+        _validate_portable_part(part, name)
+        destination.append(part)
+    if len(destination) > MAX_PATH_DEPTH:
+        raise ValueError("Archive link target depth limit exceeded: %r" % name)
     return path
 
 
@@ -211,10 +255,14 @@ class ArchiveWriter:
     """Write into a new private extraction directory with finite expansion limits."""
 
     def __init__(self, root: Path) -> None:
-        """Initialize the instance with the supplied configuration.
+        """Create a new private extraction root for validated archive members.
 
         Args:
             root: Absolute private extraction directory that does not yet exist.
+
+        Raises:
+            ValueError: ``root`` is not a safe child of its existing parent.
+            OSError: The private extraction directory cannot be created.
         """
         self.root = root
         checked_path(self.root.parent.resolve(strict=True), self.root)
@@ -224,7 +272,7 @@ class ArchiveWriter:
         self.parent_names: set[str] = set()
         self.count = 0
         self.total = 0
-        self.links: list[tuple[Path, str, str]] = []
+        self.links: list[tuple[Path, PurePosixPath, str]] = []
 
     def add(
         self,
@@ -238,12 +286,18 @@ class ArchiveWriter:
         """Validate and stage one archive member without extracting through links.
 
         Args:
-            name: Name identifying the requested item.
-            kind: Operation or artifact kind selected by the caller.
+            name: Raw POSIX member name from archive metadata.
+            kind: Member type: ``file``, ``dir``, ``symlink``, or ``hardlink``.
             size: Declared member size in bytes.
             mode: Archive permission bits; unsafe write and special bits are discarded.
             source: Binary member stream, or None for entries without streamed file data.
-            link: Relative link target when supplied by archive metadata.
+            link: POSIX link target supplied by archive metadata. Symbolic-link
+                targets are relative to the member's parent; hard-link targets
+                are relative to the archive root.
+
+        Raises:
+            ValueError: The member metadata, expansion, path, type, or link target
+                violates the extraction safety policy.
         """
         self.count += 1
         if self.count > MAX_MEMBERS:
@@ -303,20 +357,10 @@ class ArchiveWriter:
                 if size > MAX_LINK_BYTES:
                     raise ValueError("Archive link target is too long")
                 link = source.read(MAX_LINK_BYTES + 1).decode("utf-8")
-            if (
-                not isinstance(link, str)
-                or not link
-                or len(link.encode("utf-8")) > MAX_LINK_BYTES
-            ):
+            if not isinstance(link, str):
                 raise ValueError("Invalid archive link target")
-            if (
-                "\\" in link
-                or "\0" in link
-                or ":" in link
-                or PurePosixPath(link).is_absolute()
-            ):
-                raise ValueError("Unsafe archive link target: %r" % link)
-            self.links.append((target, link, kind))
+            origin = relative.parent if kind == "symlink" else PurePosixPath()
+            self.links.append((target, link_path(link, origin), kind))
         else:
             raise ValueError("Archive special files are not permitted: %s" % name)
 
@@ -345,7 +389,7 @@ class ArchiveWriter:
             deferred = []
             for target, link, kind in pending:
                 origin = target.parent if kind == "symlink" else self.root
-                source = (origin / link).resolve(strict=False)
+                source = origin.joinpath(*link.parts).resolve(strict=False)
                 source.relative_to(self.root)
                 if source == self.root or source in target.parents:
                     raise ValueError("Archive link points to an ancestor directory")
@@ -357,7 +401,11 @@ class ArchiveWriter:
                         raise ValueError("Hard links must refer to a regular file")
                     os.link(source, target)
                 else:
-                    target.symlink_to(link, target_is_directory=source.is_dir())
+                    # Convert the validated archive path to a native path only at
+                    # the operating-system symlink boundary.
+                    target.symlink_to(
+                        Path(*link.parts), target_is_directory=source.is_dir()
+                    )
             if len(deferred) == len(pending):
                 raise ValueError("Archive contains dangling or cyclic links")
             pending = deferred

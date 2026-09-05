@@ -1,4 +1,3 @@
-# -*- coding: UTF-8 -*-
 """Public exports for the aselenium.chrome package."""
 
 from aselenium.chrome.options import ChromeOptions
